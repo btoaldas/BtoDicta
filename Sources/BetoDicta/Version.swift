@@ -7,7 +7,7 @@ import Foundation
 
 enum Version {
     static let numero = "0.52.0"
-    static let fecha = "2026-08-17"
+    static let fecha = "2026-09-01"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [

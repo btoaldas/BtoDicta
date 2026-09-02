@@ -429,11 +429,16 @@ enum AssemblyAITranscribe {
                 // `speech_model` quedó DEPRECADO: la API responde 400 desde ago-2026 (2 873
                 // fallos en dos días). Ahora va `speech_models`, lista en orden de
                 // preferencia. Alias viejos: best → universal-3-5-pro, nano → universal-2.
+                // Valores que la API acepta HOY: universal-3-5-pro y universal-2. Alias
+                // viejos (catálogo/config guardada) se mapean para no caer en 400.
                 let modelos: [String]
                 switch model {
-                case "", "best": modelos = ["universal-3-5-pro", "universal-2"]
-                case "nano":     modelos = ["universal-2"]
-                default:         modelos = [model, "universal-2"]
+                case "", "best", "universal-3-pro", "universal", "slam-1":
+                    modelos = ["universal-3-5-pro", "universal-2"]
+                case "nano":
+                    modelos = ["universal-2"]
+                default:
+                    modelos = [model, "universal-2"]
                 }
                 cuerpo["speech_models"] = modelos
                 postJSON(url: "https://api.assemblyai.com/v2/transcript",
@@ -747,8 +752,9 @@ enum Failover {
         // Fallo DETERMINISTA reciente (4xx: key/cuota/parámetro deprecado): se salta sin
         // gastar la llamada ni sumar latencia. Ver CuarentenaSTT (avisa una vez).
         if CuarentenaSTT.activa(p.id) {
+            let d = CuarentenaSTT.detalle(p.id)
             intentar(wav: wav, cadena: cadena, idx: idx + 1,
-                     ultimoError: ultimoError ?? ScribeError.ws("\(p.nombre) en cuarentena por un fallo reciente"),
+                     ultimoError: ultimoError ?? ScribeError.http(d?.codigo ?? 0, "\(p.nombre) \(d?.texto ?? "en cuarentena")"),
                      completion: completion)
             return
         }

@@ -31,7 +31,7 @@ enum Providers {
         ("fireworks", "Fireworks (Whisper)", ["whisper-v3", "whisper-v3-turbo"], "FIREWORKS_API_KEY"),
         ("hf", "Hugging Face (Whisper, gratis)", ["openai/whisper-large-v3", "openai/whisper-large-v3-turbo", "distil-whisper/distil-large-v3"], "HF_API_KEY"),
         ("deepgram", "Deepgram (Nova)", ["nova-3", "nova-2", "nova-3-medical"], "DEEPGRAM_API_KEY"),
-        ("assemblyai", "AssemblyAI (Universal)", ["universal-3-pro", "universal-2"], "ASSEMBLYAI_API_KEY"),
+        ("assemblyai", "AssemblyAI (Universal)", ["universal-3-5-pro", "universal-2"], "ASSEMBLYAI_API_KEY"),
         ("soniox", "Soniox (premium, ES latino)", ["stt-async-v5", "stt-async-v4"], "SONIOX_API_KEY"),
         ("azure", "Azure AI Speech (es-EC)", ["azure-fast"], "AZURE_SPEECH_KEY"),
         ("gladia", "Gladia (gratis 10h/mes)", ["default"], "GLADIA_API_KEY"),
@@ -65,7 +65,7 @@ enum Providers {
         Provider(id: "deepgram", nombre: "Deepgram (Nova)", tipo: "nube", activo: false,
                  orden: 108, modelo: "nova-3"),
         Provider(id: "assemblyai", nombre: "AssemblyAI (Universal)", tipo: "nube", activo: false,
-                 orden: 109, modelo: "universal-3-pro"),
+                 orden: 109, modelo: "universal-3-5-pro"),
         // STT de PAGO premium (investigados jul-2026): Soniox = mejor valor +
         // español latino; Azure = único con es-EC (Ecuador).
         Provider(id: "soniox", nombre: "Soniox (ES latino)", tipo: "nube", activo: false,
@@ -140,6 +140,7 @@ enum Providers {
     }
 
     static func save(_ list: [Provider]) {
+        CuarentenaSTT.limpiarTodo()   // cambió la cascada/modelo: lo que fallaba ya puede estar bien
         var ordenados = list
         for i in ordenados.indices { ordenados[i].orden = i }
         if let data = try? JSONEncoder().encode(ordenados) {
@@ -179,6 +180,7 @@ enum ApiKeys {
     }
 
     static func set(_ envName: String, _ value: String) {
+        CuarentenaSTT.limpiarTodo()   // key nueva: el 401/403 anterior ya no aplica
         var lineas = (try? String(contentsOf: envURL, encoding: .utf8))?
             .split(separator: "\n", omittingEmptySubsequences: false).map(String.init) ?? []
         lineas.removeAll { $0.hasPrefix("\(envName)=") }

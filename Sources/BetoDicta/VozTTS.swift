@@ -464,12 +464,18 @@ enum ElevenLabsTTS {
         if let h = sinCreditosHasta, h > Date() { return true }
         return false
     }
-    static func marcarSinCreditos(minutos: Double = 60, motivo: String) {
-        let yaEstaba = sinCreditos
-        sinCreditosHasta = Date().addingTimeInterval(minutos * 60)
-        guard !yaEstaba else { return }
-        Log.log(.ia, "TTS ElevenLabs SIN CRÉDITOS (\(motivo)) → voz de respaldo durante \(Int(minutos)) min")
-        DispatchQueue.main.async { NotificationCenter.default.post(name: .betoTTSSinCreditos, object: nil) }
+    /// `avisar` = mostrar el aviso de "sin créditos" (solo cuota real, no un 429 de
+    /// concurrencia). El estado se muta SIEMPRE en main (mismo hilo que Voz.intentar lo
+    /// lee): sin carreras entre el callback de URLSession y la cascada.
+    static func marcarSinCreditos(minutos: Double = 60, motivo: String, avisar: Bool = true) {
+        let cuerpo = {
+            let yaEstaba = sinCreditos
+            sinCreditosHasta = Date().addingTimeInterval(minutos * 60)
+            guard !yaEstaba else { return }
+            Log.log(.ia, "TTS ElevenLabs \(avisar ? "SIN CRÉDITOS" : "no disponible") (\(motivo)) → voz de respaldo durante \(Int(minutos)) min")
+            if avisar { NotificationCenter.default.post(name: .betoTTSSinCreditos, object: nil) }
+        }
+        if Thread.isMainThread { cuerpo() } else { DispatchQueue.main.async(execute: cuerpo) }
     }
 
     /// Sintetiza `texto` con la voz clonada y devuelve el mp3 (o nil si falla).
@@ -505,9 +511,12 @@ enum ElevenLabsTTS {
                 let cuerpo = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
                 let motivo = err?.localizedDescription ?? "HTTP \(code): \(cuerpo.prefix(120))"
                 Log.log(.ia, "TTS ElevenLabs falló (\(motivo))")
-                // Cuota agotada: no volver a intentar en cada frase — respaldo directo.
-                if code == 402 || code == 429 || (code == 401 && cuerpo.contains("quota_exceeded")) {
+                // Cuota agotada (401 quota_exceeded / 402): respaldo directo 60 min con aviso.
+                // 429 = concurrencia/ocupado (NO cuota): respiro de 1 min, sin alarma.
+                if code == 402 || (code == 401 && cuerpo.contains("quota_exceeded")) {
                     marcarSinCreditos(motivo: "HTTP \(code) quota")
+                } else if code == 429 {
+                    marcarSinCreditos(minutos: 1, motivo: "HTTP 429 ocupado", avisar: false)
                 }
                 completion(nil)
             }

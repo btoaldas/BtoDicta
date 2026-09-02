@@ -9,7 +9,7 @@ enum ScribeError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .sinApiKey: return "Falta la API key de ElevenLabs — ponla en Configuración → Modelos"
+        case .sinApiKey: return "Falta la API key del proveedor — ponla en Configuración → Modelos"
         // Error COMPARTIDO por todos los proveedores HTTP (Groq, AssemblyAI, Deepgram…):
         // sin nombre de marca, si no el log culpa a ElevenLabs de fallos ajenos.
         case .http(let code, let body): return "HTTP \(code): \(body.prefix(120))"

@@ -1325,7 +1325,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 chk(Date().timeIntervalSince(t0) < 8, "failover a voz de macOS completó en \(String(format: "%.1f", Date().timeIntervalSince(t0)))s")
                 // e) AssemblyAI REAL con el body corregido (opcional, requiere key + red)
                 if let w = ProcessInfo.processInfo.environment["BETODICTA_STTWAV"], let d = try? Data(contentsOf: URL(fileURLWithPath: w)) {
-                    AssemblyAITranscribe.run(wav: d, model: "") { r in
+                    // Con el modelo GUARDADO del proveedor (ejercita el mapeo de alias viejos
+                    // como universal-3-pro, no solo la rama vacía).
+                    let mGuardado = Providers.cadena().first(where: { $0.id == "assemblyai" })?.modelo ?? "universal-3-pro"
+                    print("ROBUSTEZTEST AssemblyAI modelo guardado='\(mGuardado)'")
+                    AssemblyAITranscribe.run(wav: d, model: mGuardado) { r in
                         switch r {
                         case .success(let t): chk(!t.isEmpty, "AssemblyAI speech_models OK → '\(t.prefix(70))'")
                         case .failure(let e): chk(false, "AssemblyAI falló: \(e.localizedDescription.prefix(160))")
@@ -4352,6 +4356,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Mensaje al panel SOLO si no hay otro dictado en curso (una entrega
     /// tardía no debe pisar el panel del dictado siguiente).
     private func avisarSiLibre(_ mensaje: String) {
+        // Puede llegar desde el hilo de un lector (tcpp/onFinal) o de una cascada
+        // resuelta en el acto (todos en cuarentena): AppKit SOLO en main.
+        guard Thread.isMainThread else { DispatchQueue.main.async { self.avisarSiLibre(mensaje) }; return }
         guard !recorder.isRecording else { return }
         setIcono(.reposo)
         panel.update(mensaje)

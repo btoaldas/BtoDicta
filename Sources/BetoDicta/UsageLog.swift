@@ -28,7 +28,7 @@ struct UsageLog {
         "distil-whisper/distil-large-v3": 0.02,
         // Deepgram Nova — $0.0043/min (~$0.258/h)
         "nova-3": 0.258, "nova-2": 0.258, "nova-3-medical": 0.312, "flux": 0.46,
-        // AssemblyAI — best/nano son ALIAS deprecados (→ universal-3-pro/universal-2)
+        // AssemblyAI — best/nano/universal-3-pro son ALIAS viejos (→ universal-3-5-pro/universal-2)
         "best": 0.21, "nano": 0.15, "universal-3-5-pro": 0.21, "universal-3-pro": 0.21, "universal-2": 0.15,
         // Soniox — todo incluido (diarización/LID/formato); capa gratis
         "stt-rt-v5": 0.12, "stt-async-v5": 0.10, "stt-async-v4": 0.10,
