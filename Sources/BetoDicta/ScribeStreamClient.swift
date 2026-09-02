@@ -12,6 +12,11 @@ final class StreamClient: NSObject {
     var onPartial: ((String) -> Void)?
     var onCommitted: ((String) -> Void)?
     var onError: ((String) -> Void)?
+    /// La sesión murió a mitad del dictado (el servidor cerró por cuota o
+    /// clave, o la red cayó). Se avisa UNA vez, para que quien dicta pase al
+    /// plan B con todo el audio acumulado en vez de seguir enviando al vacío.
+    var onCierre: ((String) -> Void)?
+    private var cierreAvisado = false
 
     /// Circuit breaker: si el WS acaba de fallar (red caída), los próximos
     /// dictados van DIRECTO a grabar sin esperar otro timeout de conexión.
@@ -106,6 +111,11 @@ final class StreamClient: NSObject {
     }
 
     func send(chunk: Data) {
+        // Sin sesión viva no hay a quién mandar: enviar a un socket que el
+        // servidor cerró fallaba diez veces por segundo durante TODO el dictado
+        // (un buffer de micrófono cada 100 ms) y llenaba el registro — 19 539
+        // líneas en tres días — sin que nadie pasara al plan B.
+        guard conectado else { return }
         let message: [String: Any] = [
             "message_type": "input_audio_chunk",
             "audio_base_64": chunk.base64EncodedString(),
@@ -116,6 +126,7 @@ final class StreamClient: NSObject {
     }
 
     func commit() {
+        guard conectado else { return }
         let message: [String: Any] = [
             "message_type": "input_audio_chunk",
             "audio_base_64": "",
@@ -156,7 +167,7 @@ final class StreamClient: NSObject {
         task?.receive { [weak self] result in
             guard let self else { return }
             switch result {
-            case .failure:
+            case .failure(let error):
                 // Conexión muerta a mitad del dictado: marcarlo para que el
                 // cierre tome la ruta de rescate (cascada con el wav completo).
                 // OJO: si NOSOTROS desconectamos (cierre normal tras un dictado
@@ -166,6 +177,7 @@ final class StreamClient: NSObject {
                     guard !self.cerrando else { return }
                     self.conectado = false
                     StreamClient.registrarFallo()
+                    self.avisarCierre("conexión perdida: \(error.localizedDescription)")
                 }
                 return
             case .success(let message):
@@ -188,8 +200,18 @@ final class StreamClient: NSObject {
                     self.committedPieces.append(t)
                     self.onCommitted?(self.fullText())
                 }
-            case "error", "auth_error", "quota_exceeded", "rate_limited",
-                 "resource_exhausted", "session_time_limit_exceeded",
+            case "quota_exceeded", "auth_error", "rate_limited", "resource_exhausted":
+                // El servidor va a cerrar la sesión: sin cuota o sin clave. Es
+                // la cuarentena REAL del proveedor (30 min; 5 min si es tope de
+                // ritmo), no la breve de «red caída»: la cascada por lotes y la
+                // siguiente sesión en vivo lo saltan de plano.
+                let codigo = (type == "rate_limited" || type == "resource_exhausted") ? 429 : 401
+                CuarentenaSTT.registrar("elevenlabs", nombre: "ElevenLabs",
+                                        error: ScribeError.http(codigo, type))
+                self.onError?(json["message"] as? String ?? type)
+                self.conectado = false
+                self.avisarCierre(type)
+            case "error", "session_time_limit_exceeded",
                  "input_error", "chunk_size_exceeded", "transcriber_error":
                 self.onError?(json["message"] as? String ?? type)
             default:
@@ -197,5 +219,15 @@ final class StreamClient: NSObject {
             }
         }
     }
+
+    private func avisarCierre(_ motivo: String) {
+        guard !cierreAvisado else { return }
+        cierreAvisado = true
+        onCierre?(motivo)
+    }
+
+    /// Solo para la prueba de robustez: inyecta un mensaje como si viniera
+    /// del servidor (mismo camino que `receiveLoop`).
+    func inyectarParaPrueba(_ texto: String) { handle(texto) }
 }
 

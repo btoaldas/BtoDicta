@@ -517,6 +517,10 @@ enum ElevenLabsTTS {
                     marcarSinCreditos(motivo: "HTTP \(code) quota")
                 } else if code == 429 {
                     marcarSinCreditos(minutos: 1, motivo: "HTTP 429 ocupado", avisar: false)
+                } else if SinConexion.es(err) {
+                    // Sin internet: un minuto directo a la voz local, sin
+                    // reintentar WebSocket + lotes en cada frase.
+                    marcarSinCreditos(minutos: 1, motivo: "sin conexión a internet", avisar: false)
                 }
                 completion(nil)
             }

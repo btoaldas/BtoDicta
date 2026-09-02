@@ -1292,6 +1292,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("MODOVIVOTEST \(totalOK ? "TODO OK" : "FALLOS=\(mal)")")
             exit(totalOK ? 0 : 1)
         }
+        // Recompresión REAL acotada: BETODICTA_RECOMPTEST=<n> → convierte n crudos ya
+        // transcritos de la bitácora y verifica m4a legible + crudo liberado + índice al día.
+        if let nStr = ProcessInfo.processInfo.environment["BETODICTA_RECOMPTEST"], let n = Int(nStr), n > 0 {
+            ContinuoIndice.shared.abrir()
+            let carpeta = Config.continuoCarpeta()
+            let antes = ContinuoIndice.shared.audiosCrudosProcesados(limite: n, carpeta: carpeta)
+            print("RECOMPTEST candidatos=\(antes.count) (tope \(n))")
+            ContinuoLote.recomprimirPendientes(tope: n, manual: true) { r in
+                print("RECOMPTEST resultado: \(r)")
+                var ok = 0
+                for c in antes {
+                    let m4a = c.ruta.deletingPathExtension().appendingPathExtension("m4a")
+                    let marcos = (try? AVAudioFile(forReading: m4a))?.length ?? -1
+                    let pcmSigue = FileManager.default.fileExists(atPath: c.ruta.path)
+                    if marcos > 0, !pcmSigue { ok += 1 }
+                    else { print("RECOMPTEST ✗ \(c.ruta.lastPathComponent) marcos=\(marcos) pcmSigue=\(pcmSigue)") }
+                }
+                let despues = ContinuoIndice.shared.audiosCrudosProcesados(limite: n, carpeta: carpeta)
+                let indiceAlDia = Set(despues.map { $0.id }).isDisjoint(with: Set(antes.map { $0.id }))
+                print("RECOMPTEST \(ok)/\(antes.count) convertidos y verificados · índice al día: \(indiceAlDia ? "sí" : "NO")")
+                let bien = ok == antes.count && indiceAlDia
+                print("RECOMPTEST \(bien ? "TODO OK" : "FALLA")"); exit(bien ? 0 : 1)
+            }
+            RunLoop.main.run(); return
+        }
         // Regresión de ROBUSTEZ: BETODICTA_ROBUSTEZTEST=1 [BETODICTA_STTWAV=<wav>]
         // Cubre las 4 clases de fallo de ago-2026: NSException de audio (crash 20:00),
         // reproductor desconectado, cuarentena STT (AssemblyAI 400 en bucle) y ElevenLabs
@@ -1317,6 +1342,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             chk(!CuarentenaSTT.activa("assemblyai"), "OK limpia la cuarentena")
             CuarentenaSTT.registrar("groq", nombre: "Groq", error: ScribeError.ws("red caída"))
             chk(!CuarentenaSTT.activa("groq"), "fallo de red NO pone en cuarentena")
+            // c2) streaming Scribe: quota_exceeded → cuarentena REAL + aviso de cierre UNA sola vez
+            let sc = StreamClient(); var cierres = 0
+            sc.onCierre = { _ in cierres += 1 }
+            sc.inyectarParaPrueba(#"{"message_type":"quota_exceeded","message":"quota"}"#)
+            sc.inyectarParaPrueba(#"{"message_type":"quota_exceeded","message":"quota"}"#)
+            DispatchQueue.main.async {
+                chk(CuarentenaSTT.activa("elevenlabs"), "streaming quota_exceeded → cuarentena real de ElevenLabs")
+                chk(cierres == 1 && !sc.conectado, "cierre del streaming avisado UNA vez (\(cierres)) y sin conexión")
+                CuarentenaSTT.limpiar("elevenlabs")
+            }
+            // c3) clasificador de «sin internet»
+            chk(SinConexion.es(URLError(.notConnectedToInternet)) && !SinConexion.es(URLError(.timedOut)) && !SinConexion.es(nil),
+                "clasificador sin conexión (-1009 sí, timeout no)")
+            // f) compresión de la bitácora: PCM sintético → m4a válido (marcos) → crudo liberado
+            let dirTmp = FileManager.default.temporaryDirectory.appendingPathComponent("betodicta-robustez-\(getpid())")
+            try? FileManager.default.createDirectory(at: dirTmp, withIntermediateDirectories: true)
+            let pcmURL = dirTmp.appendingPathComponent("prueba.pcm")
+            let nMarcos = 16_000 * 3
+            var pcm = Data(capacity: nMarcos * 2)
+            for i in 0..<nMarcos {
+                var v = Int16(sin(Double(i) * 2 * .pi * 440 / 16_000) * 12_000)
+                withUnsafeBytes(of: &v) { pcm.append(contentsOf: $0) }
+            }
+            try? pcm.write(to: pcmURL)
+            let ahorro = ContinuoLote.comprimir(pcmURL, id: 0) ?? 0
+            let m4aURL = dirTmp.appendingPathComponent("prueba.m4a")
+            let leidos = (try? AVAudioFile(forReading: m4aURL))?.length ?? -1
+            chk(ahorro > 0 && !FileManager.default.fileExists(atPath: pcmURL.path) && leidos >= Int64(nMarcos) - 8_000,
+                "bitácora: pcm → m4a válido (\(leidos) de \(nMarcos) marcos, \(ahorro) B ahorrados) y crudo liberado")
+            try? FileManager.default.removeItem(at: dirTmp)
             // d) ElevenLabs sin créditos → salta directo al respaldo (Apple habla)
             ElevenLabsTTS.marcarSinCreditos(minutos: 1, motivo: "test")
             chk(ElevenLabsTTS.sinCreditos, "breaker de créditos activo")
@@ -3858,8 +3913,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else if let id = primero?.id, LiveNube.disponible(id) {
             conectarNubeVivo(id: id, model: primero?.modelo ?? "", history: history, sesion: sesion)
         } else if isStreamingModel {
-            if StreamClient.enCuarentena {
-                // Red recién caída: ni intentar la nube — plan B directo.
+            if StreamClient.enCuarentena || CuarentenaSTT.activa("elevenlabs") {
+                // Red recién caída o proveedor en cuarentena (sin cuota/clave):
+                // ni intentar la nube — plan B directo.
                 planBVivo(history: history, sesion: sesion)
             } else {
                 conectarScribeVivo(history: history, sesion: sesion)
@@ -3953,7 +4009,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else if let id = primero?.id, LiveNube.disponible(id) {
             conectarNubeVivo(id: id, model: primero?.modelo ?? "", history: history, sesion: sesion)
         } else if primero?.id == "elevenlabs", (primero?.modelo ?? "") == "scribe_v2_realtime",
-                  !StreamClient.enCuarentena {
+                  !StreamClient.enCuarentena, !CuarentenaSTT.activa("elevenlabs") {
             conectarScribeVivo(history: history, sesion: sesion)
         } else {
             panel.setMotor(Self.nombreMotor(primero), enVivo: false)
@@ -4013,6 +4069,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         stream.onError = { message in
             Log.write("stream: ERROR \(message)")
+        }
+        stream.onCierre = { [weak self, weak stream] motivo in
+            // El servidor cerró la sesión a mitad del dictado (cuota, clave,
+            // red): el plan B toma el mando con TODO el audio acumulado, así
+            // no se pierde ni una palabra ni la vista previa. Antes nadie se
+            // enteraba y cada buffer seguía yendo al socket muerto.
+            guard let self, let stream, self.stream === stream, self.recorder.isRecording else { return }
+            Log.log(.ia, "streaming ElevenLabs cerrado a mitad del dictado (\(motivo)) → plan B")
+            stream.disconnect()
+            self.stream = nil
+            self.entregaVivo = nil
+            self.planBVivo(history: history, sesion: sesion)
         }
         stream.connect { [weak self] result in
             guard let self, self.recorder.isRecording else { return }

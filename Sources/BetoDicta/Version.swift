@@ -6,11 +6,19 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.52.0"
+    static let numero = "0.53.0"
     static let fecha = "2026-09-01"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.53.0", "2026-09-01", [
+            "LA BITÁCORA VUELVE A COMPRIMIR: desde el 17 de agosto cada fragmento de audio se quedaba en PCM crudo (el m4a se validaba con el escritor aún abierto, fallaba y se borraba el archivo bueno) — 17,5 GB en dos semanas. Corregido, con validación estricta por marcos antes de soltar el crudo, y RECOMPRESIÓN en segundo plano de todo lo que quedó atrás (pasadas de 1 500 archivos, una por minuto mientras quede cola, se detiene si dictas, cada m4a se comprueba antes de borrar su PCM). Ajuste y botón «Recomprimir ahora» en Bitácora",
+            "STREAMING SCRIBE SIN CUOTA: cuando ElevenLabs cerraba la sesión por cuota o clave, la app seguía mandándole audio diez veces por segundo durante todo el dictado (19 539 líneas de error en tres días) y nadie pasaba al plan B. Ahora corta de una, el proveedor entra en cuarentena real (30 min) y el motor local toma el dictado a mitad de frase con todo el audio acumulado",
+            "CAPTURAS DE PANTALLA CON EL EQUIPO CARGADO: el rescate de 30 s marcaba como «colgada» (y culpaba al permiso) una captura que solo iba lenta durante la tanda; umbral holgado, mensaje con la causa real y ajuste opcional para pausar la pantalla mientras corre una tanda",
+            "RUTINAS DE RESUMEN HONESTAS: sin material en el rango se registra como omitida, no como fallo; si la IA no responde, el log dice por qué (HTTP, red, sin contenido) y se prueban hasta dos respaldos de tu cascada de pulido",
+            "SIN INTERNET, SIN VUELTAS: el pulido ya no recorre los 16 proveedores de nube uno por uno; salta directo a tu motor local o entrega el texto original, y la voz cae a la de macOS un minuto",
+            "Prueba de robustez ampliada (12 comprobaciones): compresión pcm→m4a real, cierre del streaming por cuota y clasificador de «sin conexión»",
+        ]),
         ("0.52.0", "2026-09-01", [
             "ARREGLADO el crash diario de las 20:00: al hablar el resumen vespertino, el audio de ElevenLabs lanzaba una excepción de macOS (salida de audio cambiada/apagada) que tumbaba la app entera. Ahora TODO el audio va por un atrapador nativo: si falla, hace failover al siguiente motor de voz — la app nunca se cae por el audio",
             "ElevenLabs SIN CRÉDITOS ya baja al respaldo de una: se salta 60 min (sin los ~3 s de silencio por frase) y avisa una vez en el notch (\"🔇 ElevenLabs sin créditos → hablo con la voz de macOS\")",

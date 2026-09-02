@@ -299,81 +299,194 @@ enum ContinuoLote {
 
     /// PCM crudo a m4a, ahora que el fragmento ya está transcrito y cerrado.
     /// Devuelve los bytes ahorrados, o nil si no se pudo y se conserva el crudo.
-    private static func comprimir(_ pcm: URL, id: Int64) -> Int64? {
+    /// Interno (no privado) para que la prueba de robustez lo ejercite de
+    /// punta a punta con un PCM sintético; con `id` ≤ 0 no toca el índice.
+    static func comprimir(_ pcm: URL, id: Int64) -> Int64? {
         guard let crudo = try? Data(contentsOf: pcm), crudo.count > 1_024 else { return nil }
         let destino = pcm.deletingPathExtension().appendingPathExtension("m4a")
         try? FileManager.default.removeItem(at: destino)
+        let marcos = Int64(crudo.count / 2)
 
+        do {
+            // La escritura vive en SU función: el AVAudioFile de escritura se
+            // libera al salir de ella y solo entonces el contenedor MPEG-4 queda
+            // finalizado. Validarlo con el escritor todavía vivo (bastaba una
+            // segunda referencia en este mismo ámbito) hacía que la lectura
+            // fallara siempre, se borrara un m4a perfectamente bueno y se
+            // conservara el crudo: dos semanas así dejaron 17 GB de PCM.
+            try escribirM4A(crudo, marcos: AVAudioFrameCount(marcos), en: destino)
+        } catch {
+            Log.log(.sistema, "bitácora: no pude comprimir \(pcm.lastPathComponent) — \(error.localizedDescription)")
+            try? FileManager.default.removeItem(at: destino)
+            return nil
+        }
+
+        let escrito = ((try? FileManager.default.attributesOfItem(atPath: destino.path))?[.size] as? Int64) ?? 0
+        guard escrito > 1_024 else {
+            try? FileManager.default.removeItem(at: destino)
+            return nil
+        }
+        // El tamaño no basta: el contenedor tiene que ABRIR y traer (casi) los
+        // mismos marcos que el crudo — AVAudioFile descuenta el priming del AAC,
+        // así que más de medio segundo de diferencia es un archivo truncado.
+        // Borrar el crudo contra un m4a corrupto es perder la grabación.
+        let minimo = max(1, marcos - 8_000)
+        guard let comprobacion = try? AVAudioFile(forReading: destino),
+              comprobacion.length >= minimo else {
+            let leidos = (try? AVAudioFile(forReading: destino))?.length ?? -1
+            try? FileManager.default.removeItem(at: destino)
+            Log.log(.sistema, "bitácora: el m4a de \(pcm.lastPathComponent) no valida (\(leidos) marcos de \(marcos)) — conservo el crudo")
+            return nil
+        }
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destino.path)
+        let antes = Int64(crudo.count)
+        // Sin índice actualizado no hay intercambio: quedarían un m4a huérfano
+        // (que el rescate volvería a transcribir) y una fila apuntando a un
+        // crudo borrado. Se deshace y se reintenta en otra pasada.
+        if id > 0, !ContinuoIndice.shared.reemplazarRuta(id: id, material: .audio, por: destino, bytes: escrito) {
+            try? FileManager.default.removeItem(at: destino)
+            Log.log(.sistema, "bitácora: el índice no aceptó el m4a de \(pcm.lastPathComponent) — conservo el crudo")
+            return nil
+        }
+        try? FileManager.default.removeItem(at: pcm)
+        // El .txt conserva el mismo nombre base que el audio, así que no
+        // hay que moverlo: sigue emparejado con el .m4a.
+        return antes - escrito
+    }
+
+    /// Escribe el AAC y, al salir, suelta el escritor: ahí se cierra el
+    /// contenedor. Nada de fuera debe conservar una referencia a `salida`.
+    private static func escribirM4A(_ crudo: Data, marcos: AVAudioFrameCount, en destino: URL) throws {
         let ajustes: [String: Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
             AVSampleRateKey: 16000,
             AVNumberOfChannelsKey: 1,
             AVEncoderBitRateKey: 24_000
         ]
-        do {
-            var archivo: AVAudioFile? = try AVAudioFile(forWriting: destino, settings: ajustes)
-            guard let salida = archivo else { return nil }
+        let salida = try AVAudioFile(forWriting: destino, settings: ajustes)
+        // El buffer DEBE ir en el processingFormat del archivo (Float32), no
+        // en Int16: `write(from:)` lanza si el formato no coincide, y ese
+        // fallo dejaba antes un contenedor de 28 bytes.
+        let formato = salida.processingFormat
+        guard marcos > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: formato, frameCapacity: marcos),
+              let destinoCanal = buffer.floatChannelData else {
+            throw ErrorLote.bufferInvalido
+        }
+        buffer.frameLength = marcos
+        crudo.withUnsafeBytes { bytes in
+            guard let origen = bytes.bindMemory(to: Int16.self).baseAddress else { return }
+            for i in 0..<Int(marcos) {
+                destinoCanal[0][i] = Float(origen[i]) / 32768.0
+            }
+        }
+        try salida.write(from: buffer)
+    }
 
-            // El buffer DEBE ir en el processingFormat del archivo (Float32), no
-            // en Int16: `write(from:)` lanza si el formato no coincide, y ese
-            // fallo dejaba antes un contenedor de 28 bytes.
-            let formato = salida.processingFormat
-            let marcos = AVAudioFrameCount(crudo.count / 2)
-            guard marcos > 0, let buffer = AVAudioPCMBuffer(pcmFormat: formato, frameCapacity: marcos) else {
-                archivo = nil
-                try? FileManager.default.removeItem(at: destino)
-                return nil
+    // MARK: Recompresión de crudos pendientes
+
+    /// Archivos que no se pudieron comprimir en esta sesión: se apartan para
+    /// que un PCM dañado no bloquee la cola eternamente.
+    private static var recompresionFallidos: Set<Int64> = []
+    private static var recompresionReloj: Timer?
+
+    /// Comprime el PCM que quedó crudo estando ya transcrito (por ejemplo, tras
+    /// una temporada en que la compresión fallaba). Va por la misma cola que la
+    /// tanda, de a `tope` archivos por pasada, y se detiene si empieza un
+    /// dictado. Parametrizable: Config.continuoRecomprimirPendientes; respeta
+    /// «solo con el equipo enchufado» y el interruptor de compresión.
+    static func recomprimirPendientes(tope: Int = 1_500, manual: Bool = false,
+                                      alTerminar: ((String) -> Void)? = nil) {
+        guard Config.continuoActivo(), Config.continuoLoteComprimir() else {
+            alTerminar?("la compresión está desactivada"); return
+        }
+        guard manual || Config.continuoRecomprimirPendientes() else {
+            alTerminar?("la recompresión automática está desactivada"); return
+        }
+        if !manual, Config.continuoLoteSoloConCorriente(), !EnergiaMac.conCorriente() {
+            alTerminar?("recompresión pospuesta: el equipo está con batería"); return
+        }
+        candado.lock()
+        if enMarcha {
+            candado.unlock()
+            alTerminar?("hay una tanda en curso"); return
+        }
+        enMarcha = true
+        candado.unlock()
+
+        cola.async {
+            defer { candado.lock(); enMarcha = false; candado.unlock() }
+            ContinuoIndice.shared.abrir()
+            let carpeta = Config.continuoCarpeta()
+            let candidatos = ContinuoIndice.shared.audiosCrudosProcesados(
+                limite: tope + recompresionFallidos.count, carpeta: carpeta)
+                .filter { !recompresionFallidos.contains($0.id) }
+                .prefix(tope)
+            guard !candidatos.isEmpty else {
+                DispatchQueue.main.async { alTerminar?("no hay audio crudo pendiente de comprimir") }
+                return
             }
-            buffer.frameLength = marcos
-            guard let destinoCanal = buffer.floatChannelData else {
-                archivo = nil
-                try? FileManager.default.removeItem(at: destino)
-                return nil
+            var hechos = 0, fallos = 0, cortado = false
+            var ahorro: Int64 = 0
+            let inicio = Date()
+            for c in candidatos {
+                if dictadoOcupado?() == true { cortado = true; break }
+                guard FileManager.default.fileExists(atPath: c.ruta.path) else {
+                    recompresionFallidos.insert(c.id); continue
+                }
+                if let a = comprimir(c.ruta, id: c.id) {
+                    hechos += 1; ahorro += a
+                } else {
+                    fallos += 1; recompresionFallidos.insert(c.id)
+                }
+                // Respiro entre archivos: que el disco y la CPU sigan siendo
+                // de quien está usando el equipo.
+                Thread.sleep(forTimeInterval: 0.02)
             }
-            crudo.withUnsafeBytes { bytes in
-                guard let origen = bytes.bindMemory(to: Int16.self).baseAddress else { return }
-                for i in 0..<Int(marcos) {
-                    destinoCanal[0][i] = Float(origen[i]) / 32768.0
+            var partes = ["recompresión: \(hechos) archivos, \(ContinuoBitacora.tamanoLegible(ahorro)) liberados en \(Int(Date().timeIntervalSince(inicio))) s"]
+            if fallos > 0 { partes.append("\(fallos) sin comprimir (se apartan)") }
+            if cortado { partes.append("detenida al empezar un dictado") }
+            else if candidatos.count == tope { partes.append("quedan más; sigue en la próxima pasada") }
+            let resumen = partes.joined(separator: ", ")
+            Log.log(.sistema, "bitácora: \(resumen)")
+            DispatchQueue.main.async {
+                alTerminar?(resumen)
+                // Con cola pendiente no hay por qué esperar al próximo cuarto de
+                // hora: otra pasada al minuto (solo automática y con reloj vivo).
+                if !manual, !cortado, candidatos.count == tope, recompresionReloj != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 60) { recomprimirPendientes() }
                 }
             }
-            try salida.write(from: buffer)
-            // El contenedor MPEG-4 se finaliza al liberar la instancia.
-            archivo = nil
+        }
+    }
 
-            let escrito = ((try? FileManager.default.attributesOfItem(atPath: destino.path))?[.size] as? Int64) ?? 0
-            guard escrito > 1_024 else {
-                try? FileManager.default.removeItem(at: destino)
-                return nil
+    /// Pasada automática: una al minuto de encender la bitácora, luego cada
+    /// 15 min y, mientras quede cola, una por minuto. Cero coste sin crudo.
+    static func programarRecompresion() {
+        DispatchQueue.main.async {
+            recompresionReloj?.invalidate()
+            recompresionReloj = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { _ in
+                recomprimirPendientes()
             }
-            // El tamaño no basta: el contenedor tiene que ABRIR y tener marcos.
-            // Borrar el crudo contra un m4a corrupto es perder la grabación.
-            guard let comprobacion = try? AVAudioFile(forReading: destino),
-                  comprobacion.length > 0 else {
-                try? FileManager.default.removeItem(at: destino)
-                Log.log(.sistema, "bitácora: el m4a de \(pcm.lastPathComponent) no valida — conservo el crudo")
-                return nil
-            }
-            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destino.path)
-            let antes = Int64(crudo.count)
-            ContinuoIndice.shared.reemplazarRuta(id: id, material: .audio, por: destino, bytes: escrito)
-            try? FileManager.default.removeItem(at: pcm)
-            // El .txt conserva el mismo nombre base que el audio, así que no
-            // hay que moverlo: sigue emparejado con el .m4a.
-            return antes - escrito
-        } catch {
-            Log.log(.sistema, "bitácora: no pude comprimir \(pcm.lastPathComponent) — \(error.localizedDescription)")
-            try? FileManager.default.removeItem(at: destino)
-            return nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 60) { recomprimirPendientes() }
+        }
+    }
+
+    static func detenerRecompresion() {
+        DispatchQueue.main.async {
+            recompresionReloj?.invalidate()
+            recompresionReloj = nil
         }
     }
 
     enum ErrorLote: LocalizedError {
-        case archivoVacio, sinRespuesta, tiempoAgotado
+        case archivoVacio, sinRespuesta, tiempoAgotado, bufferInvalido
         var errorDescription: String? {
             switch self {
             case .archivoVacio: return "el fragmento está vacío"
             case .sinRespuesta: return "el motor no respondió"
             case .tiempoAgotado: return "se agotó el tiempo de transcripción"
+            case .bufferInvalido: return "no pude preparar el buffer de audio"
             }
         }
     }

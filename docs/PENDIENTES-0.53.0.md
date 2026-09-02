@@ -129,14 +129,17 @@ ContinuoPantalla (estado compartido main/Task) se relacionan con 2.5.
   primero; el TTS ya cae a la voz de macOS).
 - Ollama apagado en esta Mac: la capa semántica de modos degrada a exacto/raíz.
 
-## 5. Propuesta de alcance para 0.53.0
+## 5. Estado en 0.53.0
 
-1. 2.1 compresión m4a (+ test).
-2. 2.2 streaming Scribe (guard, plan B a mitad, cuarentena por cuota).
-3. 2.5 capturas durante la tanda.
-4. 2.6 rutinas honestas con failover.
-5. 2.7 cortocircuito sin internet.
-6. 2.2 (d) etiquetas de cuarentena con motivo real.
+| Punto | Estado | Cómo se verifica |
+|---|---|---|
+| 2.1 compresión m4a | **Corregido**: escritor en su propio ámbito; validación por marcos (≥ crudo − 0,5 s); sin índice actualizado no se suelta el crudo. **Recompresión** en segundo plano (`continuo_recomprimir_pendientes`, pasadas de 1 500 archivos cada 15 min y una por minuto mientras quede cola, se detiene al dictar) + botón «Recomprimir ahora» | `ROBUSTEZTEST` (pcm sintético → m4a 48 000/48 000 marcos) y `BETODICTA_RECOMPTEST=<n>` sobre archivos reales |
+| 2.2 streaming Scribe | **Corregido**: `send`/`commit` exigen sesión viva; `quota_exceeded`/`auth_error` → `CuarentenaSTT` 30 min (429 → 5); `onCierre` una sola vez → `planBVivo` a mitad de dictado con todo el audio; las dos puertas al WS consultan también `CuarentenaSTT` | `ROBUSTEZTEST` (inyección de `quota_exceeded`: cuarentena real + cierre avisado una vez) |
+| 2.2 (d) etiquetas | **Corregido**: «cuarentena breve (su streaming cayó hace menos de 1 min)» | lectura del log |
+| 2.5 capturas en tanda | **Corregido**: rescate a 90 s, mensaje con la causa real (tanda en curso / permiso), aviso único de «captura lenta», ajuste `continuo_pantalla_pausar_en_tanda` (apagado de fábrica) | log durante la próxima tanda |
+| 2.6 rutinas | **Corregido**: `sinMaterial` → «omitida»; `llamarUna` devuelve motivo (HTTP/red/sin contenido) y `llamar` prueba hasta dos respaldos de `cadenaPulido` | log de la próxima rutina |
+| 2.7 sin internet | **Corregido**: `SinConexion.es` (-1009/-1020); pulido salta directo al primer motor local o al texto original; TTS cae 1 min a la voz local | `ROBUSTEZTEST` (clasificador) |
+| 2.8 menores | Pendientes (Groq 200 sin contenido, huérfanos por cierre, nivel del log) | — |
+| 3 heredados | Pendientes | — |
 
-Todo con hooks de prueba reproducibles y sin tocar el entrenador Piper ni las
-voces. Release solo bajo pedido.
+Entrenador Piper, destilador y voces sin tocar. Release solo bajo pedido.

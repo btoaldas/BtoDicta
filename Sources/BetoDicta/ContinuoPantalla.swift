@@ -24,6 +24,7 @@ final class ContinuoPantalla {
     private var reloj: Timer?
     private var capturando = false
     private var inicioIntento = Date.distantPast
+    private var capturaLentaAvisada = false
     /// Por monitor: comparar la huella de una pantalla contra la de OTRA haría
     /// que la deduplicación no funcionara nunca (o siempre) con varias.
     /// CONFINADOS a la cola `escribir`: los muta el Task de captura (executor
@@ -82,14 +83,30 @@ final class ContinuoPantalla {
         // reinstalar el binario), sin este rescate el módulo enmudece para
         // siempre y sin un solo error en el registro.
         if capturando {
-            if Date().timeIntervalSince(inicioIntento) > 30 {
-                Log.log(.sistema, "bitácora: la captura anterior se quedó colgada (¿falta permiso de grabación de pantalla?) — reintento")
+            let espera = Date().timeIntervalSince(inicioIntento)
+            if espera > 90 {
+                // Con el equipo cargado (una tanda transcribiendo en local) una
+                // captura puede tardar más que el intervalo sin estar colgada:
+                // por eso el umbral es holgado y el mensaje distingue ese caso
+                // del permiso pendiente, que sí deja a SCShareableContent mudo.
+                let causa = ContinuoLote.ocupado
+                    ? "tanda en curso: el equipo está cargado"
+                    : "¿permiso de grabación de pantalla pendiente?"
+                Log.log(.sistema, "bitácora: la captura anterior lleva \(Int(espera)) s sin terminar (\(causa)) — reintento")
                 capturando = false
             } else {
+                if espera > 30, !capturaLentaAvisada {
+                    capturaLentaAvisada = true
+                    Log.debug("bitácora: captura lenta (\(Int(espera)) s), espero a que termine")
+                }
                 return
             }
         }
         guard Config.continuoActivo(), Config.continuoPantallaActiva() else { return }
+        if Config.continuoPantallaPausarEnTanda(), ContinuoLote.ocupado {
+            Log.debug("bitácora: tanda en curso y el ajuste pide pausar la pantalla, no capturo")
+            return
+        }
         if Config.continuoPantallaPausarBloqueada(), Self.pantallaNoDisponible() {
             Log.debug("bitácora: pantalla bloqueada o dormida, no capturo")
             return
@@ -100,6 +117,7 @@ final class ContinuoPantalla {
         }
         capturando = true
         inicioIntento = Date()
+        capturaLentaAvisada = false
         Task { [weak self] in
             await self?.capturar()
             self?.capturando = false

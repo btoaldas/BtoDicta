@@ -137,7 +137,14 @@ enum ContinuoRutinas {
                 case .success(let url):
                     Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» → \(url.lastPathComponent)")
                 case .failure(let e):
-                    Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» falló — \(e.localizedDescription)")
+                    // Sin material en el rango (la rutina de madrugada, un día
+                    // sin usar el equipo) no es un fallo: se omite y punto.
+                    // Registrarlo como «falló» hacía ruido y escondía los reales.
+                    if let er = e as? ContinuoResumen.ErrorResumen, er == .sinMaterial {
+                        Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» omitida — sin material en el rango")
+                    } else {
+                        Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» falló — \(e.localizedDescription)")
+                    }
                 }
             }
         }

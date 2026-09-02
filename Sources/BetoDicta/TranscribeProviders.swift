@@ -745,7 +745,7 @@ enum Failover {
         // Red hacia ElevenLabs recién caída: saltarlo sin gastar su timeout —
         // el siguiente de la cascada responde ya.
         if p.id == "elevenlabs" && StreamClient.enCuarentena {
-            Log.log(.ia, "failover: ElevenLabs en cuarentena (red caída) → siguiente")
+            Log.log(.ia, "failover: ElevenLabs en cuarentena breve (su streaming cayó hace menos de 1 min) → siguiente")
             intentar(wav: wav, cadena: cadena, idx: idx + 1, ultimoError: ultimoError, completion: completion)
             return
         }

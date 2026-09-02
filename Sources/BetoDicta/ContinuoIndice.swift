@@ -216,17 +216,20 @@ final class ContinuoIndice {
     }
 
     /// Cambia la ruta de una fila tras comprimir el archivo, conservando su
-    /// texto y su marca de procesado.
-    func reemplazarRuta(id: Int64, material: MaterialContinuo, por url: URL, bytes: Int64) {
+    /// texto y su marca de procesado. Devuelve false si el índice no quedó
+    /// actualizado (base cerrada, fila inexistente, base ocupada): quien
+    /// comprime NO debe soltar el crudo en ese caso.
+    @discardableResult
+    func reemplazarRuta(id: Int64, material: MaterialContinuo, por url: URL, bytes: Int64) -> Bool {
         cola.sync {
-            guard let d = db else { return }
+            guard let d = db else { return false }
             var st: OpaquePointer?
-            guard sqlite3_prepare_v2(d, "UPDATE \(material.rawValue) SET ruta = ?, bytes = ? WHERE id = ?;", -1, &st, nil) == SQLITE_OK else { return }
+            guard sqlite3_prepare_v2(d, "UPDATE \(material.rawValue) SET ruta = ?, bytes = ? WHERE id = ?;", -1, &st, nil) == SQLITE_OK else { return false }
             defer { sqlite3_finalize(st) }
             bindTexto(st, 1, url.path)
             sqlite3_bind_int64(st, 2, bytes)
             sqlite3_bind_int64(st, 3, id)
-            sqlite3_step(st)
+            return sqlite3_step(st) == SQLITE_DONE && sqlite3_changes(d) == 1
         }
     }
 
@@ -255,6 +258,32 @@ final class ContinuoIndice {
                 salida.append(PendienteContinuo(
                     id: sqlite3_column_int64(st, 0),
                     material: material,
+                    ruta: URL(fileURLWithPath: String(cString: c)),
+                    instante: Date(timeIntervalSince1970: sqlite3_column_double(st, 2))
+                ))
+            }
+            return salida
+        }
+    }
+
+    /// Audio ya transcrito que sigue en PCM crudo dentro de la carpeta de la
+    /// bitácora: candidatos a recompresión, de lo más viejo a lo más nuevo.
+    /// Fuera de la carpeta (archivos adoptados del historial) no se toca nada.
+    func audiosCrudosProcesados(limite: Int, carpeta: URL) -> [PendienteContinuo] {
+        cola.sync {
+            guard let d = db else { return [] }
+            var st: OpaquePointer?
+            let sql = "SELECT id, ruta, instante FROM audio WHERE procesado = 1 AND ruta LIKE ? AND ruta LIKE '%.pcm' ORDER BY instante ASC LIMIT ?;"
+            guard sqlite3_prepare_v2(d, sql, -1, &st, nil) == SQLITE_OK else { return [] }
+            defer { sqlite3_finalize(st) }
+            bindTexto(st, 1, carpeta.path + "/%")
+            sqlite3_bind_int(st, 2, Int32(max(1, limite)))
+            var salida: [PendienteContinuo] = []
+            while sqlite3_step(st) == SQLITE_ROW {
+                guard let c = sqlite3_column_text(st, 1) else { continue }
+                salida.append(PendienteContinuo(
+                    id: sqlite3_column_int64(st, 0),
+                    material: .audio,
                     ruta: URL(fileURLWithPath: String(cString: c)),
                     instante: Date(timeIntervalSince1970: sqlite3_column_double(st, 2))
                 ))

@@ -948,6 +948,23 @@ enum LLMPostProcess {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? -1
                 let motivo = esRed ? (error?.localizedDescription ?? "red")
                     : "HTTP \(code): \(data.flatMap { String(data: $0, encoding: .utf8) }?.prefix(120).description ?? "")"
+                // Sin internet (-1009): ni reintento ni recorrer la cascada de
+                // nube — todos van a fallar igual y solo suman 16 líneas al
+                // registro y segundos de espera. Directo al primer motor LOCAL
+                // que quede en la cascada; si no hay, texto original. Una línea.
+                if SinConexion.es(error) {
+                    let locales = resto.filter { $0.local }
+                    if let primero = locales.first {
+                        Log.write("pulido: sin conexión a internet → salto directo al motor local \(primero.id)")
+                        continuarFailover(desde: ia, motivo: "sin conexión", textoOriginal: text,
+                                          salvaguarda: salvaguarda, prompt: prompt, temp: temp,
+                                          resto: locales, completion: completion)
+                    } else {
+                        Log.write("pulido: sin conexión a internet y sin motor local → texto original")
+                        completion(text)
+                    }
+                    return
+                }
                 // 1º fallo de RED (connection lost/timeout) → reintenta el MISMO proveedor
                 // con conexión FRESCA (arregla el socket reusado muerto, es lo más rápido).
                 if esRed, intento < 2 {

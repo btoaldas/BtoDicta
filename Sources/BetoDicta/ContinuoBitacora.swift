@@ -25,6 +25,7 @@ enum ContinuoBitacora {
         if #available(macOS 14.0, *) { ContinuoPantalla.shared.arrancar() }
         if #available(macOS 13.0, *) { ContinuoAudioSistema.shared.arrancar() }
         ContinuoPlanificador.arrancar()
+        ContinuoLote.programarRecompresion()
         Log.log(.sistema, "bitácora: encendida")
     }
 
@@ -33,6 +34,7 @@ enum ContinuoBitacora {
         if #available(macOS 14.0, *) { ContinuoPantalla.shared.detener() }
         if #available(macOS 13.0, *) { ContinuoAudioSistema.shared.detener() }
         ContinuoPlanificador.detener()
+        ContinuoLote.detenerRecompresion()
         Log.log(.sistema, "bitácora: apagada")
     }
 

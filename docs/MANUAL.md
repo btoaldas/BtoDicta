@@ -854,7 +854,18 @@ Todo vive en tu Mac, en `~/.betodicta/`:
 - **Voz**: si ElevenLabs responde *sin cuota* (401 `quota_exceeded`, 402 o 429), BetoDicta lo **salta de plano durante 60 min** y habla con el siguiente motor de la cascada (la voz de macOS como respaldo final) — sin los ~3 s de silencio que antes tardaba en rendirse. Lo avisa **una vez** en el notch: *"🔇 ElevenLabs sin créditos → hablo con la voz de macOS"*. Al recargar créditos, en menos de una hora vuelve solo.
 - **Dictado (STT)**: un proveedor que falla de forma **determinista** (key inválida, sin cuota, parámetro rechazado — cualquier 4xx) entra en **cuarentena 30 min** (429: 5 min; 5xx: 2 min) y se salta sin gastar la llamada ni sumar latencia; un acierto lo saca al instante. En el log aparece una sola línea: *"failover: X en cuarentena N min por HTTP …"*.
 - **La app nunca se cae por el audio**: si el dispositivo de salida cambió o desapareció (pantalla con parlantes apagada, AirPlay caído) justo al hablar, el motor hace **failover** al siguiente en vez de abortar. Si ves en el log *"audio [motor]: … → failover"*, fue exactamente eso.
-- Para comprobar todo esto en tu Mac: `BETODICTA_ROBUSTEZTEST=1 /Applications/BetoDicta.app/Contents/MacOS/BetoDicta` (añade `BETODICTA_STTWAV=<wav 16 kHz mono>` para probar además una transcripción real).
+- Para comprobar todo esto en tu Mac: `BETODICTA_ROBUSTEZTEST=1 /Applications/BetoDicta.app/Contents/MacOS/BetoDicta` (añade `BETODICTA_STTWAV=<wav 16 kHz mono>` para probar además una transcripción real). Desde 0.53.0 son 12 comprobaciones: incluye la compresión pcm→m4a de la bitácora, el cierre del streaming por cuota y el clasificador de «sin conexión».
+- **Streaming de ElevenLabs sin cuota a mitad de un dictado**: el servidor cierra la sesión; la app corta el envío de audio de inmediato, pone a ElevenLabs en cuarentena 30 min y el motor local toma el dictado con todo el audio acumulado (línea *"streaming ElevenLabs cerrado a mitad del dictado (…) → plan B"*).
+- **Sin internet**: el pulido no recorre los 16 proveedores de nube uno por uno; salta directo a tu primer motor local (Ollama, LM Studio) o entrega el texto original, y la voz cae a la de macOS durante un minuto.
+
+### El disco crece: audio crudo de la bitácora sin comprimir
+
+Cada fragmento de audio se graba en PCM crudo (sobrevive a cualquier corte) y, una vez transcrito en la tanda, se convierte a m4a (unas 8 veces menos) y se libera el crudo. Si en el registro ves *"bitácora: el m4a de … no valida"* repetido, la compresión está fallando y la carpeta crece alrededor de 1 GB por día de uso.
+
+- Desde 0.53.0 el m4a se valida **por marcos** (tiene que abrir y traer los mismos que el crudo) antes de borrar el PCM; el que no valide se conserva y se aparta.
+- **Recompresión en segundo plano** (Bitácora → *Recomprimir en segundo plano el crudo que quedó sin comprimir*, activada de fábrica): pasadas cada 15 min sobre el audio ya transcrito que siga en PCM, de a 1 500 archivos, y una por minuto mientras quede cola; se detiene si empieza un dictado y respeta «solo con el equipo enchufado». **Recomprimir ahora** lanza una pasada a mano. Cada pasada deja una línea *"bitácora: recompresión: N archivos, X liberados"*.
+- **Capturas de pantalla «lentas» durante una tanda**: el equipo está cargado transcribiendo en local, no falta el permiso. Si prefieres no capturar mientras corre la tanda, activa *Pausar la pantalla mientras corre una tanda* (apagado de fábrica).
+- **Rutinas de resumen**: «omitida — sin material en el rango» es normal de madrugada; un fallo real dice el motivo (HTTP, red, sin contenido) y prueba hasta dos respaldos de tu cascada de pulido.
 
 ### Diagnóstico reproducible
 

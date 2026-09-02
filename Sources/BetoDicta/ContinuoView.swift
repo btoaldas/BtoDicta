@@ -56,6 +56,8 @@ final class ContinuoModel: ObservableObject {
     @Published var promptTexto: String = ""
     @Published var promptNombre: String = ""
     @Published var loteComprimir: Bool { didSet { Config.set("continuo_lote_comprimir", to: loteComprimir) } }
+    @Published var loteRecomprimir: Bool { didSet { Config.set("continuo_recomprimir_pendientes", to: loteRecomprimir) } }
+    @Published var pantallaPausarEnTanda: Bool { didSet { Config.set("continuo_pantalla_pausar_en_tanda", to: pantallaPausarEnTanda) } }
     @Published var loteCorriente: Bool { didSet { Config.set("continuo_lote_solo_con_corriente", to: loteCorriente) } }
     @Published var ocrActivo: Bool { didSet { Config.set("continuo_ocr_activo", to: ocrActivo) } }
     @Published var ocrPreciso: Bool { didSet { Config.set("continuo_ocr_preciso", to: ocrPreciso) } }
@@ -86,6 +88,7 @@ final class ContinuoModel: ObservableObject {
     @Published var manualHasta: Date = Date()
     @Published var resumenEstado: String = "—"
     @Published var loteEstado: String = "—"
+    @Published var recompresionEstado: String = ""
     @Published var loteCorriendo = false
 
     // ---- Explorador de lo guardado ----
@@ -219,6 +222,8 @@ final class ContinuoModel: ObservableObject {
         resumenIA = Config.continuoResumenIA()
         promptActivo = Config.continuoPromptActivo()
         loteComprimir = Config.continuoLoteComprimir()
+        loteRecomprimir = Config.continuoRecomprimirPendientes()
+        pantallaPausarEnTanda = Config.continuoPantallaPausarEnTanda()
         loteCorriente = Config.continuoLoteSoloConCorriente()
         ocrActivo = Config.continuoOcrActivo()
         ocrPreciso = Config.continuoOcrPreciso()
@@ -265,6 +270,18 @@ final class ContinuoModel: ObservableObject {
             self?.loteEstado = resultado
             self?.refrescar()
             self?.cargarExplorador()
+        }
+    }
+
+    /// Pasada manual de recompresión del crudo pendiente.
+    func recomprimirAhora() {
+        guard !loteCorriendo else { return }
+        loteCorriendo = true
+        recompresionEstado = "recomprimiendo…"
+        ContinuoLote.recomprimirPendientes(manual: true) { [weak self] resultado in
+            self?.loteCorriendo = false
+            self?.recompresionEstado = resultado
+            self?.refrescar()
         }
     }
 
@@ -574,6 +591,8 @@ struct ContinuoView: View {
                     Toggle("Capturar todas las pantallas conectadas", isOn: $m.pantallaTodas)
                         .help("Con dos o tres monitores, cada uno se captura y se deduplica por separado. Apagado, solo el principal.")
                     Toggle("Pausar con la pantalla bloqueada o dormida", isOn: $m.pantallaPausar)
+                    Toggle("Pausar la pantalla mientras corre una tanda", isOn: $m.pantallaPausarEnTanda)
+                        .help("Con el equipo transcribiendo en local una captura puede tardar más que el intervalo. Apagado, se sigue capturando y se espera a que termine.")
                     Toggle("Anotar qué aplicaciones estaban a la vista", isOn: $m.pantallaVisibles)
                         .help("Con cada captura se guarda la app activa y las demás visibles: «activa Claude; también a la vista Edge, Finder».")
 
@@ -626,6 +645,14 @@ struct ContinuoView: View {
 
                     Toggle("Comprimir el audio al transcribirlo", isOn: $m.loteComprimir)
                         .help("El crudo se guarda sin comprimir para sobrevivir a un corte. Ya transcrito, se comprime y se libera espacio.")
+                    Toggle("Recomprimir en segundo plano el crudo que quedó sin comprimir", isOn: $m.loteRecomprimir)
+                        .help("Pasadas cada 15 min sobre el audio ya transcrito que sigue en PCM; se detiene si empieza un dictado. Cada m4a se valida antes de borrar su crudo.")
+                    HStack {
+                        Button("Recomprimir ahora") { m.recomprimirAhora() }
+                            .disabled(m.loteCorriendo)
+                        Text(m.recompresionEstado).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     Toggle("Solo con el equipo enchufado", isOn: $m.loteCorriente)
 
                     Text("A petición — procesa solo lo que elijas, ahora mismo").font(.caption)

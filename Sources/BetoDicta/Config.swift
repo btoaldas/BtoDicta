@@ -1111,6 +1111,19 @@ struct Config {
         (json()["continuo_lote_comprimir"] as? Bool) ?? true
     }
 
+    /// Recomprimir en segundo plano el crudo que quedó sin comprimir estando
+    /// ya transcrito (pasadas de 15 min, se detiene si empieza un dictado).
+    static func continuoRecomprimirPendientes() -> Bool {
+        (json()["continuo_recomprimir_pendientes"] as? Bool) ?? true
+    }
+
+    /// No capturar la pantalla mientras corre una tanda (el equipo va cargado
+    /// y la captura puede tardar más que el intervalo). Apagado de fábrica:
+    /// la línea de tiempo no se queda en blanco por defecto.
+    static func continuoPantallaPausarEnTanda() -> Bool {
+        (json()["continuo_pantalla_pausar_en_tanda"] as? Bool) ?? false
+    }
+
     /// Tope de fragmentos por tanda, para que una pasada no se eternice. 10…5000.
     static func continuoLoteMaximoPorTanda() -> Int {
         min(5_000, max(10, (json()["continuo_lote_maximo_por_tanda"] as? Int) ?? 500))

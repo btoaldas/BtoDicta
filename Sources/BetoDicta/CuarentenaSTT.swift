@@ -13,6 +13,16 @@ import Foundation
 // proveedor) → nada · 429 → 5 min · 5xx → 2 min. Un OK la limpia al instante, y
 // cambiar la key o la cascada la limpia toda. Avisa UNA vez por cuarentena.
 
+/// Clasificador compartido: ¿el fallo es «no hay internet» (-1009 / -1020)?
+/// Con ese diagnóstico ninguna cascada de nube tiene sentido: se corta de una
+/// y se va al motor local o al texto original, con una sola línea de registro.
+enum SinConexion {
+    static func es(_ error: Error?) -> Bool {
+        guard let e = error as? URLError else { return false }
+        return e.code == .notConnectedToInternet || e.code == .dataNotAllowed
+    }
+}
+
 enum CuarentenaSTT {
     private struct Entrada { let hasta: Date; let codigo: Int; let causa: String }
     private static var tabla: [String: Entrada] = [:]

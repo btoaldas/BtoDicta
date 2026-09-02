@@ -351,29 +351,62 @@ enum ContinuoResumen {
 
     // MARK: Llamada a la IA
 
-    /// Mismo camino que el resto de la app: si el cerebro es la cuenta de Codex
-    /// va por su cliente; si no, petición HTTP normal.
+    /// Cerebro elegido primero; si no responde, hasta DOS respaldos de la
+    /// cascada de pulido (las IAs conectadas en el orden del usuario). Cada
+    /// fallo queda en el registro con su motivo real (HTTP, red, sin
+    /// contenido): antes solo decía «la IA no devolvió texto» y no había
+    /// forma de saber por qué.
     private static func llamar(_ ia: ChatIA, prompt: String, textLen: Int,
                                _ completion: @escaping (String?) -> Void) {
+        let respaldos = Array(ChatIA.cadenaPulido().filter { $0.id != ia.id }.prefix(2))
+        intentar([ia] + respaldos, indice: 0, prompt: prompt, textLen: textLen, completion)
+    }
+
+    private static func intentar(_ cadena: [ChatIA], indice: Int, prompt: String, textLen: Int,
+                                 _ completion: @escaping (String?) -> Void) {
+        guard indice < cadena.count else { completion(nil); return }
+        let ia = cadena[indice]
+        llamarUna(ia, prompt: prompt, textLen: textLen) { texto, motivo in
+            if let texto, !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if indice > 0 { Log.log(.sistema, "bitácora: resumen redactado por el respaldo \(ia.id)") }
+                completion(texto); return
+            }
+            let hayMas = indice + 1 < cadena.count
+            Log.log(.sistema, "bitácora: resumen — \(ia.id) no respondió (\(motivo ?? "sin contenido"))\(hayMas ? " → pruebo \(cadena[indice + 1].id)" : "")")
+            intentar(cadena, indice: indice + 1, prompt: prompt, textLen: textLen, completion)
+        }
+    }
+
+    /// Mismo camino que el resto de la app: si el cerebro es la cuenta de Codex
+    /// va por su cliente; si no, petición HTTP normal. Devuelve el texto o el
+    /// motivo del fallo.
+    private static func llamarUna(_ ia: ChatIA, prompt: String, textLen: Int,
+                                  _ completion: @escaping (String?, String?) -> Void) {
         if ia.esCuentaCodex {
             AgenteCodex.transformar(prompt, modelo: ia.modeloEfectivo, timeout: 180) { contenido in
-                DispatchQueue.main.async { completion(contenido) }
+                DispatchQueue.main.async { completion(contenido, contenido == nil ? "la cuenta de Codex no respondió" : nil) }
             }
             return
         }
         guard var req = ia.requestChat(prompt: prompt, temperatura: 0.3, textLen: textLen) else {
-            DispatchQueue.main.async { completion(nil) }; return
+            DispatchQueue.main.async { completion(nil, "no pude armar la petición") }; return
         }
         req.setValue("close", forHTTPHeaderField: "Connection")
         req.timeoutInterval = 180
         URLSession.shared.dataTask(with: req) { data, resp, error in
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            var motivo: String?
             let contenido: String? = {
-                guard error == nil, let data,
-                      let code = (resp as? HTTPURLResponse)?.statusCode,
-                      (200..<300).contains(code) else { return nil }
-                return ia.extraerContenido(data)
+                if let error { motivo = error.localizedDescription; return nil }
+                guard let data, (200..<300).contains(code) else {
+                    let cuerpo = data.flatMap { String(data: $0, encoding: .utf8) }?.prefix(120) ?? ""
+                    motivo = "HTTP \(code): \(cuerpo)"; return nil
+                }
+                let c = ia.extraerContenido(data)
+                if (c ?? "").isEmpty { motivo = "HTTP \(code) sin contenido extraíble" }
+                return c
             }()
-            DispatchQueue.main.async { completion(contenido) }
+            DispatchQueue.main.async { completion(contenido, motivo) }
         }.resume()
     }
 
