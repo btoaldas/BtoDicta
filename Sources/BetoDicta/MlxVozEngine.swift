@@ -519,7 +519,7 @@ private final class MlxStreamPlayer: NSObject, URLSessionDataDelegate {
                     empezar: (() -> Void)?, completion: @escaping (Bool) -> Void) {
         self.empezar = empezar; done = completion
         engine.attach(player); engine.connect(player, to: engine.mainMixerNode, format: fmt)
-        do { try engine.start() } catch { finish(false); return }
+        guard AudioSeguro.arrancarMotor(engine, player, contexto: "MLX voz") else { finish(false); return }
         var req = URLRequest(url: url); req.httpMethod = "POST"; req.timeoutInterval = 180
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.httpBody = texto.data(using: .utf8)
@@ -552,7 +552,9 @@ private final class MlxStreamPlayer: NSObject, URLSessionDataDelegate {
 
     private func arrancar() {
         guard !terminado else { return }
-        let cb = empezar; empezar = nil; player.play(); sonando = true
+        let cb = empezar; empezar = nil
+        guard AudioSeguro.reproducir(player, contexto: "MLX voz") else { finish(false); return }
+        sonando = true
         if let cb { DispatchQueue.main.async(execute: cb) }
     }
 

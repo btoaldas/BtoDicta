@@ -327,7 +327,7 @@ private final class XttsStreamPlayer: NSObject, URLSessionDataDelegate {
     func reproducir(texto: String, url: URL, empezar: (() -> Void)?, completion: @escaping (Bool) -> Void) {
         self.empezar = empezar; self.done = completion
         engine.attach(player); engine.connect(player, to: engine.mainMixerNode, format: fmt)
-        do { try engine.start() } catch { finish(false); return }
+        guard AudioSeguro.arrancarMotor(engine, player, contexto: "XTTS servidor") else { finish(false); return }
         var req = URLRequest(url: url); req.httpMethod = "POST"; req.timeoutInterval = 120
         req.httpBody = texto.data(using: .utf8)
         let s = URLSession(configuration: .default, delegate: self, delegateQueue: callbacks)
@@ -354,7 +354,8 @@ private final class XttsStreamPlayer: NSObject, URLSessionDataDelegate {
     private func arrancar() {
         guard !terminado else { return }
         let cb = empezar; empezar = nil
-        player.play(); sonando = true
+        guard AudioSeguro.reproducir(player, contexto: "XTTS servidor") else { finish(false); return }
+        sonando = true
         // AppKit (notch) SOLO en main. Este era el crash al responder el Modo Agente:
         // el callback venía desde com.apple.NSURLSession-delegate.
         if let cb { DispatchQueue.main.async(execute: cb) }

@@ -6,11 +6,19 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.51.0"
+    static let numero = "0.52.0"
     static let fecha = "2026-08-17"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.52.0", "2026-09-01", [
+            "ARREGLADO el crash diario de las 20:00: al hablar el resumen vespertino, el audio de ElevenLabs lanzaba una excepción de macOS (salida de audio cambiada/apagada) que tumbaba la app entera. Ahora TODO el audio va por un atrapador nativo: si falla, hace failover al siguiente motor de voz — la app nunca se cae por el audio",
+            "ElevenLabs SIN CRÉDITOS ya baja al respaldo de una: se salta 60 min (sin los ~3 s de silencio por frase) y avisa una vez en el notch (\"🔇 ElevenLabs sin créditos → hablo con la voz de macOS\")",
+            "AssemblyAI volvía 400 en CADA dictado y en la bitácora (2 873 fallos en dos días) porque su API deprecó `speech_model`; corregido con `speech_models` (best → universal-3-5-pro). Verificado con una transcripción real",
+            "Cuarentena de proveedores STT: un fallo determinista (4xx) se salta 30 min sin gastar la llamada ni sumar latencia; un acierto lo limpia. Una sola línea en el log, sin spam",
+            "Log honesto: los errores HTTP ya no se atribuyen a ElevenLabs cuando son de otro proveedor; y la voz de macOS registra cuándo habla (antes no se podía saber si el respaldo funcionó)",
+            "Test de regresión BETODICTA_ROBUSTEZTEST=1 que cubre las 4 clases de fallo (9 comprobaciones, incluida una transcripción real por AssemblyAI)",
+        ]),
         ("0.51.0", "2026-08-17", [
             "TODAS TUS PANTALLAS: la bitácora captura cada monitor conectado (dos, tres, los que haya), cada uno con su deduplicación y su archivo; el fallo de una pantalla que se desconecta ya no aborta las demás",
             "DIARIOS PUROS POR CANAL: cada día queda en tres archivos legibles sin la app — voz (micrófono y dictados), audio del sistema y texto en pantalla (OCR) — reconstruidos completos tras cada tanda: nunca duplican y se regeneran si los borras",

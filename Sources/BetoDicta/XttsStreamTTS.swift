@@ -63,7 +63,7 @@ final class XttsStreamTTS: NSObject {
         if reproducir {
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: fmt)
-            do { try engine.start(); player.play() } catch { finish(false); return }
+            guard AudioSeguro.arrancar(engine, player, contexto: "XTTS streaming") else { finish(false); return }
         }
 
         let p = Process()

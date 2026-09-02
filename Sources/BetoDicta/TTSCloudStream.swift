@@ -83,7 +83,7 @@ final class TTSCloudStream: NSObject {
         fmt = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1)
         if reproducir {
             engine.attach(player); engine.connect(player, to: engine.mainMixerNode, format: fmt)
-            do { try engine.start(); player.play() } catch { finish(false); return }
+            guard AudioSeguro.arrancar(engine, player, contexto: "TTS nube WS") else { finish(false); return }
         }
         req.timeoutInterval = 15
         let task = URLSession.shared.webSocketTask(with: req); ws = task; task.resume()

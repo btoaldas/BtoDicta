@@ -1292,6 +1292,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("MODOVIVOTEST \(totalOK ? "TODO OK" : "FALLOS=\(mal)")")
             exit(totalOK ? 0 : 1)
         }
+        // Regresión de ROBUSTEZ: BETODICTA_ROBUSTEZTEST=1 [BETODICTA_STTWAV=<wav>]
+        // Cubre las 4 clases de fallo de ago-2026: NSException de audio (crash 20:00),
+        // reproductor desconectado, cuarentena STT (AssemblyAI 400 en bucle) y ElevenLabs
+        // sin créditos → respaldo. Con STTWAV además transcribe de verdad por AssemblyAI.
+        if ProcessInfo.processInfo.environment["BETODICTA_ROBUSTEZTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("ROBUSTEZTEST \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            // a) NSException atrapada (Swift solo no puede)
+            let ex = AudioSeguro.atrapar { NSException(name: .genericException, reason: "simulada", userInfo: nil).raise() }
+            chk(ex?.contains("simulada") == true, "NSException atrapada: \(ex ?? "nil")")
+            // b) reproductor SIN motor (estado desconectado) → false, sin crash
+            let suelto = AVAudioPlayerNode()
+            chk(AudioSeguro.reproducir(suelto, contexto: "test") == false, "play con nodo desconectado NO tumba la app")
+            // b2) motor+nodo bien conectados → arranca
+            let eng = AVAudioEngine(); let pl = AVAudioPlayerNode()
+            eng.attach(pl); eng.connect(pl, to: eng.mainMixerNode, format: AVAudioFormat(standardFormatWithSampleRate: 22050, channels: 1))
+            let arr = AudioSeguro.arrancar(eng, pl, contexto: "test"); eng.stop()
+            chk(arr, "motor+nodo conectados arrancan (salida presente)")
+            // c) cuarentena STT: 4xx entra, OK limpia, error no-HTTP no entra
+            CuarentenaSTT.registrar("assemblyai", nombre: "AssemblyAI", error: ScribeError.http(400, "speech_model deprecated"))
+            chk(CuarentenaSTT.activa("assemblyai"), "400 → cuarentena activa")
+            CuarentenaSTT.limpiar("assemblyai")
+            chk(!CuarentenaSTT.activa("assemblyai"), "OK limpia la cuarentena")
+            CuarentenaSTT.registrar("groq", nombre: "Groq", error: ScribeError.ws("red caída"))
+            chk(!CuarentenaSTT.activa("groq"), "fallo de red NO pone en cuarentena")
+            // d) ElevenLabs sin créditos → salta directo al respaldo (Apple habla)
+            ElevenLabsTTS.marcarSinCreditos(minutos: 1, motivo: "test")
+            chk(ElevenLabsTTS.sinCreditos, "breaker de créditos activo")
+            let t0 = Date()
+            Voz.decir("Respaldo listo.", completion: {
+                chk(Date().timeIntervalSince(t0) < 8, "failover a voz de macOS completó en \(String(format: "%.1f", Date().timeIntervalSince(t0)))s")
+                // e) AssemblyAI REAL con el body corregido (opcional, requiere key + red)
+                if let w = ProcessInfo.processInfo.environment["BETODICTA_STTWAV"], let d = try? Data(contentsOf: URL(fileURLWithPath: w)) {
+                    AssemblyAITranscribe.run(wav: d, model: "") { r in
+                        switch r {
+                        case .success(let t): chk(!t.isEmpty, "AssemblyAI speech_models OK → '\(t.prefix(70))'")
+                        case .failure(let e): chk(false, "AssemblyAI falló: \(e.localizedDescription.prefix(160))")
+                        }
+                        print("ROBUSTEZTEST \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+                    }
+                } else {
+                    print("ROBUSTEZTEST \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+                }
+            })
+            RunLoop.main.run(); return
+        }
         // Prueba de recursos: BETODICTA_RECURSOS=1 → info + recomendación
         if ProcessInfo.processInfo.environment["BETODICTA_RECURSOS"] == "1" {
             let i = Recursos.info(); let r = Recursos.recomendar(i)
@@ -2888,6 +2934,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             forName: .betoHotkeyChanged, object: nil, queue: .main) { [weak self] _ in
             self?.applyBinding()
             self?.aplicarAtajoAprender()
+        }
+        // ElevenLabs sin créditos: avisar UNA vez en el notch (la voz sigue con el respaldo).
+        NotificationCenter.default.addObserver(
+            forName: .betoTTSSinCreditos, object: nil, queue: .main) { [weak self] _ in
+            self?.panel.flash("🔇 ElevenLabs sin créditos → hablo con la voz de macOS", segundos: 5)
         }
     }
 

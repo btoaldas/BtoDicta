@@ -24,6 +24,8 @@ enum TTS {
     static func hablar(_ texto: String, completion: (() -> Void)? = nil) {
         let t = texto.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { completion?(); return }
+        // Trazable: antes no había forma de saber desde el log si el respaldo habló.
+        Log.log(.ia, "TTS voz de macOS: hablando (\(t.count) caracteres)")
         DispatchQueue.main.async {
             detener()
             let u = AVSpeechUtterance(string: t)

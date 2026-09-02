@@ -141,6 +141,11 @@ enum Voz {
             // Respaldo final: no falla. Reproduce con la voz de macOS.
             empezar?(); TTS.hablar(texto) { done?() }
         case "elevenlabs":
+            // Sin créditos (ya detectado): al siguiente motor DE INMEDIATO, sin WS ni batch.
+            if ElevenLabsTTS.sinCreditos {
+                Log.log(.ia, "TTS ElevenLabs sin créditos → siguiente motor directo")
+                siguiente(); return
+            }
             // Streaming WS (suena mientras se genera); si falla, cae al batch mp3;
             // si el batch también falla, al siguiente motor.
             if Config.ttsElevenStreaming() {
@@ -445,7 +450,28 @@ private final class FinReproduccion: NSObject, AVAudioPlayerDelegate {
 
 // MARK: - ElevenLabs TTS (voz clonada "Bto", nube)
 
+extension Notification.Name {
+    /// ElevenLabs se quedó sin créditos: la app lo avisa UNA vez en el notch.
+    static let betoTTSSinCreditos = Notification.Name("BetoDictaTTSSinCreditos")
+}
+
 enum ElevenLabsTTS {
+    /// SIN CRÉDITOS (401 quota_exceeded / 402 / 429): se salta ElevenLabs de plano un
+    /// rato en vez de fallar en cada frase — WS + batch eran ~3 s de silencio antes del
+    /// failover, y la sensación de que "nunca baja al siguiente motor".
+    private(set) static var sinCreditosHasta: Date?
+    static var sinCreditos: Bool {
+        if let h = sinCreditosHasta, h > Date() { return true }
+        return false
+    }
+    static func marcarSinCreditos(minutos: Double = 60, motivo: String) {
+        let yaEstaba = sinCreditos
+        sinCreditosHasta = Date().addingTimeInterval(minutos * 60)
+        guard !yaEstaba else { return }
+        Log.log(.ia, "TTS ElevenLabs SIN CRÉDITOS (\(motivo)) → voz de respaldo durante \(Int(minutos)) min")
+        DispatchQueue.main.async { NotificationCenter.default.post(name: .betoTTSSinCreditos, object: nil) }
+    }
+
     /// Sintetiza `texto` con la voz clonada y devuelve el mp3 (o nil si falla).
     /// https fail-closed: solo va sobre TLS con la API key en el header.
     static func decir(_ texto: String, completion: @escaping (Data?) -> Void) {
@@ -476,9 +502,13 @@ enum ElevenLabsTTS {
                 Log.log(.ia, "TTS ElevenLabs OK (\(data.count) bytes)")
                 completion(data)
             } else {
-                let motivo = err?.localizedDescription
-                    ?? "HTTP \(code): \(data.flatMap { String(data: $0, encoding: .utf8) }?.prefix(120).description ?? "")"
+                let cuerpo = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                let motivo = err?.localizedDescription ?? "HTTP \(code): \(cuerpo.prefix(120))"
                 Log.log(.ia, "TTS ElevenLabs falló (\(motivo))")
+                // Cuota agotada: no volver a intentar en cada frase — respaldo directo.
+                if code == 402 || code == 429 || (code == 401 && cuerpo.contains("quota_exceeded")) {
+                    marcarSinCreditos(motivo: "HTTP \(code) quota")
+                }
                 completion(nil)
             }
         }.resume()

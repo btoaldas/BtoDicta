@@ -849,6 +849,13 @@ Todo vive en tu Mac, en `~/.betodicta/`:
 
 ## 23. Solución de problemas
 
+### Se quedó sin créditos ElevenLabs (o falla un proveedor)
+
+- **Voz**: si ElevenLabs responde *sin cuota* (401 `quota_exceeded`, 402 o 429), BetoDicta lo **salta de plano durante 60 min** y habla con el siguiente motor de la cascada (la voz de macOS como respaldo final) — sin los ~3 s de silencio que antes tardaba en rendirse. Lo avisa **una vez** en el notch: *"🔇 ElevenLabs sin créditos → hablo con la voz de macOS"*. Al recargar créditos, en menos de una hora vuelve solo.
+- **Dictado (STT)**: un proveedor que falla de forma **determinista** (key inválida, sin cuota, parámetro rechazado — cualquier 4xx) entra en **cuarentena 30 min** (429: 5 min; 5xx: 2 min) y se salta sin gastar la llamada ni sumar latencia; un acierto lo saca al instante. En el log aparece una sola línea: *"failover: X en cuarentena N min por HTTP …"*.
+- **La app nunca se cae por el audio**: si el dispositivo de salida cambió o desapareció (pantalla con parlantes apagada, AirPlay caído) justo al hablar, el motor hace **failover** al siguiente en vez de abortar. Si ves en el log *"audio [motor]: … → failover"*, fue exactamente eso.
+- Para comprobar todo esto en tu Mac: `BETODICTA_ROBUSTEZTEST=1 /Applications/BetoDicta.app/Contents/MacOS/BetoDicta` (añade `BETODICTA_STTWAV=<wav 16 kHz mono>` para probar además una transcripción real).
+
 ### Diagnóstico reproducible
 
 El proyecto incluye un paquete QA en [`qa/0.47.0/`](../qa/0.47.0/README.md):

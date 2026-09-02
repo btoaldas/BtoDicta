@@ -426,7 +426,16 @@ enum AssemblyAITranscribe {
             case .success(let uploadURL):
                 // 2) crear el job de transcripción
                 var cuerpo: [String: Any] = ["audio_url": uploadURL, "language_code": "es"]
-                if !model.isEmpty { cuerpo["speech_model"] = model }   // "best" | "nano"
+                // `speech_model` quedó DEPRECADO: la API responde 400 desde ago-2026 (2 873
+                // fallos en dos días). Ahora va `speech_models`, lista en orden de
+                // preferencia. Alias viejos: best → universal-3-5-pro, nano → universal-2.
+                let modelos: [String]
+                switch model {
+                case "", "best": modelos = ["universal-3-5-pro", "universal-2"]
+                case "nano":     modelos = ["universal-2"]
+                default:         modelos = [model, "universal-2"]
+                }
+                cuerpo["speech_models"] = modelos
                 postJSON(url: "https://api.assemblyai.com/v2/transcript",
                          headers: auth, cuerpo: cuerpo) { r2 in
                     switch r2 {
@@ -735,6 +744,14 @@ enum Failover {
             intentar(wav: wav, cadena: cadena, idx: idx + 1, ultimoError: ultimoError, completion: completion)
             return
         }
+        // Fallo DETERMINISTA reciente (4xx: key/cuota/parámetro deprecado): se salta sin
+        // gastar la llamada ni sumar latencia. Ver CuarentenaSTT (avisa una vez).
+        if CuarentenaSTT.activa(p.id) {
+            intentar(wav: wav, cadena: cadena, idx: idx + 1,
+                     ultimoError: ultimoError ?? ScribeError.ws("\(p.nombre) en cuarentena por un fallo reciente"),
+                     completion: completion)
+            return
+        }
         Log.log(.ia, "failover: intentando \(p.nombre) (#\(idx + 1))")
         // Modelo efectivo por proveedor (el que fija el costo real).
         let modeloUsado: String
@@ -763,9 +780,11 @@ enum Failover {
             switch r {
             case .success(let texto):
                 Log.log(.ia, "failover: \(p.nombre) OK")
+                CuarentenaSTT.limpiar(p.id)
                 completion(.success((texto, p.nombre, modeloUsado)))
             case .failure(let e):
                 Log.log(.ia, "failover: \(p.nombre) falló (\(e.localizedDescription)) → siguiente")
+                CuarentenaSTT.registrar(p.id, nombre: p.nombre, error: e)
                 intentar(wav: wav, cadena: cadena, idx: idx + 1, ultimoError: e, completion: completion)
             }
         }

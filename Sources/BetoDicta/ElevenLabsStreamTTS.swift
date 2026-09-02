@@ -65,7 +65,9 @@ final class ElevenLabsStreamTTS: NSObject {
         if reproducir {
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: fmt)
-            do { try engine.start(); player.play() } catch { finish(false); return }
+            // Sin excepciones ObjC de AVFoundation: si no hay salida o el motor no corre,
+            // false → failover (era el crash diario de las 20:00).
+            guard AudioSeguro.arrancar(engine, player, contexto: "ElevenLabs WS") else { finish(false); return }
         }
 
         var req = URLRequest(url: url)
