@@ -272,10 +272,11 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
             guard let e = item.fechaObjetivo else { return item.texto }
             let f = Date(timeIntervalSince1970: e)
             let cuando: String
-            if Calendar.current.isDateInToday(f) {
+            if Calendar.current.isDate(f, inSameDayAs: ahora) {
                 cuando = f < ahora ? "vencida a las \(f.formatted(date: .omitted, time: .shortened))"
                     : "hoy a las \(f.formatted(date: .omitted, time: .shortened))"
-            } else if Calendar.current.isDateInTomorrow(f) {
+            } else if let diaSiguiente = Calendar.current.date(byAdding: .day, value: 1, to: ahora),
+                      Calendar.current.isDate(f, inSameDayAs: diaSiguiente) {
                 cuando = "mañana a las \(f.formatted(date: .omitted, time: .shortened))"
             } else {
                 cuando = f.formatted(date: .abbreviated, time: .shortened)
