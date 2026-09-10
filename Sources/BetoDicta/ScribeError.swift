@@ -19,3 +19,18 @@ enum ScribeError: LocalizedError {
     }
 }
 
+/// Algunos motores locales representan el silencio con un token textual. Ese
+/// token no es un dictado y nunca debe llegar al pulido, al portapapeles ni al
+/// historial como si fueran palabras del usuario.
+enum TextoTranscrito {
+    static func limpiar(_ texto: String) -> String {
+        let limpio = texto.trimmingCharacters(in: .whitespacesAndNewlines)
+        let n = limpio.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .lowercased()
+        let marcadores = [
+            "(empty)", "[empty]", "<empty>", "[blank_audio]",
+            "<|nospeech|>", "<|no_speech|>", "(silence)", "[silence]",
+        ]
+        return marcadores.contains(n) ? "" : limpio
+    }
+}

@@ -61,9 +61,12 @@ struct ChatIA {
             let n = propio.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             return propio.isEmpty || n == "automatico" ? Config.codexCuentaModelo() : propio
         }
-        if local { return Config.pulidoModelo(id) ?? Self.modelosLocales[id] ?? modelo }
+        if local {
+            let detectado = Self.modeloSeguroParaPulido(Self.modelosLocales[id], respaldo: modelo)
+            return Self.modeloSeguroParaPulido(Config.pulidoModelo(id), respaldo: detectado)
+        }
         if id.hasPrefix("custom:") { return modelo }
-        return Config.pulidoModelo(id) ?? modelo
+        return Self.modeloSeguroParaPulido(Config.pulidoModelo(id), respaldo: modelo)
     }
     /// Copia de esta IA con OTRO modelo (para los modos, que fijan su modelo).
     func conModelo(_ m: String) -> ChatIA {
@@ -196,6 +199,43 @@ struct ChatIA {
     /// modelo de CUALQUIER proveedor (no solo gateways). Se llena al pulsar
     /// "Descubrir" en Ajustes → Pulido.
     static var modelosPorProveedor: [String: [String]] = [:]
+
+    /// Los endpoints `/models` mezclan chat, audio, embeddings, moderación y
+    /// clasificadores. Solo los generativos sirven para devolver una
+    /// transcripción pulida; un clasificador suele responder un escalar 0…1.
+    static func modeloAptoParaPulido(_ id: String) -> Bool {
+        let limpio = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !limpio.isEmpty else { return false }
+        if esEmbedding(limpio) || esSTT(limpio) { return false }
+        let n = limpio.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .lowercased()
+        let marcadores = [
+            "prompt-guard", "llama-guard", "safeguard", "moderation",
+            "classifier", "rerank", "text-to-speech",
+        ]
+        if marcadores.contains(where: { n.contains($0) }) { return false }
+        let tokens = Set(n.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
+        return !tokens.contains("guard") && !tokens.contains("safety")
+            && !tokens.contains("tts") && !tokens.contains("stt")
+    }
+
+    /// Filtra y deduplica conservando el orden publicado por el proveedor.
+    static func modelosAptosParaPulido(_ ids: [String]) -> [String] {
+        var vistos = Set<String>()
+        return ids.compactMap { bruto in
+            let id = bruto.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard modeloAptoParaPulido(id), vistos.insert(id).inserted else { return nil }
+            return id
+        }
+    }
+
+    /// Política pura usada por `modeloEfectivo`: una selección vieja o
+    /// importada que no sea de chat cae al modelo generativo predeterminado.
+    static func modeloSeguroParaPulido(_ candidato: String?, respaldo: String) -> String {
+        guard let candidato else { return respaldo }
+        let limpio = candidato.trimmingCharacters(in: .whitespacesAndNewlines)
+        return modeloAptoParaPulido(limpio) ? limpio : respaldo
+    }
     /// Precio por modelo si el proveedor lo expone (proveedorId → modeloId →
     /// etiqueta, ej. "gratis" o "$0.15/$0.60 1M"). OpenRouter lo trae; otros no.
     static var precios: [String: [String: String]] = [:]
@@ -326,8 +366,13 @@ struct ChatIA {
         PersonalizadaStore.descubrirEn(base: ia.base, apiKey: ia.key ?? "",
                                        authHeader: ia.authHeader, authPrefix: ia.authPrefix,
                                        headers: ia.headersExtra, proveedorId: ia.id) { ids, msg in
-            if !ids.isEmpty { modelosPorProveedor[ia.id] = ids }
-            done(ids, msg)
+            let aptos = modelosAptosParaPulido(ids)
+            modelosPorProveedor[ia.id] = aptos
+            let omitidos = ids.count - aptos.count
+            let detalle = omitidos > 0
+                ? "\(aptos.count) aptos para pulido · \(omitidos) omitidos (audio, embeddings o clasificación)"
+                : msg
+            done(aptos, detalle)
         }
     }
 
@@ -347,16 +392,23 @@ struct ChatIA {
     /// Usa el orden elegido por el usuario (Config.pulidoCascada); lo que no listó
     /// se agrega al final para no perder respaldo. Sin orden → el proveedor de
     /// pulido primero y luego el resto de conectados.
+    static func ordenarPulido(_ conectadas: [ChatIA], preferida: String?, orden: [String]) -> [ChatIA] {
+        var vistos = Set<String>()
+        var out = orden.compactMap { id -> ChatIA? in
+            guard vistos.insert(id).inserted else { return nil }
+            return conectadas.first { $0.id == id }
+        }
+        for ia in conectadas where vistos.insert(ia.id).inserted { out.append(ia) }
+        if let preferida, let i = out.firstIndex(where: { $0.id == preferida }), i != 0 {
+            out.insert(out.remove(at: i), at: 0)
+        }
+        return out
+    }
+
     static func cadenaPulido() -> [ChatIA] {
         let conex = conectadasPulido
-        let orden = Config.pulidoCascada()
-        if !orden.isEmpty {
-            var out = orden.compactMap { id in conex.first { $0.id == id } }
-            for c in conex where !out.contains(where: { $0.id == c.id }) { out.append(c) }
-            return out
-        }
-        guard let sel = seleccionada() else { return conex }
-        return [sel] + conex.filter { $0.id != sel.id }
+        return ordenarPulido(conex, preferida: seleccionada()?.id,
+                             orden: Config.pulidoCascada())
     }
     /// Sondea LM Studio / Ollama y cachea su modelo cargado (si responden).
     static func detectarLocales(_ done: (() -> Void)? = nil) {
@@ -377,12 +429,13 @@ struct ChatIA {
                 defer { grupo.leave() }
                 let ids = (data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] })
                     .flatMap { $0["data"] as? [[String: Any]] }?.compactMap { $0["id"] as? String } ?? []
-                // Modelo por defecto de CHAT: salta los de EMBEDDINGS (bge, nomic-embed…),
-                // que no sirven para pulir; cae al primero solo si no hay otro.
-                let modelo = ids.first { !esEmbedding($0) } ?? ids.first
+                // Solo un modelo generativo convierte este servidor en IA de
+                // pulido. Audio, embeddings y clasificadores quedan fuera.
+                let aptos = modelosAptosParaPulido(ids)
+                let modelo = aptos.first
                 DispatchQueue.main.async {
                     modelosLocales[c.id] = modelo
-                    if !ids.isEmpty { modelosPorProveedor[c.id] = ids }   // para el selector de modelo
+                    modelosPorProveedor[c.id] = aptos
                 }
             }.resume()
         }
@@ -502,11 +555,15 @@ enum PersonalizadaStore {
     /// Las personalizadas como ChatIA (para el catálogo y el selector).
     static func comoChatIA() -> [ChatIA] {
         cargar().filter { !$0.base.isEmpty && !$0.modelo.isEmpty }.map { p in
-            ChatIA(id: "custom:\(p.id)", nombre: p.nombre.isEmpty ? "Personalizada" : p.nombre,
-                   base: p.base, modelo: p.modelo, keyEnv: "", local: false,
-                   authHeader: p.authHeader.isEmpty ? "Authorization" : p.authHeader,
-                   authPrefix: p.authPrefix, headersExtra: p.headers,
-                   keyDirecta: p.apiKey, paraPulido: p.paraPulido)
+            // Conserva el gateway en el catálogo (puede servir para voz o un
+            // Modo), pero una selección vieja de audio/clasificación no entra
+            // en la cascada que reemplaza el texto de los dictados.
+            let aptaParaPulido = p.paraPulido && ChatIA.modeloAptoParaPulido(p.modelo)
+            return ChatIA(id: "custom:\(p.id)", nombre: p.nombre.isEmpty ? "Personalizada" : p.nombre,
+                          base: p.base, modelo: p.modelo, keyEnv: "", local: false,
+                          authHeader: p.authHeader.isEmpty ? "Authorization" : p.authHeader,
+                          authPrefix: p.authPrefix, headersExtra: p.headers,
+                          keyDirecta: p.apiKey, paraPulido: aptaParaPulido)
         }
     }
     /// Extrae ids de modelos de las formas comunes: {data:[{id}]}, {models:
@@ -839,6 +896,14 @@ enum LLMPostProcess {
                                           completion: completion)
                         return
                     }
+                    if salvaguarda, let motivo = razonPulidoInvalido(original: text, pulido: pulido) {
+                        Log.write("pulido: salida inválida (\(motivo)) → failover")
+                        continuarFailover(desde: ia, motivo: motivo,
+                                          textoOriginal: text, salvaguarda: salvaguarda,
+                                          prompt: prompt, temp: temp, resto: resto,
+                                          completion: completion)
+                        return
+                    }
                     let ms = Int(Date().timeIntervalSince(inicio) * 1000)
                     Log.write("pulido: OK con cuenta Codex en \(ms)ms — \(text.count)→\(pulido.count) chars")
                     if salvaguarda, let motivo = razonSospecha(original: text, pulido: pulido) {
@@ -924,6 +989,14 @@ enum LLMPostProcess {
                         if let motivo = razonFugaPrompt(original: text, pulido: pulido) {
                             Log.write("pulido: respuesta descartada por fuga interna (\(motivo))")
                             continuarFailover(desde: ia, motivo: "respuesta copió instrucciones internas",
+                                              textoOriginal: text, salvaguarda: salvaguarda,
+                                              prompt: prompt, temp: temp, resto: resto,
+                                              completion: completion)
+                            return
+                        }
+                        if salvaguarda, let motivo = razonPulidoInvalido(original: text, pulido: pulido) {
+                            Log.write("pulido: salida inválida (\(motivo)) → failover")
+                            continuarFailover(desde: ia, motivo: motivo,
                                               textoOriginal: text, salvaguarda: salvaguarda,
                                               prompt: prompt, temp: temp, resto: resto,
                                               completion: completion)
@@ -1030,6 +1103,37 @@ enum LLMPostProcess {
             if nuevos.count >= 8 {
                 return "volcó \(nuevos.count) términos nuevos del glosario"
             }
+        }
+        return nil
+    }
+
+    /// Integridad mínima SIEMPRE activa para el pulido normal. A diferencia de
+    /// la salvaguarda anti-inyección configurable, evita que una respuesta de
+    /// clasificación o una salida colapsada reemplace una transcripción válida.
+    /// Los Modos no pasan por esta política porque pueden transformar a propósito.
+    static func razonPulidoInvalido(original: String, pulido: String) -> String? {
+        let o = original.trimmingCharacters(in: .whitespacesAndNewlines)
+        let p = pulido.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !p.isEmpty, p != o else { return nil }
+
+        func esPuntaje(_ texto: String) -> Bool {
+            var t = texto.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: ",", with: ".")
+            if t.first == "+" || t.first == "-" { t.removeFirst() }
+            let partes = t.split(separator: ".", omittingEmptySubsequences: false)
+            guard partes.count == 2, partes[0] == "0" || partes[0] == "1",
+                  partes[1].count >= 8 else { return false }
+            return partes[1].allSatisfy { $0.isNumber }
+        }
+        if esPuntaje(p), !esPuntaje(o) { return "parece puntaje de clasificador" }
+
+        let letrasOriginal = o.unicodeScalars.filter { CharacterSet.letters.contains($0) }.count
+        let letrasPulido = p.unicodeScalars.filter { CharacterSet.letters.contains($0) }.count
+        if letrasOriginal >= 20, letrasPulido == 0 {
+            return "perdió todo el contenido verbal"
+        }
+        if letrasOriginal >= 40, letrasPulido * 5 < letrasOriginal, p.count < 32 {
+            return "colapsó \(o.count)→\(p.count) chars"
         }
         return nil
     }

@@ -80,7 +80,7 @@ struct TranscribeView: View {
 
             // Re-transcribir del historial
             tarjeta("Re-transcribir un dictado", "clock.arrow.circlepath") {
-                Text("Vuelve a pasar un audio guardado por la nube (útil si falló antes o si tu glosario mejoró).")
+                Text("Vuelve a pasar un audio guardado por tu cascada configurada, local o nube (útil si falló antes o si tu glosario mejoró).")
                     .font(.caption).foregroundStyle(.secondary)
                 if grabaciones.isEmpty {
                     Text("No hay grabaciones en el historial.").font(.caption).foregroundStyle(.tertiary)
@@ -145,15 +145,54 @@ struct TranscribeView: View {
 
     private func procesar(_ url: URL, etiqueta: String) {
         trabajando = true; estado = etiqueta; resultado = ""
-        transcribeFile(url: url, model: Config.model() == "scribe_v2_realtime" ? "scribe_v2" : Config.model()) { r in
+        func terminar(_ r: Result<String, Error>) {
             switch r {
             case .success(let texto):
-                aplicarModo(applyReplacements(texto))
+                let limpio = TextoTranscrito.limpiar(texto)
+                guard !limpio.isEmpty else {
+                    trabajando = false
+                    estado = "No se detectó voz en el audio."
+                    return
+                }
+                aplicarModo(applyReplacements(limpio))
             case .failure(let e):
                 trabajando = false
-                estado = "⚠️ \(e.localizedDescription)"
+                estado = "⚠️ \(mensajeError(e))"
             }
         }
+        if Self.usaCascada(url) {
+            guard let wav = try? Data(contentsOf: url) else {
+                terminar(.failure(ScribeError.http(0, "No se pudo leer el archivo")))
+                return
+            }
+            Failover.transcribe(wav: wav) { r in
+                switch r {
+                case .success(let (texto, proveedor, modelo)):
+                    Log.log(.ia, "re-transcribir: OK con \(proveedor) · \(modelo)")
+                    terminar(.success(texto))
+                case .failure(let error):
+                    terminar(.failure(error))
+                }
+            }
+        } else {
+            // ElevenLabs acepta contenedores de audio/video directamente. Los
+            // WAV pasan por la cascada completa y no dependen de su cuota.
+            transcribeFile(url: url,
+                           model: Config.model() == "scribe_v2_realtime" ? "scribe_v2" : Config.model(),
+                           completion: terminar)
+        }
+    }
+
+    static func usaCascada(_ url: URL) -> Bool {
+        url.pathExtension.lowercased() == "wav"
+    }
+
+    private func mensajeError(_ error: Error) -> String {
+        if case let ScribeError.http(code, body) = error,
+           code == 401, body.lowercased().contains("quota_exceeded") {
+            return "ElevenLabs no tiene cuota disponible. Para audio WAV usa la cascada configurada; para otros formatos cambia de cuota o conviértelos primero a WAV."
+        }
+        return error.localizedDescription
     }
 
     /// Aplica el modo elegido al texto transcrito. Dictado = solo el texto limpio;

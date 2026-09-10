@@ -4452,7 +4452,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let segundos = Double(wav.count - 44) / 32000.0
         UsageLog.record(provider: proveedor, modelo: modelo, seconds: segundos)
 
-        let crudo = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let crudo = TextoTranscrito.limpiar(raw)
         let trasReglas = applyReplacements(crudo)
         var textoFinal = trasReglas
 

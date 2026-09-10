@@ -699,7 +699,7 @@ struct SettingsView: View {
                                 let _ = detectTrigger
                                 let orden = ChatIA.cadenaPulido()
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text("Si el 1º no responde, se prueba el 2º, y así sucesivamente. Arrastra el orden con las flechas.")
+                                    Text("El 1º es la IA elegida arriba. Si no responde, se prueban los respaldos en este orden.")
                                         .font(.caption2).foregroundStyle(.secondary)
                                     ForEach(Array(orden.enumerated()), id: \.element.id) { i, ia in
                                         HStack(spacing: 6) {
@@ -707,10 +707,10 @@ struct SettingsView: View {
                                             Text(ia.etiqueta).font(.caption).lineLimit(1)
                                             Spacer()
                                             Button { moverCascada(orden.map { $0.id }, i, -1) } label: { Image(systemName: "chevron.up") }
-                                                .buttonStyle(.plain).disabled(i == 0)
+                                                .buttonStyle(.plain).disabled(i <= 1)
                                                 .help("Subir esta IA en el failover de pulido")
                                             Button { moverCascada(orden.map { $0.id }, i, 1) } label: { Image(systemName: "chevron.down") }
-                                                .buttonStyle(.plain).disabled(i == orden.count - 1)
+                                                .buttonStyle(.plain).disabled(i == 0 || i == orden.count - 1)
                                                 .help("Bajar esta IA en el failover de pulido")
                                         }
                                     }
@@ -1185,9 +1185,10 @@ struct SettingsView: View {
     private func modelosDe(_ sel: ChatIA) -> [String] {
         if sel.id.hasPrefix("custom:") {
             let gid = String(sel.id.dropFirst(7))
-            return PersonalizadaStore.cargar().first(where: { $0.id == gid })?.modelos ?? []
+            let ids = PersonalizadaStore.cargar().first(where: { $0.id == gid })?.modelos ?? []
+            return ChatIA.modelosAptosParaPulido(ids)
         }
-        return ChatIA.modelosPorProveedor[sel.id] ?? []
+        return ChatIA.modelosAptosParaPulido(ChatIA.modelosPorProveedor[sel.id] ?? [])
     }
     /// "modelo · precio" — precio manual del usuario, o el publicado por el
     /// proveedor, o el curado (aprox.).
@@ -1198,7 +1199,9 @@ struct SettingsView: View {
     /// Reordena la cascada de failover de pulido (persiste el orden completo).
     private func moverCascada(_ ids: [String], _ i: Int, _ d: Int) {
         var a = ids; let j = i + d
-        guard j >= 0, j < a.count else { return }
+        // La posición 1 pertenece al selector de IA principal. Aquí solo se
+        // reordenan sus respaldos, para que ambas configuraciones no se contradigan.
+        guard i > 0, j > 0, j < a.count else { return }
         a.swapAt(i, j)
         Config.set("pulido_cascada", to: a)
         detectTrigger += 1
@@ -1331,6 +1334,12 @@ struct SettingsView: View {
         }
     }
     private func elegirModelo(_ sel: ChatIA, _ nuevo: String) {
+        guard ChatIA.modeloAptoParaPulido(nuevo) else {
+            msgModId = sel.id
+            msgMod = "Ese modelo no genera texto y no puede pulir dictados."
+            msgModOK = false
+            return
+        }
         if sel.id.hasPrefix("custom:") {
             let gid = String(sel.id.dropFirst(7))
             var a = PersonalizadaStore.cargar()
@@ -1344,18 +1353,23 @@ struct SettingsView: View {
             let gid = String(sel.id.dropFirst(7))
             guard let snap = PersonalizadaStore.cargar().first(where: { $0.id == gid }) else { descubriendoMod = false; return }
             PersonalizadaStore.descubrirModelos(snap) { ids, msg in
+                let aptos = ChatIA.modelosAptosParaPulido(ids)
+                let omitidos = ids.count - aptos.count
                 // Recarga FRESCO dentro del callback y aplica solo la mutación
                 // puntual: no pisa ediciones a otros gateways hechas mientras se
                 // descubría (el editor es otra ventana no modal).
-                if !ids.isEmpty {
+                if !aptos.isEmpty {
                     var fresh = PersonalizadaStore.cargar()
                     if let k = fresh.firstIndex(where: { $0.id == gid }) {
-                        fresh[k].modelos = ids
-                        if fresh[k].modelo.isEmpty { fresh[k].modelo = ids[0] }
+                        fresh[k].modelos = aptos
+                        if !ChatIA.modeloAptoParaPulido(fresh[k].modelo) { fresh[k].modelo = aptos[0] }
                         PersonalizadaStore.guardar(fresh)
                     }
                 }
-                descubriendoMod = false; msgMod = msg; msgModOK = !ids.isEmpty; detectTrigger += 1
+                let detalle = omitidos > 0
+                    ? "\(aptos.count) aptos para pulido · \(omitidos) omitidos (audio, embeddings o clasificación)"
+                    : msg
+                descubriendoMod = false; msgMod = detalle; msgModOK = !aptos.isEmpty; detectTrigger += 1
             }
         } else {
             ChatIA.descubrirProveedor(sel) { ids, msg in

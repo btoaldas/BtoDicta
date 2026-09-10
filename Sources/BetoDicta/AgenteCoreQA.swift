@@ -639,6 +639,50 @@ enum AgenteCoreQA {
                     && ChatIA.precioDe("codex_account", "automático")?.contains("plan ChatGPT") == true)
         comprobar("cuenta Codex no se anuncia como motor de embeddings",
                   !EmbeddingSearch.motores.contains(where: { $0.id == "codex_account" }))
+        comprobar("catálogo de pulido excluye clasificadores y audio",
+                  !ChatIA.modeloAptoParaPulido("meta-llama/llama-prompt-guard-2-86m")
+                    && !ChatIA.modeloAptoParaPulido("meta-llama/Llama-Guard-4-12B")
+                    && !ChatIA.modeloAptoParaPulido("whisper-large-v3-turbo")
+                    && !ChatIA.modeloAptoParaPulido("nomic-embed-text")
+                    && ChatIA.modeloAptoParaPulido("openai/gpt-oss-120b"))
+        comprobar("selección no generativa cae al modelo seguro",
+                  ChatIA.modeloSeguroParaPulido(
+                    "meta-llama/llama-prompt-guard-2-86m",
+                    respaldo: "llama-3.3-70b-versatile") == "llama-3.3-70b-versatile")
+        let qaGroq = ChatIA(id: "qa-groq", nombre: "QA Groq", base: "https://example.com/v1",
+                            modelo: "qa-chat", keyEnv: "", local: false)
+        let qaCodex = ChatIA(id: "qa-codex", nombre: "QA Codex", base: "codex://qa",
+                             modelo: "qa-chat", keyEnv: "", local: false)
+        let qaLocal = ChatIA(id: "qa-local", nombre: "QA Local", base: "http://localhost:1/v1",
+                             modelo: "qa-chat", keyEnv: "", local: true)
+        let ordenPulido = ChatIA.ordenarPulido(
+            [qaGroq, qaCodex, qaLocal], preferida: qaCodex.id,
+            orden: [qaGroq.id, qaLocal.id, qaGroq.id])
+        comprobar("IA elegida encabeza la cascada sin duplicados",
+                  ordenPulido.map(\.id) == [qaCodex.id, qaGroq.id, qaLocal.id],
+                  ordenPulido.map(\.id).joined(separator: ", "))
+        let originalPulidoQA = "Necesitamos revisar mañana el informe completo con todo el equipo."
+        comprobar("pulido rechaza puntaje de clasificador",
+                  LLMPostProcess.razonPulidoInvalido(
+                    original: originalPulidoQA, pulido: "0.9381640553474426") != nil)
+        comprobar("pulido rechaza colapso de contenido verbal",
+                  LLMPostProcess.razonPulidoInvalido(
+                    original: originalPulidoQA, pulido: "42") != nil)
+        comprobar("pulido acepta texto corregido y decimal dictado intacto",
+                  LLMPostProcess.razonPulidoInvalido(
+                    original: originalPulidoQA,
+                    pulido: "Necesitamos revisar mañana el informe completo con todo el equipo.") == nil
+                    && LLMPostProcess.razonPulidoInvalido(
+                        original: "0.9381640553474426", pulido: "0.9381640553474426") == nil)
+        comprobar("marcador STT de silencio no llega al pulido",
+                  TextoTranscrito.limpiar(" (empty) \n").isEmpty
+                    && TextoTranscrito.limpiar("<|no_speech|>").isEmpty)
+        comprobar("una frase real que menciona empty se conserva",
+                  TextoTranscrito.limpiar("La palabra empty aparece en el informe.")
+                    == "La palabra empty aparece en el informe.")
+        comprobar("re-transcribir WAV usa cascada y otros contenedores conservan compatibilidad",
+                  TranscribeView.usaCascada(URL(fileURLWithPath: "/tmp/audio.WAV"))
+                    && !TranscribeView.usaCascada(URL(fileURLWithPath: "/tmp/audio.mp3")))
         let modelosCodex = AgenteCodex.modelosDisponibles()
         comprobar("selector Codex enumera automático y familia 5.6",
                   modelosCodex.first?.id == "automatico"
