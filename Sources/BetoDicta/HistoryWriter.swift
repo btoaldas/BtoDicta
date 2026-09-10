@@ -15,6 +15,25 @@ final class HistoryWriter {
 
     static var historyDir: URL { Config.dir.appendingPathComponent("historial") }
 
+    /// Un rescate aditivo vive junto al texto original como
+    /// `HH-mm-ss.recuperado.txt`. No es otra entrada del historial: es la copia
+    /// verificada que los lectores deben preferir sin pisar la evidencia previa.
+    static func esTextoPrincipal(_ url: URL) -> Bool {
+        url.pathExtension.lowercased() == "txt"
+            && !url.lastPathComponent.lowercased().hasSuffix(".recuperado.txt")
+    }
+
+    static func textoRecuperadoURL(para principal: URL) -> URL {
+        principal.deletingPathExtension()
+            .appendingPathExtension("recuperado")
+            .appendingPathExtension("txt")
+    }
+
+    static func textoPreferidoURL(para principal: URL) -> URL {
+        let recuperado = textoRecuperadoURL(para: principal)
+        return FileManager.default.fileExists(atPath: recuperado.path) ? recuperado : principal
+    }
+
     init() {
         let dir = Self.historyDir
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -120,4 +139,3 @@ final class HistoryWriter {
         return wav
     }
 }
-

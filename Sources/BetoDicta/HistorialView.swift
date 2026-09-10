@@ -6,8 +6,10 @@ private let acentoH = Color(red: 0.36, green: 0.28, blue: 0.62)
 // MARK: - Historial con buscador: todos tus dictados, filtrables al instante
 
 struct EntradaHistorial: Identifiable {
-    let id: URL           // el .txt
+    let id: URL           // el .txt original, identidad estable de la entrada
+    let archivoTexto: URL // original o sidecar recuperado preferido
     let fecha: Date
+    let versionTexto: Date // invalida embeddings si aparece/cambia el sidecar
     let texto: String
     let wav: URL?         // el audio hermano, si existe
 
@@ -31,13 +33,17 @@ final class HistorialModel: ObservableObject {
             let fm = FileManager.default
             if let en = fm.enumerator(at: HistoryWriter.historyDir,
                                       includingPropertiesForKeys: [.contentModificationDateKey]) {
-                for case let url as URL in en where url.pathExtension == "txt" {
-                    guard let texto = try? String(contentsOf: url, encoding: .utf8),
+                for case let url as URL in en where HistoryWriter.esTextoPrincipal(url) {
+                    let preferido = HistoryWriter.textoPreferidoURL(para: url)
+                    guard let texto = try? String(contentsOf: preferido, encoding: .utf8),
                           !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
                     let fecha = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
                         .contentModificationDate ?? .distantPast
+                    let versionTexto = (try? preferido.resourceValues(forKeys: [.contentModificationDateKey]))?
+                        .contentModificationDate ?? fecha
                     let wav = url.deletingPathExtension().appendingPathExtension("wav")
-                    lista.append(EntradaHistorial(id: url, fecha: fecha, texto: texto,
+                    lista.append(EntradaHistorial(id: url, archivoTexto: preferido,
+                                                  fecha: fecha, versionTexto: versionTexto, texto: texto,
                                                   wav: fm.fileExists(atPath: wav.path) ? wav : nil))
                 }
             }
@@ -85,7 +91,9 @@ struct HistorialView: View {
         let q = busqueda.trimmingCharacters(in: .whitespaces)
         guard semantica, !q.isEmpty else { rank = [:]; ordenSem = []; return }
         buscandoSem = true; errorSem = nil; progresoSem = (0, m.entradas.count)
-        let items = m.entradas.map { (path: $0.id.path, mtime: $0.fecha.timeIntervalSince1970, texto: $0.texto) }
+        let items = m.entradas.map {
+            (path: $0.id.path, mtime: $0.versionTexto.timeIntervalSince1970, texto: $0.texto)
+        }
         EmbeddingSearch.buscar(consulta: q, items: items,
                                progreso: { hechos, total in progresoSem = (hechos, total) },
                                done: { r in
@@ -202,7 +210,7 @@ struct HistorialView: View {
                         .foregroundStyle(copiado == e.id ? .green : acentoH)
                 }.buttonStyle(.plain).help("Copiar el texto")
                 Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([e.id])
+                    NSWorkspace.shared.activateFileViewerSelecting([e.archivoTexto])
                 } label: {
                     Image(systemName: "folder").foregroundStyle(.secondary)
                 }.buttonStyle(.plain).help("Mostrar en Finder")

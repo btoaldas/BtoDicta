@@ -216,7 +216,8 @@ struct TranscribeView: View {
         if let walker = fm.enumerator(at: HistoryWriter.historyDir, includingPropertiesForKeys: [.contentModificationDateKey]) {
             for case let url as URL in walker where url.pathExtension == "wav" {
                 let fecha = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                let txt = url.deletingPathExtension().appendingPathExtension("txt")
+                let principal = url.deletingPathExtension().appendingPathExtension("txt")
+                let txt = HistoryWriter.textoPreferidoURL(para: principal)
                 let previo = (try? String(contentsOf: txt, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 out.append(Grabacion(wav: url, fecha: fecha, textoPrevio: previo))
             }

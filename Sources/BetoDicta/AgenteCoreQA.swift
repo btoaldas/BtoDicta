@@ -683,6 +683,12 @@ enum AgenteCoreQA {
         comprobar("re-transcribir WAV usa cascada y otros contenedores conservan compatibilidad",
                   TranscribeView.usaCascada(URL(fileURLWithPath: "/tmp/audio.WAV"))
                     && !TranscribeView.usaCascada(URL(fileURLWithPath: "/tmp/audio.mp3")))
+        let historialPrincipalQA = URL(fileURLWithPath: "/tmp/12-34-56.txt")
+        let historialRecuperadoQA = HistoryWriter.textoRecuperadoURL(para: historialPrincipalQA)
+        comprobar("historial asocia el rescate sin duplicarlo como otro dictado",
+                  HistoryWriter.esTextoPrincipal(historialPrincipalQA)
+                    && !HistoryWriter.esTextoPrincipal(historialRecuperadoQA)
+                    && historialRecuperadoQA.lastPathComponent == "12-34-56.recuperado.txt")
         let modelosCodex = AgenteCodex.modelosDisponibles()
         comprobar("selector Codex enumera automático y familia 5.6",
                   modelosCodex.first?.id == "automatico"

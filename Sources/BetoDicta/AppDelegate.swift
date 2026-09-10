@@ -2868,22 +2868,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openReplacements() { NSWorkspace.shared.open(Config.dir.appendingPathComponent("reemplazos.json")) }
     @objc private func copyLastDictation() {
         let fm = FileManager.default
-        var newest: (url: URL, date: Date)?
+        var newest: (text: String, date: Date)?
         if let walker = fm.enumerator(at: HistoryWriter.historyDir, includingPropertiesForKeys: [.contentModificationDateKey]) {
-            for case let url as URL in walker where url.pathExtension == "txt" {
+            for case let url as URL in walker where HistoryWriter.esTextoPrincipal(url) {
                 let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                if newest == nil || date > newest!.date { newest = (url, date) }
+                let preferido = HistoryWriter.textoPreferidoURL(para: url)
+                guard let text = try? String(contentsOf: preferido, encoding: .utf8),
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                if newest == nil || date > newest!.date { newest = (text, date) }
             }
         }
-        guard let newest, let text = try? String(contentsOf: newest.url, encoding: .utf8), !text.isEmpty else {
+        guard let newest else {
             panel.show("Historial vacío — nada que copiar")
             panel.hide(after: 1.5)
             return
         }
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(text, forType: .string)
-        panel.show("📋 Copiado: " + text)
+        pb.setString(newest.text, forType: .string)
+        panel.show("📋 Copiado: " + newest.text)
         panel.hide(after: 2)
     }
 
@@ -2913,9 +2916,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let fm = FileManager.default
         var found: [(Date, URL)] = []
         if let walker = fm.enumerator(at: HistoryWriter.historyDir, includingPropertiesForKeys: [.contentModificationDateKey]) {
-            for case let url as URL in walker where url.pathExtension == "txt" {
+            for case let url as URL in walker where HistoryWriter.esTextoPrincipal(url) {
                 let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                found.append((date, url))
+                let preferido = HistoryWriter.textoPreferidoURL(para: url)
+                guard let text = try? String(contentsOf: preferido, encoding: .utf8),
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                found.append((date, preferido))
             }
         }
         return found.sorted { $0.0 > $1.0 }.prefix(count).map { (date: $0.0, url: $0.1) }
@@ -2937,16 +2943,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let día = fmt.string(from: Date())
         var nota = "# Dictados del \(día)\n\n"
         let archivos = ((try? FileManager.default.contentsOfDirectory(at: hoy, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension == "txt" }
+            .filter(HistoryWriter.esTextoPrincipal)
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
-        guard !archivos.isEmpty else {
+        let entradas = archivos.compactMap { archivo -> (URL, String)? in
+            let preferido = HistoryWriter.textoPreferidoURL(para: archivo)
+            guard let texto = try? String(contentsOf: preferido, encoding: .utf8),
+                  !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return (archivo, texto)
+        }
+        guard !entradas.isEmpty else {
             panel.show("Hoy no hay dictados que exportar")
             panel.hide(after: 1.5)
             return
         }
-        for archivo in archivos {
+        for (archivo, texto) in entradas {
             let hora = archivo.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "-", with: ":")
-            let texto = (try? String(contentsOf: archivo, encoding: .utf8)) ?? ""
             nota += "## \(hora)\n\n\(texto)\n\n"
         }
         let destino = Config.exportFolder().appendingPathComponent("Dictados-\(día).md")
