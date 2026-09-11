@@ -15,6 +15,7 @@ let package = Package(
             name: "BetoDicta",
             dependencies: ["BDObjC"],
             path: "Sources/BetoDicta"
-        )
+        ),
+        .testTarget(name: "BetoDictaTests", dependencies: ["BetoDicta"], path: "Tests/BetoDictaTests")
     ]
 )

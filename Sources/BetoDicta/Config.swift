@@ -67,9 +67,9 @@ struct Config {
     }
     static func pausePlayback() -> Bool { (json()["pausar_multimedia"] as? Bool) ?? true }
     static func devMode() -> Bool { (json()["modo_desarrollo"] as? Bool) ?? false }
-    /// Segundos a esperar la respuesta del pulido con IA (Groq) antes de
-    /// rendirse. Parametrizable (Avanzado). Default 20, hasta 60.
-    static func pulidoTimeout() -> Double { min(60, max(5, (json()["pulido_timeout_seg"] as? Double) ?? 20)) }
+    /// Base por proveedor para textos cortos. El presupuesto adaptativo añade
+    /// tiempo para dictados/contextos largos, hasta 120 s. Default 8.
+    static func pulidoTimeout() -> Double { min(60, max(5, (json()["pulido_timeout_seg"] as? Double) ?? 8)) }
     static func showInDock() -> Bool { (json()["mostrar_en_dock"] as? Bool) ?? false }
     /// Al abrir la app, busca en silencio si hay versión nueva (GitHub) y la
     /// muestra abajo-izquierda ("Actualización disponible"). Parametrizable.

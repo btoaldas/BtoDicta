@@ -160,37 +160,21 @@ struct TranscribeView: View {
                 estado = "⚠️ \(mensajeError(e))"
             }
         }
-        if Self.usaCascada(url) {
-            guard let wav = try? Data(contentsOf: url) else {
-                terminar(.failure(ScribeError.http(0, "No se pudo leer el archivo")))
-                return
+        AudioArchivo.transcribir(url) { r in
+            switch r {
+            case .success(let (texto, proveedor, modelo)):
+                Log.log(.ia, "transcribir archivo: OK con \(proveedor) · \(modelo)")
+                terminar(.success(texto))
+            case .failure(let error):
+                terminar(.failure(error))
             }
-            Failover.transcribe(wav: wav) { r in
-                switch r {
-                case .success(let (texto, proveedor, modelo)):
-                    Log.log(.ia, "re-transcribir: OK con \(proveedor) · \(modelo)")
-                    terminar(.success(texto))
-                case .failure(let error):
-                    terminar(.failure(error))
-                }
-            }
-        } else {
-            // ElevenLabs acepta contenedores de audio/video directamente. Los
-            // WAV pasan por la cascada completa y no dependen de su cuota.
-            transcribeFile(url: url,
-                           model: Config.model() == "scribe_v2_realtime" ? "scribe_v2" : Config.model(),
-                           completion: terminar)
         }
-    }
-
-    static func usaCascada(_ url: URL) -> Bool {
-        url.pathExtension.lowercased() == "wav"
     }
 
     private func mensajeError(_ error: Error) -> String {
         if case let ScribeError.http(code, body) = error,
            code == 401, body.lowercased().contains("quota_exceeded") {
-            return "ElevenLabs no tiene cuota disponible. Para audio WAV usa la cascada configurada; para otros formatos cambia de cuota o conviértelos primero a WAV."
+            return "ElevenLabs no tiene cuota disponible y la cascada no pudo resolver el audio. Revisa los modelos habilitados y sus credenciales."
         }
         return error.localizedDescription
     }

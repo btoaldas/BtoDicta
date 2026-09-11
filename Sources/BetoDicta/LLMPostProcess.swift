@@ -97,10 +97,14 @@ struct ChatIA {
             // temperatura arbitraria. Para el pulido interesa respuesta rápida,
             // por eso desactivamos el razonamiento largo de forma oficial.
             // Kimi Code también gestiona el razonamiento según el modelo/plan.
-            if id == "moonshot" {
+            if id == "moonshot" || id == "deepseek" {
                 body["thinking"] = ["type": "disabled"]
             } else if id != "kimi_code" {
                 body["temperature"] = temperatura
+            }
+            if id == "groq", modeloEfectivo.hasPrefix("openai/gpt-oss-") {
+                body["reasoning_effort"] = "low"
+                body["include_reasoning"] = false
             }
         case .anthropic:
             urlStr = "\(base)/v1/messages"
@@ -114,7 +118,8 @@ struct ChatIA {
         guard let url = URL(string: urlStr) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
-        req.timeoutInterval = min(120, Config.pulidoTimeout() + Double(textLen) / 40)
+        req.timeoutInterval = PoliticaPulido.espera(texto: textLen, contexto: prompt.count,
+                                                   base: Config.pulidoTimeout())
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         // Kimi Code exige conservar la identidad real del cliente. No fingimos
         // ser Claude Code/Kimi CLI ni reutilizamos cookies de la cuenta.
@@ -160,7 +165,7 @@ struct ChatIA {
 
     /// Proveedores fijos (nube + locales). Constantes.
     static let fijos: [ChatIA] = [
-        ChatIA(id: "groq",       nombre: "Groq · Llama 3.3 70B", base: "https://api.groq.com/openai/v1", modelo: "llama-3.3-70b-versatile", keyEnv: "GROQ_API_KEY",       local: false),
+        ChatIA(id: "groq",       nombre: "Groq · GPT OSS 20B", base: "https://api.groq.com/openai/v1", modelo: "openai/gpt-oss-20b", keyEnv: "GROQ_API_KEY",       local: false),
         ChatIA(id: "openai",     nombre: "OpenAI · gpt-4o-mini", base: "https://api.openai.com/v1",      modelo: "gpt-4o-mini",             keyEnv: "OPENAI_API_KEY",     local: false),
         // Cuenta ChatGPT delegada al cliente OFICIAL Codex. Capacidad: texto
         // (asistente, Modos, traducción y pulido). No STT/TTS/embeddings.
@@ -172,7 +177,7 @@ struct ChatIA {
         ChatIA(id: "kimi_code",  nombre: "Kimi cuenta · K3/K2.7", base: "https://api.kimi.com/coding/v1", modelo: "kimi-for-coding", keyEnv: "KIMI_CODE_API_KEY", local: false),
         ChatIA(id: "mistral",    nombre: "Mistral · small",      base: "https://api.mistral.ai/v1",      modelo: "mistral-small-latest",    keyEnv: "MISTRAL_API_KEY",    local: false),
         ChatIA(id: "openrouter", nombre: "OpenRouter",           base: "https://openrouter.ai/api/v1",   modelo: "openai/gpt-4o-mini",      keyEnv: "OPENROUTER_API_KEY", local: false),
-        ChatIA(id: "deepseek",   nombre: "DeepSeek · chat",      base: "https://api.deepseek.com",       modelo: "deepseek-chat",           keyEnv: "DEEPSEEK_API_KEY",   local: false),
+        ChatIA(id: "deepseek",   nombre: "DeepSeek · V4.1 Flash", base: "https://api.deepseek.com",       modelo: "deepseek-flash",          keyEnv: "DEEPSEEK_API_KEY",   local: false),
         ChatIA(id: "xai",        nombre: "xAI · Grok",           base: "https://api.x.ai/v1",            modelo: "grok-2-latest",           keyEnv: "XAI_API_KEY",        local: false),
         ChatIA(id: "gemini",     nombre: "Gemini · Flash",       base: "https://generativelanguage.googleapis.com/v1beta/openai", modelo: "gemini-2.5-flash", keyEnv: "GEMINI_API_KEY", local: false),
         ChatIA(id: "anthropic",  nombre: "Anthropic · Claude",   base: "https://api.anthropic.com",      modelo: "claude-haiku-4-5",        keyEnv: "ANTHROPIC_API_KEY",  local: false,
@@ -286,7 +291,10 @@ struct ChatIA {
         "devstral-small-latest": (0.1, 0.3), "open-mistral-nemo": (0.15, 0.15), "open-mixtral-8x22b": (2, 6),
         "open-mixtral-8x7b": (0.7, 0.7), "labs-leanstral-2603": (0, 0),
         // DeepSeek
-        "deepseek-v4-flash": (0.14, 0.28), "deepseek-v4-pro": (0.435, 0.87), "deepseek-chat": (0.14, 0.28),
+        // V4.1 Flash: tarifa pico conservadora, sin caché (consulta 2026-09-10).
+        // Fuera de pico la tarifa publicada es 0.15/0.60; con caché, menor.
+        "deepseek-flash": (0.30, 1.20), "deepseek-v4-flash": (0.30, 1.20),
+        "deepseek-v4-pro": (0.435, 0.87), "deepseek-chat": (0.14, 0.28),
         "deepseek-reasoner": (0.14, 0.28),
         // xAI (Grok)
         "grok-4.5": (2, 6), "grok-4.3": (1.25, 2.5), "grok-4.20-0309-reasoning": (1.25, 2.5),
@@ -726,6 +734,7 @@ enum PersonalizadaStore {
 /// REGLA DE ORO: si algo falla (sin key, sin red, timeout), devuelve el
 /// texto original intacto — el post-proceso jamás rompe un dictado.
 enum LLMPostProcess {
+    static var sesionHTTP = URLSession.shared
 
     /// Da una forma más natural y breve a un resumen de pendientes ya calculado
     /// localmente. No decide fechas ni acciones: la IA solo reescribe. Ante
@@ -877,15 +886,23 @@ enum LLMPostProcess {
 
     /// Despacho común de un proveedor: HTTP normal o cuenta ChatGPT mediante
     /// el cliente oficial Codex. La cuenta nunca se convierte en una falsa API.
-    private static func hacerProveedor(_ ia: ChatIA, textoOriginal text: String,
+    static func hacerProveedor(_ ia: ChatIA, textoOriginal text: String,
                                        inicio: Date, intento: Int,
                                        salvaguarda: Bool = true,
                                        prompt: String, temp: Double,
                                        resto: [ChatIA],
                                        completion: @escaping (String) -> Void) {
+        let identidad = CuarentenaPulido.identidad(ia)
+        if CuarentenaPulido.compartida.activa(identidad, local: ia.local) {
+            continuarFailover(desde: ia, motivo: "cuarentena temporal", textoOriginal: text,
+                              salvaguarda: salvaguarda, prompt: prompt, temp: temp,
+                              resto: resto, completion: completion)
+            return
+        }
         if ia.esCuentaCodex {
             AgenteCodex.transformar(prompt, modelo: ia.modeloEfectivo,
-                                    timeout: Config.pulidoTimeout()) { respuesta in
+                                    timeout: PoliticaPulido.espera(texto: text.count, contexto: prompt.count,
+                                                                  base: Config.pulidoTimeout())) { respuesta in
                 let pulido = respuesta?.trimmingCharacters(in: .whitespacesAndNewlines)
                 if let pulido, !pulido.isEmpty {
                     if let motivo = razonFugaPrompt(original: text, pulido: pulido) {
@@ -912,16 +929,8 @@ enum LLMPostProcess {
                     }
                     completion(pulido); return
                 }
-                if intento < 2 {
-                    Log.write("pulido: cuenta Codex no respondió — reintento fresco…")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        hacerProveedor(ia, textoOriginal: text, inicio: Date(),
-                                       intento: intento + 1, salvaguarda: salvaguarda,
-                                       prompt: prompt, temp: temp, resto: resto,
-                                       completion: completion)
-                    }
-                    return
-                }
+                CuarentenaPulido.compartida.registrar(identidad, local: ia.local, codigo: 0,
+                                                      cuerpo: "", error: URLError(.timedOut))
                 continuarFailover(desde: ia, motivo: "sin respuesta de Codex",
                                   textoOriginal: text, salvaguarda: salvaguarda,
                                   prompt: prompt, temp: temp, resto: resto,
@@ -957,8 +966,7 @@ enum LLMPostProcess {
                        resto: Array(resto.dropFirst()), completion: completion)
     }
 
-    /// Ejecuta la llamada con hasta 1 REINTENTO ante fallos de red/timeout
-    /// (transitorios). En error de servidor (HTTP 4xx/5xx) no reintenta.
+    /// Un intento por proveedor y cuarentena: nunca pagar dos timeouts seguidos.
     private static func hacer(_ request: URLRequest, ia: ChatIA, textoOriginal text: String,
                               inicio: Date, intento: Int, salvaguarda: Bool = true,
                               prompt: String = "", temp: Double = 0, resto: [ChatIA] = [],
@@ -966,17 +974,16 @@ enum LLMPostProcess {
         // REUSA la conexión CALIENTE que mantiene CalientaRed (latido keep-alive):
         // así el pulido no paga handshake TLS tras inactividad → rápido desde el 1er
         // uso. NO ponemos "Connection: close" (eso forzaba handshake cada vez = lento).
-        // Si el socket murió igual (VPN lo mató), el bloque de fallo reintenta con
-        // conexión fresca → nunca se cuelga.
-        var req = request
-        if req.timeoutInterval > 30 || req.timeoutInterval == 0 { req.timeoutInterval = max(12, Config.pulidoTimeout()) }
-        URLSession.shared.dataTask(with: req) { data, response, error in
+        Log.write("pulido: intento \(ia.id) · \(ia.modeloEfectivo), plazo \(Int(request.timeoutInterval))s, texto \(text.count), contexto \(prompt.count)")
+        PeticionPulido.ejecutar(request, session: sesionHTTP) { data, response, error in
             DispatchQueue.main.async {
                 if let data,
                    let code = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(code) {
                     if ia.fueTruncado(data) {
-                        Log.write("pulido: respuesta TRUNCADA por tope de tokens → texto original")
-                        completion(text); return
+                        continuarFailover(desde: ia, motivo: "respuesta truncada", textoOriginal: text,
+                                          salvaguarda: salvaguarda, prompt: prompt, temp: temp,
+                                          resto: resto, completion: completion)
+                        return
                     }
                     if let pulido = ia.extraerContenido(data)?
                         .trimmingCharacters(in: .whitespacesAndNewlines), !pulido.isEmpty {
@@ -1003,7 +1010,8 @@ enum LLMPostProcess {
                             return
                         }
                         let ms = Int(Date().timeIntervalSince(inicio) * 1000)
-                        Log.write("pulido: OK en \(ms)ms — \(text.count)→\(pulido.count) chars\(intento > 1 ? " (reintento)" : "")")
+                        CuarentenaPulido.compartida.limpiar(CuarentenaPulido.identidad(ia))
+                        Log.write("pulido: OK \(ia.id) · \(ia.modeloEfectivo) en \(ms)ms — \(text.count)→\(pulido.count) chars")
                         // Salvaguarda anti-inyección (opt-in): si el pulido diverge
                         // groseramente del dictado, cae al ORIGINAL (nunca bloquea).
                         // Los modos que TRANSFORMAN (correo/oficio/traducir/…) la
@@ -1021,11 +1029,17 @@ enum LLMPostProcess {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? -1
                 let motivo = esRed ? (error?.localizedDescription ?? "red")
                     : "HTTP \(code): \(data.flatMap { String(data: $0, encoding: .utf8) }?.prefix(120).description ?? "")"
+                let cuarentena = CuarentenaPulido.compartida.registrar(
+                    CuarentenaPulido.identidad(ia), local: ia.local, codigo: code,
+                    cuerpo: data.flatMap { String(data: $0, encoding: .utf8) } ?? "", error: error)
+                if cuarentena > 0 {
+                    Log.write("pulido: \(ia.id) en cuarentena \(Int(cuarentena))s (HTTP \(code), red: \(esRed))")
+                }
                 // Sin internet (-1009): ni reintento ni recorrer la cascada de
                 // nube — todos van a fallar igual y solo suman 16 líneas al
                 // registro y segundos de espera. Directo al primer motor LOCAL
                 // que quede en la cascada; si no hay, texto original. Una línea.
-                if SinConexion.es(error) {
+                if !ia.local, SinConexion.es(error) {
                     let locales = resto.filter { $0.local }
                     if let primero = locales.first {
                         Log.write("pulido: sin conexión a internet → salto directo al motor local \(primero.id)")
@@ -1038,25 +1052,12 @@ enum LLMPostProcess {
                     }
                     return
                 }
-                // 1º fallo de RED (connection lost/timeout) → reintenta el MISMO proveedor
-                // con conexión FRESCA (arregla el socket reusado muerto, es lo más rápido).
-                if esRed, intento < 2 {
-                    Log.write("pulido: fallo de red (\(motivo)) — reintento con conexión fresca…")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        hacerProveedor(ia, textoOriginal: text, inicio: inicio,
-                                       intento: intento + 1, salvaguarda: salvaguarda,
-                                       prompt: prompt, temp: temp, resto: resto,
-                                       completion: completion)
-                    }
-                    return
-                }
-                // Ya reintentó (o fue error de SERVIDOR HTTP) → FAILOVER al siguiente
-                // proveedor de la cascada. Cascada finita = sin bucle.
+                // Siguiente proveedor de la cascada, sin repetir el que ya falló.
                 continuarFailover(desde: ia, motivo: motivo, textoOriginal: text,
                                   salvaguarda: salvaguarda, prompt: prompt, temp: temp,
                                   resto: resto, completion: completion)
             }
-        }.resume()
+        }
     }
 
     /// Protección obligatoria contra respuestas que copian el prompt interno o
