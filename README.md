@@ -34,6 +34,29 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.53.1
+
+- **Dictado protegido**: los clasificadores como Prompt Guard no sirven para
+  redactar y ya no se ofrecen para pulido. Si llega un puntaje o una respuesta
+  inválida, se intenta el respaldo; si ninguno sirve, se conserva el original.
+- **Archivos por la misma cascada STT**: WAV, MP3, M4A, MP4 y MOV se convierten
+  localmente a WAV antes de usar tus motores habilitados en el orden elegido.
+  Ya no existe la ruta directa obligatoria a ElevenLabs. Ogg y otros códecs pueden
+  utilizar un ffmpeg ya instalado; sin decodificador compatible se avisa sin subir nada.
+- **Pulido adaptativo**: base de 8 s por proveedor, ampliada según texto y contexto
+  hasta 120 s. La cascada comparte un máximo de 24 s para textos cortos y hasta
+  240 s para los largos. Cuota, clave inválida y problemas de red activan cuarentena.
+- **Modelos generativos actuales**: DeepSeek V4.1 Flash (`deepseek-flash`), sin
+  razonamiento para pulir; Groq GPT OSS 20B como opción de menor tarifa pública
+  de producción consultada. Los precios son estimaciones, no facturas.
+- **Historial recuperable**: los rescates aditivos se muestran sin duplicar entradas
+  ni sobrescribir los textos originales. Corregidos los días relativos del resumen
+  de tareas y optimizada la copia del último dictado.
+
+![Espera del pulido: captura real de la compilación de validación](docs/img/pulido-adaptativo-0531.png)
+
+Detalles, límites y pruebas: [QA de cascada y pulido](docs/QA-cascada-pulido-2026-09-10.md).
+
 - **Bitácora continua (opt-in)**: graba tu voz, el audio del sistema y capturas de pantalla en segundo plano; transcribe y lee todo en tandas diferidas con tus motores; y genera documentos del día (resumen, ideas, tareas…) con la IA que elijas —local o nube— mediante rutinas programables. El dictado siempre tiene prioridad sobre el micrófono. Apagada de fábrica.
 
 - **Modos — entiende la intención y decide qué hacer**: además de **Dictado**, usa **Correo, Oficio, Tarea, Nota, Traducir, Resumir, Asistente, Agente, Buscar, Música** o **Aplicación**, cada uno con comportamiento/color propios. El modo Aplicación hace un inventario de las apps reales del Mac: *"modo abrir aplicación Word, borrador del informe"* abre Word y coloca el texto (sin enviarlo). Entiende comandos explícitos y pedidos naturales, incluso cadenas de **1 a N etapas** (*"resume, traduce al quichua y envía por correo y WhatsApp"*) con idioma y destinatario. Ante una propuesta, el notch se expande: **fn una vez confirma; X continúa el dictado normal**. Reglas locales → embeddings con margen → IA opcional como último árbitro, siempre con degradación suave y sin ejecutar acciones ambiguas. También admite pausa en vivo, app/sitio, un solo uso y modos propios.

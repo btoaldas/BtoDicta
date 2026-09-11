@@ -6,11 +6,18 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.53.0"
-    static let fecha = "2026-09-01"
+    static let numero = "0.53.1"
+    static let fecha = "2026-09-10"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.53.1", "2026-09-10", [
+            "DICTADO PROTEGIDO: se excluyen clasificadores como Prompt Guard del pulido; un puntaje o una respuesta inválida pasa al respaldo y nunca sustituye silenciosamente el texto original",
+            "ARCHIVOS CON CASCADA: MP3, M4A, MP4, MOV y WAV se normalizan localmente antes de usar los motores STT habilitados en tu orden; ya no van obligatoriamente a ElevenLabs. Conversión sin modificar originales y con protocolos de red restringidos",
+            "PULIDO ADAPTATIVO: espera base de 8 s por proveedor, ampliada para textos y contextos largos hasta 120 s. La cascada comparte un presupuesto de 24 a 240 s; no repite timeouts y conserva el original si nadie responde",
+            "MODELOS GENERATIVOS: DeepSeek V4.1 Flash sin razonamiento para pulir y Groq GPT OSS 20B como opción económica; cuarentena temporal por cuota, autenticación, red o servidor caído",
+            "HISTORIAL RECUPERABLE: muestra rescates aditivos sin duplicar entradas ni sobrescribir los originales; copia del último dictado más eficiente y fechas relativas corregidas en el resumen de tareas",
+        ]),
         ("0.53.0", "2026-09-01", [
             "LA BITÁCORA VUELVE A COMPRIMIR: desde el 17 de agosto cada fragmento de audio se quedaba en PCM crudo (el m4a se validaba con el escritor aún abierto, fallaba y se borraba el archivo bueno) — 17,5 GB en dos semanas. Corregido, con validación estricta por marcos antes de soltar el crudo, y RECOMPRESIÓN en segundo plano de todo lo que quedó atrás (pasadas de 1 500 archivos, una por minuto mientras quede cola, se detiene si dictas, cada m4a se comprueba antes de borrar su PCM). Ajuste y botón «Recomprimir ahora» en Bitácora",
             "STREAMING SCRIBE SIN CUOTA: cuando ElevenLabs cerraba la sesión por cuota o clave, la app seguía mandándole audio diez veces por segundo durante todo el dictado (19 539 líneas de error en tres días) y nadie pasaba al plan B. Ahora corta de una, el proveedor entra en cuarentena real (30 min) y el motor local toma el dictado a mitad de frase con todo el audio acumulado",

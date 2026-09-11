@@ -2868,15 +2868,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openReplacements() { NSWorkspace.shared.open(Config.dir.appendingPathComponent("reemplazos.json")) }
     @objc private func copyLastDictation() {
         let fm = FileManager.default
-        var newest: (text: String, date: Date)?
+        var candidatos: [(url: URL, date: Date)] = []
         if let walker = fm.enumerator(at: HistoryWriter.historyDir, includingPropertiesForKeys: [.contentModificationDateKey]) {
             for case let url as URL in walker where HistoryWriter.esTextoPrincipal(url) {
                 let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                let preferido = HistoryWriter.textoPreferidoURL(para: url)
-                guard let text = try? String(contentsOf: preferido, encoding: .utf8),
-                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-                if newest == nil || date > newest!.date { newest = (text, date) }
+                candidatos.append((url, date))
             }
+        }
+        var newest: String?
+        for candidato in candidatos.sorted(by: { $0.date > $1.date }) {
+            let preferido = HistoryWriter.textoPreferidoURL(para: candidato.url)
+            guard let text = try? String(contentsOf: preferido, encoding: .utf8),
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            newest = text; break
         }
         guard let newest else {
             panel.show("Historial vacío — nada que copiar")
@@ -2885,8 +2889,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(newest.text, forType: .string)
-        panel.show("📋 Copiado: " + newest.text)
+        pb.setString(newest, forType: .string)
+        panel.show("📋 Copiado: " + newest)
         panel.hide(after: 2)
     }
 

@@ -14,9 +14,11 @@ enum AudioArchivo {
     static let maxPCM = 512 * 1024 * 1024
 
     static func normalizar(_ url: URL) throws -> Data {
+        guard url.isFileURL else { throw Fallo.detalle("Selecciona un archivo local, no una dirección de red.") }
         let acceso = url.startAccessingSecurityScopedResource()
         defer { if acceso { url.stopAccessingSecurityScopedResource() } }
-        guard FileManager.default.isReadableFile(atPath: url.path) else {
+        guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+              FileManager.default.isReadableFile(atPath: url.path) else {
             throw Fallo.detalle("No se puede leer el archivo seleccionado.")
         }
         do { return try nativo(url) }
@@ -30,7 +32,10 @@ enum AudioArchivo {
     }
 
     private static func nativo(_ url: URL) throws -> Data {
-        let asset = AVURLAsset(url: url)
+        // La pista debe vivir dentro del contenedor elegido, no en URLs referidas.
+        let asset = AVURLAsset(url: url, options: [
+            AVURLAssetReferenceRestrictionsKey: AVAssetReferenceRestrictions.forbidAll.rawValue,
+        ])
         guard let track = asset.tracks(withMediaType: .audio).first else {
             throw Fallo.detalle("El archivo no contiene una pista de audio compatible con macOS.")
         }
@@ -73,7 +78,8 @@ enum AudioArchivo {
         defer { try? FileManager.default.removeItem(at: temporal) }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: ejecutable)
-        task.arguments = ["-nostdin", "-v", "error", "-i", url.path, "-map", "0:a:0", "-vn",
+        task.arguments = ["-nostdin", "-v", "error", "-protocol_whitelist", "file",
+                          "-i", url.path, "-map", "0:a:0", "-vn",
                           "-ac", "1", "-ar", "16000", "-f", "s16le", "-fs", String(maxPCM + 2), temporal.path]
         task.standardOutput = FileHandle.nullDevice
         task.standardError = FileHandle.nullDevice

@@ -15,6 +15,8 @@
 - Plazo por proveedor: base 8 s + `(caracteresTexto-500)/90` +
   `(caracteresPrompt-3000)/400`, sumando solo excesos positivos, máximo 120 s.
   El prompt incluye instrucciones/glosario. Configuración manual base: 5–60 s.
+- Presupuesto compartido de cascada: tres veces la espera adaptativa, mínimo
+  24 s y máximo 240 s. Cada respaldo recibe únicamente el tiempo restante.
 - Deadline de pared con cancelación y callback único, sin repetir un timeout
   contra el mismo proveedor. Respuestas truncadas/inválidas pasan al siguiente.
 - Cuarentena efímera: sin conexión/timeout 15 s; cuota/auth/modelo no disponible
@@ -22,6 +24,8 @@
   los locales. Modelo/clave diferente obtiene otra identidad; no se guardan claves
   en la tabla. Cambiar el orden no modifica la selección persistente.
 - Agotada la cascada de pulido, se entrega la transcripción original.
+- Solo se aceptan archivos locales regulares. AVFoundation bloquea referencias
+  externas y ffmpeg limita explícitamente los protocolos de entrada a `file`.
 
 ## Verificación reproducible
 
@@ -37,6 +41,18 @@ intactos, WAV mono/16 kHz, entrega a la cascada, y archivo corrupto sin upload.
 Pruebas HTTP simuladas: cuota y siguiente dictado, timeout sin reintento, respuesta
 de clasificador, original conservado, límite real con callback único, texto largo
 sin recorte del plazo, expiración/aislamiento de cuarentena.
+
+Sonda de protocolos con servidor exclusivamente loopback y control positivo:
+
+```sh
+python3 scripts/qa-audio-protocolos.py --app build-agent/debug/BetoDicta
+python3 scripts/qa-audio-protocolos.py --extension m3u8 --app build-agent/debug/BetoDicta
+```
+
+El control positivo debe producir una petición HTTP; el conversor restringido
+y la app deben rechazar la lista sin ninguna petición. El ffmpeg de esta Mac
+ya bloqueaba el vector antes del parche: no se demostró SSRF previo. La nueva
+restricción evita depender de las políticas predeterminadas del binario externo.
 
 Integración opt-in (consume los proveedores configurados; no guarda ni pega):
 
@@ -63,7 +79,8 @@ y aprobación específica. No fusionar esta rama a main sin aprobación separada
 
 ## Resultado de esta validación
 
-- Tests nuevos: 7/7, repetidos con MP4/MOV que contienen vídeo.
+- Tests nuevos: 9/9, incluyendo plazo total compartido, archivos locales
+  regulares y MP4/MOV que contienen vídeo.
 - Suite general: 15/15 en debug y 15/15 en el paquete release firmado.
 - MP3 sintético: conversión + Voxtral local + frase completa, 9,39 s en frío.
   Mismo hash del original antes/después. Repetido desde la interfaz instalada:
@@ -77,3 +94,14 @@ y aprobación específica. No fusionar esta rama a main sin aprobación separada
   `7ed1e62a294bdbb85a69fc5cda698abbf5af37be7f25978ef4989d5a4b8b90b5`.
 - Evidencia bajo `build-agent/qa-cascada-adaptativa-*` (no versionada).
   App anterior, config y proveedores respaldados fuera del repositorio.
+
+### Cierre para 0.53.1
+
+- Revisión independiente de código: PASS. Seguridad: PASS tras comprobar y
+  endurecer los protocolos del conversor; no se afirmó una explotación no probada.
+- Suite general repetida: 15/15 en debug. Sondas MP3/HLS: control positivo
+  1 petición HTTP, conversor restringido 0, BetoDicta 0 y rechazo local.
+- Pipeline con directorio nuevo, QA del bundle final, Ed25519 y publicación
+  apuntando al commit exacto. README, Manual y captura del ajuste actualizados.
+- La captura pública corresponde a la compilación de validación instalada
+  antes del release (por eso conserva el número 0.53.0 en el lateral).

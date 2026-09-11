@@ -57,13 +57,20 @@ VPLIST=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.pli
 V="$VSWIFT"
 IS_PRE=0; [[ "$V" == *-* ]] && IS_PRE=1
 ok "Versión $V (base de bundle $VPLIST)"
+[[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || fail "Versión no válida: $V"
+# Cada release tiene un destino NUEVO: no borrar bundles/DMG anteriores.
+BUILD_DIR="${BETODICTA_RELEASE_DIR:-build/releases/v$V}"
+[[ "$BUILD_DIR" =~ ^build/releases/[A-Za-z0-9._-]+$ ]] || fail "El destino debe estar bajo build/releases/ y no contener espacios"
+[ ! -e "$BUILD_DIR" ] || fail "$BUILD_DIR ya existe; consérvalo y elige otro BETODICTA_RELEASE_DIR"
+git diff --quiet && git diff --cached --quiet || fail "Hay cambios sin commit"
+RELEASE_COMMIT=$(git rev-parse HEAD)
 
 # ── Gate 3: manual + README tocados en este ciclo (desde el último tag) ─────
 git fetch --tags -q 2>/dev/null || true
 LASTTAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 if [ -n "$LASTTAG" ]; then
   CH=$(git diff --name-only "$LASTTAG"..HEAD -- docs/MANUAL.md README.md | wc -l | tr -d ' ')
-  [ "$CH" -gt 0 ] || fail "Manual/README NO cambiaron desde $LASTTAG. Actualízalos (gobernanza) antes del release."
+  [ "$CH" -eq 2 ] || fail "Deben cambiar AMBOS: Manual y README desde $LASTTAG."
   ok "Manual/README actualizados desde $LASTTAG"
 fi
 grep -q "$V" Sources/BetoDicta/Version.swift || fail "El historial de Version.swift no menciona $V"
@@ -71,9 +78,11 @@ ok "Historial de novedades incluye $V"
 
 # Los instaladores de Atajos son parte del producto. Verificamos firma Apple,
 # estructura y puente antes del build para no publicar un paquete vacío o roto.
-scripts/verify-shortcut-installers.sh >/tmp/bd-shortcuts.log 2>&1 \
-  || { cat /tmp/bd-shortcuts.log; fail "Instaladores de Atajos inválidos"; }
-cat /tmp/bd-shortcuts.log
+SHORTCUT_LOG=$(mktemp -t betodicta-shortcuts)
+scripts/verify-shortcut-installers.sh >"$SHORTCUT_LOG" 2>&1 \
+  || { cat "$SHORTCUT_LOG"; rm -f "$SHORTCUT_LOG"; fail "Instaladores de Atajos inválidos"; }
+cat "$SHORTCUT_LOG"
+rm -f "$SHORTCUT_LOG"
 ok "Instaladores de Atajos firmados e íntegros"
 
 # ── Clave de releases: privada local, pública embebida ─────────────────────
@@ -92,15 +101,17 @@ ok "Clave Ed25519 de releases presente, 0600 y vinculada a la pública embebida"
 # ── Gate 4: build + verificar firma del bundle ─────────────────────────────
 # Sin pipe (evita el problema SIGPIPE+pipefail): consulta directa del tag.
 git rev-parse -q --verify "refs/tags/v$V" >/dev/null 2>&1 && fail "El tag v$V ya existe (¿versión sin subir?)"
-make dmg >/tmp/bd-release.log 2>&1 || { tail -20 /tmp/bd-release.log; fail "make dmg falló"; }
-DMG="build/BetoDicta-$VBASE.dmg"
+mkdir -p "$(dirname "$BUILD_DIR")"
+mkdir "$BUILD_DIR"
+make dmg BUILD_DIR="$BUILD_DIR" >"$BUILD_DIR/build.log" 2>&1 || { tail -20 "$BUILD_DIR/build.log"; fail "make dmg falló"; }
+DMG="$BUILD_DIR/BetoDicta-$VBASE.dmg"
 [ -f "$DMG" ] || fail "No se generó $DMG"
 # Capturamos a variable: con pipefail, `codesign … | grep -q` haría que grep
 # cierre el pipe temprano → codesign recibe SIGPIPE (141) → falso fallo.
-SIG=$(codesign -dvvv build/BetoDicta.app 2>&1 || true)
+SIG=$(codesign -dvvv "$BUILD_DIR/BetoDicta.app" 2>&1 || true)
 echo "$SIG" | grep -q "Signature=adhoc" \
   && fail "El bundle quedó ad-hoc; esperaba el certificado propio"
-REQ=$(codesign -d -r- build/BetoDicta.app 2>&1 || true)
+REQ=$(codesign -d -r- "$BUILD_DIR/BetoDicta.app" 2>&1 || true)
 CERT_SHA1=$(security find-certificate -c "BetoDicta Self Signed" -Z 2>/dev/null \
   | sed -n 's/^SHA-1 hash: //p' | head -1 | tr '[:upper:]' '[:lower:]')
 [ -n "$CERT_SHA1" ] || fail "No pude leer la huella del certificado propio"
@@ -114,6 +125,11 @@ cmp -s "$TMPCERT" Resources/code-signing-cert.der \
   || { rm -f "$TMPCERT"; fail "El certificado del llavero no coincide con el fijado en Resources"; }
 rm -f "$TMPCERT"
 ok "Bundle firmado con el certificado propio exacto y fijado ($CERT_SHA1)"
+codesign --verify --deep --strict "$BUILD_DIR/BetoDicta.app" || fail "Firma del bundle inválida"
+BETODICTA_QA_BIN="$PWD/$BUILD_DIR/BetoDicta.app/Contents/MacOS/BetoDicta" \
+  scripts/qa-paquete.sh --automatico --salida "$PWD/$BUILD_DIR/qa" \
+  || fail "La suite del paquete release falló"
+ok "Suite automática del paquete final aprobada"
 
 # La firma distribuible NO depende de que cada Mac confíe en un certificado
 # autofirmado: Ed25519 autentica el DMG completo con una clave privada local.
@@ -126,7 +142,7 @@ openssl pkeyutl -sign -rawin -inkey "$UPDATE_KEY" -in "$DIGEST" -out "$DMG_SIG" 
 rm -f "$DIGEST"
 [ "$(stat -f '%z' "$DMG_SIG")" = "64" ] || fail "La firma Ed25519 no mide 64 bytes"
 if BETODICTA_DMGVERIFYTEST="$DMG" BETODICTA_DMGVERIFY_SIG="$DMG_SIG" \
-   build/BetoDicta.app/Contents/MacOS/BetoDicta >/dev/null 2>&1; then
+   "$BUILD_DIR/BetoDicta.app/Contents/MacOS/BetoDicta" >/dev/null 2>&1; then
   ok "Firma Ed25519 del DMG verificada por la misma app"
 else
   fail "La app no pudo verificar la firma Ed25519 del DMG"
@@ -144,7 +160,7 @@ VERIFY_OUT=""
 # identidad realmente incorrecta seguirá fallando en todos los intentos.
 for intento in 1 2 3 4 5 6; do
   if VERIFY_OUT=$(BETODICTA_VERIFYTEST="$VOL/BetoDicta.app" \
-      build/BetoDicta.app/Contents/MacOS/BetoDicta 2>&1); then
+      "$BUILD_DIR/BetoDicta.app/Contents/MacOS/BetoDicta" 2>&1); then
     VERIFY_OK=1
     break
   fi
@@ -159,13 +175,13 @@ fi
 hdiutil detach "$VOL" >/dev/null 2>&1 || true; trap - EXIT
 
 # ── Gate 5: publicar (DMG versionado + estable para brew) ──────────────────
-cp "$DMG" "build/BetoDicta.dmg"
-cp "$DMG_SIG" "build/BetoDicta.dmg.sig"
+cp "$DMG" "$BUILD_DIR/BetoDicta.dmg"
+cp "$DMG_SIG" "$BUILD_DIR/BetoDicta.dmg.sig"
 NOTES="${NOTES:-Ver historial en Créditos.}"
 PRE_FLAG=()
 [ "$IS_PRE" = 1 ] && PRE_FLAG=(--prerelease)
-gh release create "v$V" --title "BetoDicta $V" --notes "$NOTES" "${PRE_FLAG[@]}" \
-  "$DMG" "$DMG_SIG" "build/BetoDicta.dmg" "build/BetoDicta.dmg.sig" \
+gh release create "v$V" --target "$RELEASE_COMMIT" --title "BetoDicta $V" --notes "$NOTES" "${PRE_FLAG[@]}" \
+  "$DMG" "$DMG_SIG" "$BUILD_DIR/BetoDicta.dmg" "$BUILD_DIR/BetoDicta.dmg.sig" \
   || fail "gh release create falló"
 ok "Release v$V publicado"
 

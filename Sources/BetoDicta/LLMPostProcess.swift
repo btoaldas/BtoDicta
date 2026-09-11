@@ -890,26 +890,33 @@ enum LLMPostProcess {
                                        inicio: Date, intento: Int,
                                        salvaguarda: Bool = true,
                                        prompt: String, temp: Double,
-                                       resto: [ChatIA],
+                                       resto: [ChatIA], plazo: Date? = nil,
                                        completion: @escaping (String) -> Void) {
+        let vencimiento = plazo ?? Date().addingTimeInterval(
+            PoliticaPulido.esperaTotal(texto: text.count, contexto: prompt.count, base: Config.pulidoTimeout()))
+        let restante = vencimiento.timeIntervalSinceNow
+        guard restante > 0 else {
+            Log.write("pulido: plazo total agotado → texto original")
+            completion(text); return
+        }
         let identidad = CuarentenaPulido.identidad(ia)
         if CuarentenaPulido.compartida.activa(identidad, local: ia.local) {
             continuarFailover(desde: ia, motivo: "cuarentena temporal", textoOriginal: text,
                               salvaguarda: salvaguarda, prompt: prompt, temp: temp,
-                              resto: resto, completion: completion)
+                              resto: resto, plazo: vencimiento, completion: completion)
             return
         }
         if ia.esCuentaCodex {
             AgenteCodex.transformar(prompt, modelo: ia.modeloEfectivo,
-                                    timeout: PoliticaPulido.espera(texto: text.count, contexto: prompt.count,
-                                                                  base: Config.pulidoTimeout())) { respuesta in
+                                    timeout: min(restante, PoliticaPulido.espera(texto: text.count, contexto: prompt.count,
+                                                                  base: Config.pulidoTimeout()))) { respuesta in
                 let pulido = respuesta?.trimmingCharacters(in: .whitespacesAndNewlines)
                 if let pulido, !pulido.isEmpty {
                     if let motivo = razonFugaPrompt(original: text, pulido: pulido) {
                         Log.write("pulido: respuesta descartada por fuga interna (\(motivo))")
                         continuarFailover(desde: ia, motivo: "respuesta copió instrucciones internas",
                                           textoOriginal: text, salvaguarda: salvaguarda,
-                                          prompt: prompt, temp: temp, resto: resto,
+                                          prompt: prompt, temp: temp, resto: resto, plazo: vencimiento,
                                           completion: completion)
                         return
                     }
@@ -917,7 +924,7 @@ enum LLMPostProcess {
                         Log.write("pulido: salida inválida (\(motivo)) → failover")
                         continuarFailover(desde: ia, motivo: motivo,
                                           textoOriginal: text, salvaguarda: salvaguarda,
-                                          prompt: prompt, temp: temp, resto: resto,
+                                          prompt: prompt, temp: temp, resto: resto, plazo: vencimiento,
                                           completion: completion)
                         return
                     }
@@ -933,28 +940,29 @@ enum LLMPostProcess {
                                                       cuerpo: "", error: URLError(.timedOut))
                 continuarFailover(desde: ia, motivo: "sin respuesta de Codex",
                                   textoOriginal: text, salvaguarda: salvaguarda,
-                                  prompt: prompt, temp: temp, resto: resto,
+                                  prompt: prompt, temp: temp, resto: resto, plazo: vencimiento,
                                   completion: completion)
             }
             return
         }
-        guard let request = ia.requestChat(prompt: prompt, temperatura: temp,
+        guard var request = ia.requestChat(prompt: prompt, temperatura: temp,
                                            textLen: text.count) else {
             continuarFailover(desde: ia, motivo: "no pude armar la consulta",
                               textoOriginal: text, salvaguarda: salvaguarda,
-                              prompt: prompt, temp: temp, resto: resto,
+                              prompt: prompt, temp: temp, resto: resto, plazo: vencimiento,
                               completion: completion)
             return
         }
+        request.timeoutInterval = min(request.timeoutInterval, restante)
         hacer(request, ia: ia, textoOriginal: text, inicio: inicio, intento: intento,
-              salvaguarda: salvaguarda, prompt: prompt, temp: temp, resto: resto,
+              salvaguarda: salvaguarda, prompt: prompt, temp: temp, resto: resto, plazo: vencimiento,
               completion: completion)
     }
 
     private static func continuarFailover(desde ia: ChatIA, motivo: String,
                                           textoOriginal text: String,
                                           salvaguarda: Bool, prompt: String,
-                                          temp: Double, resto: [ChatIA],
+                                          temp: Double, resto: [ChatIA], plazo: Date,
                                           completion: @escaping (String) -> Void) {
         guard let siguiente = resto.first, !prompt.isEmpty else {
             Log.write("pulido: FALLÓ (\(motivo)) → texto original.")
@@ -963,13 +971,13 @@ enum LLMPostProcess {
         Log.write("pulido: \(ia.id) falló (\(motivo)) → failover a \(siguiente.id)")
         hacerProveedor(siguiente, textoOriginal: text, inicio: Date(), intento: 1,
                        salvaguarda: salvaguarda, prompt: prompt, temp: temp,
-                       resto: Array(resto.dropFirst()), completion: completion)
+                       resto: Array(resto.dropFirst()), plazo: plazo, completion: completion)
     }
 
     /// Un intento por proveedor y cuarentena: nunca pagar dos timeouts seguidos.
     private static func hacer(_ request: URLRequest, ia: ChatIA, textoOriginal text: String,
                               inicio: Date, intento: Int, salvaguarda: Bool = true,
-                              prompt: String = "", temp: Double = 0, resto: [ChatIA] = [],
+                              prompt: String = "", temp: Double = 0, resto: [ChatIA] = [], plazo: Date,
                               completion: @escaping (String) -> Void) {
         // REUSA la conexión CALIENTE que mantiene CalientaRed (latido keep-alive):
         // así el pulido no paga handshake TLS tras inactividad → rápido desde el 1er
@@ -977,12 +985,16 @@ enum LLMPostProcess {
         Log.write("pulido: intento \(ia.id) · \(ia.modeloEfectivo), plazo \(Int(request.timeoutInterval))s, texto \(text.count), contexto \(prompt.count)")
         PeticionPulido.ejecutar(request, session: sesionHTTP) { data, response, error in
             DispatchQueue.main.async {
+                guard Date() < plazo else {
+                    Log.write("pulido: plazo total agotado → texto original")
+                    completion(text); return
+                }
                 if let data,
                    let code = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(code) {
                     if ia.fueTruncado(data) {
                         continuarFailover(desde: ia, motivo: "respuesta truncada", textoOriginal: text,
                                           salvaguarda: salvaguarda, prompt: prompt, temp: temp,
-                                          resto: resto, completion: completion)
+                                          resto: resto, plazo: plazo, completion: completion)
                         return
                     }
                     if let pulido = ia.extraerContenido(data)?
@@ -997,7 +1009,7 @@ enum LLMPostProcess {
                             Log.write("pulido: respuesta descartada por fuga interna (\(motivo))")
                             continuarFailover(desde: ia, motivo: "respuesta copió instrucciones internas",
                                               textoOriginal: text, salvaguarda: salvaguarda,
-                                              prompt: prompt, temp: temp, resto: resto,
+                                              prompt: prompt, temp: temp, resto: resto, plazo: plazo,
                                               completion: completion)
                             return
                         }
@@ -1005,7 +1017,7 @@ enum LLMPostProcess {
                             Log.write("pulido: salida inválida (\(motivo)) → failover")
                             continuarFailover(desde: ia, motivo: motivo,
                                               textoOriginal: text, salvaguarda: salvaguarda,
-                                              prompt: prompt, temp: temp, resto: resto,
+                                              prompt: prompt, temp: temp, resto: resto, plazo: plazo,
                                               completion: completion)
                             return
                         }
@@ -1045,7 +1057,7 @@ enum LLMPostProcess {
                         Log.write("pulido: sin conexión a internet → salto directo al motor local \(primero.id)")
                         continuarFailover(desde: ia, motivo: "sin conexión", textoOriginal: text,
                                           salvaguarda: salvaguarda, prompt: prompt, temp: temp,
-                                          resto: locales, completion: completion)
+                                          resto: locales, plazo: plazo, completion: completion)
                     } else {
                         Log.write("pulido: sin conexión a internet y sin motor local → texto original")
                         completion(text)
@@ -1055,7 +1067,7 @@ enum LLMPostProcess {
                 // Siguiente proveedor de la cascada, sin repetir el que ya falló.
                 continuarFailover(desde: ia, motivo: motivo, textoOriginal: text,
                                   salvaguarda: salvaguarda, prompt: prompt, temp: temp,
-                                  resto: resto, completion: completion)
+                                  resto: resto, plazo: plazo, completion: completion)
             }
         }
     }

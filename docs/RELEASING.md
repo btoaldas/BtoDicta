@@ -23,6 +23,27 @@ El script exige esos flags (no se puede publicar sin confirmar las reviews), ver
 
 Antes de correrlo: subir la versión en `Sources/BetoDicta/Version.swift` (número, fecha y una entrada en `historial`) y en `Info.plist` (`CFBundleShortVersionString` y `CFBundleVersion`).
 
+## Directorio y pruebas del paquete
+
+El árbol debe estar limpio y **ambos** documentos (README y Manual) deben cambiar
+desde el último tag. Cada release se construye en un directorio nuevo:
+`build/releases/v<VERSION>`. Si ya existe, el script se detiene y conserva todo;
+para repetir una compilación fallida se elige otro nombre con
+`BETODICTA_RELEASE_DIR=build/releases/v<VERSION>-intento2`. Nunca se limpian
+los paquetes anteriores. Los temporales exclusivos de la operación y su DMG
+parcial pueden retirarse durante el mismo intento de construcción.
+
+`BETODICTA_DMG_HEADLESS=1` permite generar el DMG sin automatizar Finder. Antes
+de publicar, la app firmada pasa la suite automática de paquete, la verificación
+Ed25519 del DMG y la comprobación de identidad del bundle montado. GitHub recibe
+el commit exacto de `HEAD` mediante `--target`; el script crea el tag, por lo que
+no debe crearse un tag local previamente.
+
+Si la copia instalada tiene Autoactualizar activo, comprobar su revisión
+periódica y no reiniciarla durante la validación. El botón «Comprobar de nuevo»
+solo consulta: no instala. Cambiar el interruptor automático exige aprobación
+específica; el pipeline no lo modifica.
+
 ## ¿Script o git hook?
 
 **Script** (esto). Un git hook no encaja bien: los releases se hacen con `gh release create` (no con un push de tag que un hook intercepte), y las reviews son juicio de Claude/humano, no algo que un hook de shell pueda evaluar. El script deja **un solo comando auditable** con todos los gates. (Un `pre-push` que bloquee tags `v*` sería redundante y frágil aquí.)

@@ -1,5 +1,6 @@
 APP = BetoDicta
-BUNDLE = build/$(APP).app
+BUILD_DIR ?= build
+BUNDLE = $(BUILD_DIR)/$(APP).app
 TRANSCRIBE_DIR ?= $(HOME)/transcribe.cpp
 TRANSCRIBE_BUILD ?= $(TRANSCRIBE_DIR)/build
 
@@ -7,8 +8,8 @@ all: bundle
 
 SOURCES := $(wildcard Sources/BetoDicta/*.swift)
 
-build/release/$(APP): $(SOURCES) Package.swift
-	swift build -c release --build-path build
+$(BUILD_DIR)/release/$(APP): $(SOURCES) Package.swift
+	swift build -c release --build-path $(BUILD_DIR)
 
 # Puente C de streaming local. Es un target explícito: `make bundle` sigue
 # funcionando para quien no haya clonado transcribe.cpp, pero una actualización
@@ -41,10 +42,10 @@ beto-stream:
 	mv build/native/beto-stream.nuevo native/beto-stream
 	@echo "Puente listo: native/beto-stream"
 
-bundle: build/release/$(APP)
+bundle: $(BUILD_DIR)/release/$(APP)
 	rm -rf $(BUNDLE)
 	mkdir -p $(BUNDLE)/Contents/MacOS
-	cp build/release/$(APP) $(BUNDLE)/Contents/MacOS/
+	cp $(BUILD_DIR)/release/$(APP) $(BUNDLE)/Contents/MacOS/
 	cp Info.plist $(BUNDLE)/Contents/
 	mkdir -p $(BUNDLE)/Contents/Resources
 	cp -R Resources/ $(BUNDLE)/Contents/Resources/
@@ -75,9 +76,10 @@ bundle: build/release/$(APP)
 
 # Instalador DMG (requiere: brew install create-dmg)
 dmg: bundle
-	rm -f build/BetoDicta-*.dmg
 	@V=$$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist); \
-	if perl -e '$$SIG{ALRM}=sub{exit 1}; alarm 5; exec @ARGV' /usr/bin/osascript -e 'tell application "Finder" to get name of every disk' >/dev/null 2>&1 && \
+	if [ -e "$(BUILD_DIR)/BetoDicta-$$V.dmg" ]; then echo "El DMG ya existe; usa otro BUILD_DIR para preservarlo."; exit 1; fi; \
+	if [ "$${BETODICTA_DMG_HEADLESS:-0}" != 1 ] && \
+	perl -e '$$SIG{ALRM}=sub{exit 1}; alarm 5; exec @ARGV' /usr/bin/osascript -e 'tell application "Finder" to get name of every disk' >/dev/null 2>&1 && \
 	create-dmg \
 		--volname "BetoDicta $$V" \
 		--window-size 560 400 \
@@ -85,18 +87,18 @@ dmg: bundle
 		--icon "BetoDicta.app" 140 160 \
 		--app-drop-link 420 160 \
 		--add-file "LÉEME primero.txt" packaging/LEEME-primero.txt 280 300 \
-		"build/BetoDicta-$$V.dmg" "$(BUNDLE)"; then \
+		"$(BUILD_DIR)/BetoDicta-$$V.dmg" "$(BUNDLE)"; then \
 		true; \
 	else \
-		echo "Finder no respondió; reintentando DMG sin AppleScript…"; \
-		rm -f "build/BetoDicta-$$V.dmg"; \
+		echo "Generando DMG sin AppleScript (modo headless o Finder no disponible)…"; \
+		rm -f "$(BUILD_DIR)/BetoDicta-$$V.dmg"; \
 		create-dmg --skip-jenkins \
 			--volname "BetoDicta $$V" \
 			--app-drop-link 420 160 \
 			--add-file "LÉEME primero.txt" packaging/LEEME-primero.txt 280 300 \
-			"build/BetoDicta-$$V.dmg" "$(BUNDLE)"; \
+			"$(BUILD_DIR)/BetoDicta-$$V.dmg" "$(BUNDLE)" || exit 1; \
 	fi; \
-	echo "DMG listo: build/BetoDicta-$$V.dmg"
+	echo "DMG listo: $(BUILD_DIR)/BetoDicta-$$V.dmg"
 
 install: bundle
 	rm -rf /Applications/$(APP).app

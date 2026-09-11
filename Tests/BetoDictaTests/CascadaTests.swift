@@ -123,6 +123,20 @@ final class CascadaTests: XCTestCase {
         wait(for: [tardio], timeout: 1)
         XCTAssertEqual(respuestas, 1)
     }
+    func testCascadaComparteElPlazoTotal() {
+        XCTAssertEqual(PoliticaPulido.esperaTotal(texto: 120, contexto: 2000), 24)
+        XCTAssertEqual(PoliticaPulido.esperaTotal(texto: 100000, contexto: 120000), 240)
+        var llamadas = 0
+        RespuestaQA.responder = { _ in llamadas += 1; return nil }
+        let fin = expectation(description: "presupuesto compartido")
+        LLMPostProcess.hacerProveedor(ia("sin-respuesta"), textoOriginal: frase, inicio: Date(), intento: 1,
+                                     prompt: frase, temp: 0, resto: [ia("no-debe-iniciar")],
+                                     plazo: Date().addingTimeInterval(0.15)) { salida in
+            XCTAssertEqual(salida, self.frase); fin.fulfill()
+        }
+        wait(for: [fin], timeout: 2)
+        XCTAssertEqual(llamadas, 1)
+    }
     func testTextoLargoNoSeRecortaAEsperaCorta() {
         let proveedor = ia("largo"), original = String(repeating: "Hay que revisar el documento. ", count: 350)
         RespuestaQA.responder = { req in
@@ -135,6 +149,11 @@ final class CascadaTests: XCTestCase {
             XCTAssertEqual(salida, original.trimmingCharacters(in: .whitespacesAndNewlines)); fin.fulfill()
         }
         wait(for: [fin], timeout: 3)
+    }
+
+    func testSoloAdmiteArchivosLocalesRegulares() {
+        XCTAssertThrowsError(try AudioArchivo.normalizar(URL(string: "https://audio.invalid/prueba.mp3")!))
+        XCTAssertThrowsError(try AudioArchivo.normalizar(FileManager.default.temporaryDirectory))
     }
 
     func testFormatosUsanWAVYCascadaSinModificarOriginales() throws {

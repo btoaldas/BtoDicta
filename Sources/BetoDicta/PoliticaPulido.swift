@@ -8,6 +8,12 @@ enum PoliticaPulido {
         min(120, max(5, base) + Double(max(0, texto - 500)) / 90
             + Double(max(0, contexto - 3000)) / 400)
     }
+
+    /// Evita N × 120 s cuando varios respaldos se cuelgan. El presupuesto se
+    /// comparte entre intentos: base normal 24 s, hasta 240 s para textos largos.
+    static func esperaTotal(texto: Int, contexto: Int, base: Double = 8) -> TimeInterval {
+        min(240, max(24, espera(texto: texto, contexto: contexto, base: base) * 3))
+    }
 }
 
 /// Estado efímero: no desactiva proveedores ni reordena la configuración.

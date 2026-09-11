@@ -281,14 +281,22 @@ Tres formas, de la más rápida a la más completa:
 - **Pulsar Shift+Enter al terminar**: salto de línea suave, sin enviar (excluyente con Enter).
 
 **Pulido con IA**
+
+En 0.53.1, DeepSeek usa `deepseek-flash` (V4.1 Flash) sin modo de
+razonamiento para editar texto. Groq usa `openai/gpt-oss-20b` como modelo
+generativo de producción con menor tarifa pública consultada el 2026-09-10.
+No se sustituye la elección de otros proveedores que hayas configurado.
+
+![Espera adaptativa: compilación de validación previa a 0.53.1](img/pulido-adaptativo-0531.png)
+
 - Pasa el texto por una IA que corrige puntuación y quita muletillas ("eh", "este…").
 - **Elige la IA**: no tiene que ser Groq. Cualquiera conectada — **Groq, OpenAI, Mistral, OpenRouter, DeepSeek, xAI (Grok), Anthropic (Claude), Gemini (Google), Moonshot AI/Kimi K2.6** y **Kimi K3/K2.7 por cuenta**, además de varias opciones con capa gratis o modelos locales. El selector muestra **"proveedor · modelo activo"** y solo lista las conectadas; la misma IA puede participar en pulido, traducción, modos y asistente.
 - **Elige el modelo de CUALQUIER proveedor** (no solo gateways): al elegir una IA aparece una fila **"Modelo"** con un botón **"Descubrir"** que trae su lista completa; eliges cuál usar al vuelo y se guarda por proveedor. Si el proveedor publica precios (ej. **OpenRouter**), cada modelo muestra su costo: **`$entrada/$salida por millón de tokens`** o **`gratis`** — así ves cuánto te costará antes de usarlo.
-- **Failover de pulido** (si tienes 2+ IAs conectadas): despliega **"Failover de pulido (respaldo si uno cae)"** y ordena tus proveedores con las flechas. Igual que la cascada de voz: se intenta el **1º** (ej. Groq, el más rápido) y, si no responde (caído, sin cupo, error), salta solo al **2º**, luego al **3º**… (ej. OpenAI → OpenRouter → local). Si un modo tiene su **propia IA**, esa va primero y la cascada queda de respaldo. Así el pulido nunca se queda sin funcionar por un proveedor caído.
+- **Failover de pulido**: la IA seleccionada va primero, seguida de los respaldos conectados en el orden configurado. Un modo con IA propia comienza por ella. Si todos fallan, devuelve el original; no promete un pulido cuando no hubo respuesta válida. Los clasificadores como Prompt Guard se excluyen: sus puntajes no son transcripciones ni texto editado.
 - **Glosario inteligente** (opt-in, *Ajustes → Avanzado*): a medida que tu glosario crece, mandarlo entero a la IA en cada dictado alarga el prompt y va más lento. Con esta opción, la app usa **embeddings** para enviar **solo los términos afines a lo que dictaste** (más los que aparecen literalmente) — prompt corto = **pulido más rápido**, y escala aunque tengas cientos de términos. Usa el mismo motor de embeddings que la búsqueda semántica (interno, Ollama o nube); la primera vez calienta los vectores en segundo plano.
 - **Motor de embeddings — interno por defecto**: el glosario inteligente, el reconocimiento de modos y la búsqueda semántica usan embeddings. El recomendado es **Interno de BetoDicta** (`bge-m3`): corre en tu Mac, es gratis, privado y no exige instalar Ollama; el modelo se descarga una sola vez desde Ajustes. **Ollama** sigue disponible como alternativa local y también puedes elegir nube (OpenAI/Gemini/Mistral). Si **no hay ningún motor listo**, no pasa nada: la app salta esa capa y sigue con el glosario completo y el reconocimiento normal, sin bloquear el dictado.
-- **Failover del pulido**: si un proveedor no responde (red caída, sin cupo), la app **reintenta una vez con conexión fresca** y, si sigue fallando, **salta al siguiente proveedor** de tu cascada; en el peor caso pega el texto original. Nunca se queda colgada.
-- **Red siempre caliente (pulido rápido)** (*Ajustes → Avanzado*, default ON): si usas una **VPN** (WireGuard/OpenVPN/etc.) que "duerme" cuando está inactiva, el primer dictado podía tardar ~14s por rehacer el handshake. Ahora un **latido** cada 15s mantiene el túnel y la conexión **calientes**, y el pulido **reusa** esa conexión → rápido **desde el primer dictado**, aunque dictes cada varios minutos. Si el socket muriera igual, reintenta con conexión fresca. Funciona con cualquier VPN o ninguna, y **nunca frena el dictado**.
+- **Espera adaptativa y cuarentena**: base de 8 s por proveedor, configurable entre 5 y 60 s en Ajustes → Avanzado. El texto y contexto largos amplían cada intento hasta 120 s. Toda la cascada comparte un presupuesto de tres intentos adaptativos, con mínimo 24 s y máximo 240 s; ningún respaldo reinicia ese reloj. No se repite un timeout contra el mismo proveedor. Cuota, autenticación o modelo inexistente lo apartan 30 min; rate limit, 60 s; error de servidor, 30 s; red/timeout, 15 s. Sin internet se omite temporalmente la nube y se conservan los locales. Al agotarse el plazo se entrega el original.
+- **Red caliente** (*Ajustes → Avanzado*): el latido de red y el despertar al grabar pueden reducir la latencia inicial con VPN. Si una petición de pulido falla, se continúa con el siguiente proveedor sin repetir la misma espera. Estas opciones no garantizan una latencia fija.
 - **Voz del sistema (texto → voz)** (*Ajustes → Avanzado*): BetoDicta puede **leerte** respuestas en voz (Modo Agente). Eliges el **motor** con failover — si el elegido falla, cae al siguiente y **termina en la voz de macOS**, nunca se queda mudo:
   - **Voz de macOS** (default): gratis, local, sin setup. Eliges voz + velocidad.
   - **ElevenLabs — tu voz clonada**: tu voz "Bto" en la nube (usa tu `ELEVENLABS_API_KEY`), modelo `eleven_flash_v2_5`. Con **streaming por WebSocket** (opción, default ON) el audio **empieza a sonar en ~75-130ms** mientras se genera; si el streaming falla, cae al modo normal.
@@ -739,6 +747,20 @@ Todos tus dictados, buscables:
 - **Procesar como**: arriba eliges un **modo** (Dictado = solo limpieza, o Correo, Oficio, Tarea, Nota, Traducir, Asistente…). Se aplica tanto al archivo que subes como a la re-transcripción — ágil para, por ejemplo, subir un audio y sacarlo ya como correo o traducido. Buscar no aplica aquí (abre navegador, no da texto).
 - **Subir un archivo**: elige un audio o video (wav, mp3, m4a, mp4, mov…) y lo convierte a texto con tu glosario. Ideal para grabaciones de reuniones.
 - **Re-transcribir un dictado**: vuelve a pasar un audio del historial por el motor — útil si falló la primera vez o si tu glosario mejoró desde entonces.
+
+Desde 0.53.1, importar y re-transcribir convierten primero a WAV PCM16 mono de
+16 kHz **en la Mac**, sin modificar el archivo seleccionado. Después usan la
+misma cascada de **motores habilitados** de Modelos: cambiar el primero cambia
+también el que se intenta aquí. Un proveedor apagado no participa. Un error de
+cuota salta al siguiente disponible; MP3/M4A/MP4/MOV ya no fuerzan ElevenLabs.
+
+macOS decodifica los formatos compatibles. Para Ogg u otros códecs puede usarse
+un ffmpeg existente, nunca descargado automáticamente. Si no hay decodificador,
+el archivo está dañado o carece de pista, se muestra un error local y no se sube.
+Límite de salida: 512 MB de PCM (aproximadamente 4,6 horas); conversión con
+plazo de 180 s por motor. Las referencias de red se bloquean. Los archivos
+originales y los textos principales del historial se conservan; un rescate
+`.recuperado.txt` se muestra como texto preferido de la misma entrada.
 
 ## 19. Estadísticas y costo por modelo
 
