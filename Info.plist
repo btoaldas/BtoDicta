@@ -3,53 +3,53 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key>
-	<string>BetoDicta</string>
+	<string>BtoDicta</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>ec.bto.betodicta</string>
+	<string>ec.bto.btodicta</string>
 	<key>CFBundleName</key>
-	<string>BetoDicta</string>
+	<string>BtoDicta</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.54.2</string>
+	<string>0.55.0</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>CFBundleURLName</key>
-			<string>ec.bto.betodicta.agente</string>
+			<string>ec.bto.btodicta.agente</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>betodicta</string>
+				<string>btodicta</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>0.54.2</string>
+	<string>0.55.0</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>BetoDicta usa Automatización únicamente para las acciones que tú solicitas, como crear una nota en Notas de Apple, crear un documento en Word, ejecutar Atajos, leer la URL activa o controlar la reproducción.</string>
+	<string>BtoDicta usa Automatización únicamente para las acciones que tú solicitas, como crear una nota en Notas de Apple, crear un documento en Word, ejecutar Atajos, leer la URL activa o controlar la reproducción.</string>
 	<key>NSAppleMusicUsageDescription</key>
-	<string>BetoDicta puede reproducir la música que tú solicites cuando habilitas esa herramienta.</string>
+	<string>BtoDicta puede reproducir la música que tú solicites cuando habilitas esa herramienta.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>BetoDicta crea los eventos de Calendario que tú confirmes por voz.</string>
+	<string>BtoDicta crea los eventos de Calendario que tú confirmes por voz.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>BetoDicta usa tus contactos para enviar WhatsApp al nombre que dictes.</string>
+	<string>BtoDicta usa tus contactos para enviar WhatsApp al nombre que dictes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>BetoDicta usa una ubicación aproximada únicamente cuando le preguntas por el clima sin indicar una ciudad.</string>
+	<string>BtoDicta usa una ubicación aproximada únicamente cuando le preguntas por el clima sin indicar una ciudad.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>BetoDicta usa el micrófono para transcribir tu voz y, solo si activas la opción manos libres, detectar localmente tu frase de presencia.</string>
+	<string>BtoDicta usa el micrófono para transcribir tu voz y, solo si activas la opción manos libres, detectar localmente tu frase de presencia.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>BetoDicta crea los recordatorios que tú confirmes por voz.</string>
+	<string>BtoDicta crea los recordatorios que tú confirmes por voz.</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>BetoDicta captura o graba la pantalla únicamente cuando tú se lo pides al asistente.</string>
+	<string>BtoDicta captura o graba la pantalla únicamente cuando tú se lo pides al asistente.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>BetoDicta usa el reconocimiento local de Apple para mostrar el dictado en vivo y, si tú lo activas, reconocer una frase de presencia sin enviar el audio a la nube.</string>
+	<string>BtoDicta usa el reconocimiento local de Apple para mostrar el dictado en vivo y, si tú lo activas, reconocer una frase de presencia sin enviar el audio a la nube.</string>
 </dict>
 </plist>

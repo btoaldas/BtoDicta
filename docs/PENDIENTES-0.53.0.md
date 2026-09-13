@@ -1,7 +1,7 @@
 # Diagnóstico 2026-09-01 y pendientes para 0.53.0
 
 Fuentes: informes de fallo de macOS (`~/Library/Logs/DiagnosticReports`),
-registros semanales W33–W35 más el actual (`~/.betodicta/logs`, 2026-08-17 →
+registros semanales W33–W35 más el actual (`~/.btodicta/logs`, 2026-08-17 →
 2026-09-01), y el código de `main` en `a7a15b0` (0.52.0). Cada punto trae
 evidencia, causa localizada y propuesta; nada de aquí se ha corregido todavía
 salvo lo marcado como cerrado en 0.52.0.
@@ -12,7 +12,7 @@ salvo lo marcado como cerrado en 0.52.0.
 |---|---|---|---|
 | 08-25 20:08 · 08-26 20:03 · 08-27 20:13 · 08-28 20:04 | 0.51.0 | `presentarAvisoPendiente → Voz.decir → ElevenLabsStreamTTS.stream → [AVAudioPlayerNode play]` → `NSException` → `SIGABRT` | **Cerrado en 0.52.0** (`AudioSeguro` + puente ObjC) |
 
-No hay más informes de BetoDicta en el histórico completo, ni informes de
+No hay más informes de BtoDicta en el histórico completo, ni informes de
 cuelgue (`.hang`/`.spin`), ni de procesos hijos (llama-server, XTTS, Piper).
 
 ## 2. Errores recurrentes con causa localizada (por impacto)
@@ -133,7 +133,7 @@ ContinuoPantalla (estado compartido main/Task) se relacionan con 2.5.
 
 | Punto | Estado | Cómo se verifica |
 |---|---|---|
-| 2.1 compresión m4a | **Corregido**: escritor en su propio ámbito; validación por marcos (≥ crudo − 0,5 s); sin índice actualizado no se suelta el crudo. **Recompresión** en segundo plano (`continuo_recomprimir_pendientes`, pasadas de 1 500 archivos cada 15 min y una por minuto mientras quede cola, se detiene al dictar) + botón «Recomprimir ahora» | `ROBUSTEZTEST` (pcm sintético → m4a 48 000/48 000 marcos) y `BETODICTA_RECOMPTEST=<n>` sobre archivos reales |
+| 2.1 compresión m4a | **Corregido**: escritor en su propio ámbito; validación por marcos (≥ crudo − 0,5 s); sin índice actualizado no se suelta el crudo. **Recompresión** en segundo plano (`continuo_recomprimir_pendientes`, pasadas de 1 500 archivos cada 15 min y una por minuto mientras quede cola, se detiene al dictar) + botón «Recomprimir ahora» | `ROBUSTEZTEST` (pcm sintético → m4a 48 000/48 000 marcos) y `BTODICTA_RECOMPTEST=<n>` sobre archivos reales |
 | 2.2 streaming Scribe | **Corregido**: `send`/`commit` exigen sesión viva; `quota_exceeded`/`auth_error` → `CuarentenaSTT` 30 min (429 → 5); `onCierre` una sola vez → `planBVivo` a mitad de dictado con todo el audio; las dos puertas al WS consultan también `CuarentenaSTT` | `ROBUSTEZTEST` (inyección de `quota_exceeded`: cuarentena real + cierre avisado una vez) |
 | 2.2 (d) etiquetas | **Corregido**: «cuarentena breve (su streaming cayó hace menos de 1 min)» | lectura del log |
 | 2.5 capturas en tanda | **Corregido**: rescate a 90 s, mensaje con la causa real (tanda en curso / permiso), aviso único de «captura lenta», ajuste `continuo_pantalla_pausar_en_tanda` (apagado de fábrica) | log durante la próxima tanda |

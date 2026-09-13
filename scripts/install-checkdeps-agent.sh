@@ -3,7 +3,7 @@
 # Instala (o quita) DOS LaunchAgents automáticos (al iniciar sesión y los lunes):
 #   1) Revisar actualizaciones de motores de TERCEROS → notifica (no actualiza).
 #   2) Actualizar los PRECIOS de los modelos de IA desde LiteLLM (sin gastar IA)
-#      → ~/.betodicta/precios_ia.json, para que TODO modelo tenga precio real.
+#      → ~/.btodicta/precios_ia.json, para que TODO modelo tenga precio real.
 #
 # Uso:
 #   scripts/install-checkdeps-agent.sh            # instalar/activar ambos
@@ -51,16 +51,16 @@ quitar_agente() {
 }
 
 if [ "${1:-install}" = "uninstall" ]; then
-  quitar_agente "ec.bto.betodicta.checkdeps"
-  quitar_agente "ec.bto.betodicta.precios"
+  quitar_agente "ec.bto.btodicta.checkdeps"
+  quitar_agente "ec.bto.btodicta.precios"
   echo "✅ LaunchAgents desinstalados (dependencias + precios)."
   exit 0
 fi
 
-crear_agente "ec.bto.betodicta.checkdeps" "check-deps.sh" "--notify"
-crear_agente "ec.bto.betodicta.precios" "update-prices.sh" ""
+crear_agente "ec.bto.btodicta.checkdeps" "check-deps.sh" "--notify"
+crear_agente "ec.bto.btodicta.precios" "update-prices.sh" ""
 echo "✅ LaunchAgents activos (al iniciar sesión y los LUNES 10:00):"
 echo "   • dependencias de terceros → avisa si hay versión nueva (no actualiza)."
-echo "   • precios de IA → baja precios reales de LiteLLM a ~/.betodicta/precios_ia.json (sin gastar IA)."
-echo "   Logs en ~/Library/Logs/ec.bto.betodicta.*.log"
+echo "   • precios de IA → baja precios reales de LiteLLM a ~/.btodicta/precios_ia.json (sin gastar IA)."
+echo "   Logs en ~/Library/Logs/ec.bto.btodicta.*.log"
 echo "   Desinstalar: scripts/install-checkdeps-agent.sh uninstall"

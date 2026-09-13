@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Recupera de forma aditiva dictados reemplazados por puntajes 0..1.
 
-Lee el texto anterior al pulido desde betodicta.log y crea, solo con --apply,
+Lee el texto anterior al pulido desde btodicta.log y crea, solo con --apply,
 un archivo hermano `*.recuperado.txt`. Nunca reemplaza el `.txt` original.
 """
 
@@ -96,7 +96,7 @@ def ejecutar() -> int:
     parser.add_argument("--history", required=True, type=Path,
                         help="raíz del historial que se inspeccionará")
     parser.add_argument("--log", required=True, type=Path,
-                        help="betodicta.log que conserva el texto anterior al pulido")
+                        help="btodicta.log que conserva el texto anterior al pulido")
     parser.add_argument("--silence-wav", action="append", default=[], type=Path,
                         help="WAV verificado acústicamente como silencio; puede repetirse")
     parser.add_argument("--apply", action="store_true",

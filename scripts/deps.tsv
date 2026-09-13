@@ -1,4 +1,4 @@
-# Componentes de TERCEROS que usa BetoDicta. Columnas (tab):
+# Componentes de TERCEROS que usa BtoDicta. Columnas (tab):
 #   nombre <TAB> repo_github(owner/name) <TAB> carpeta_local(opcional, ~ ok)
 # El checker (scripts/check-deps.sh) avisa si hay versión nueva; NO actualiza.
 transcribe.cpp	handy-computer/transcribe.cpp	~/transcribe.cpp

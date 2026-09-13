@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Paquete QA reproducible de BetoDicta. Por defecto solo ejecuta pruebas locales
+# Paquete QA reproducible de BtoDicta. Por defecto solo ejecuta pruebas locales
 # que no abren aplicaciones, no envían mensajes y no llaman proveedores de pago.
 set -u
 umask 077
@@ -42,15 +42,15 @@ done
 
 [[ -d "$QA_DIR" ]] || { print -u2 "No encuentro las matrices QA en $QA_DIR"; exit 2; }
 
-if [[ -n "${BETODICTA_QA_BIN:-}" ]]; then
-  BIN="$BETODICTA_QA_BIN"
-elif [[ -n "$REPO" && -x "$REPO/build/release/BetoDicta" ]]; then
-  BIN="$REPO/build/release/BetoDicta"
+if [[ -n "${BTODICTA_QA_BIN:-}" ]]; then
+  BIN="$BTODICTA_QA_BIN"
+elif [[ -n "$REPO" && -x "$REPO/build/release/BtoDicta" ]]; then
+  BIN="$REPO/build/release/BtoDicta"
 else
-  BIN="/Applications/BetoDicta.app/Contents/MacOS/BetoDicta"
+  BIN="/Applications/BtoDicta.app/Contents/MacOS/BtoDicta"
 fi
 [[ -x "$BIN" ]] || {
-  print -u2 "No encuentro el binario de BetoDicta. Instala la app o define BETODICTA_QA_BIN."
+  print -u2 "No encuentro el binario de BtoDicta. Instala la app o define BTODICTA_QA_BIN."
   exit 2
 }
 
@@ -63,12 +63,12 @@ version_app="desconocida"
 plist="${BIN:h:h}/Info.plist"
 if [[ -f "$plist" ]]; then
   version_app="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist" 2>/dev/null || print desconocida)"
-elif [[ -f /Applications/BetoDicta.app/Contents/Info.plist ]]; then
-  version_app="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/BetoDicta.app/Contents/Info.plist 2>/dev/null || print desconocida)"
+elif [[ -f /Applications/BtoDicta.app/Contents/Info.plist ]]; then
+  version_app="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/BtoDicta.app/Contents/Info.plist 2>/dev/null || print desconocida)"
 fi
 
 {
-  print "Paquete QA BetoDicta $VERSION_PAQUETE"
+  print "Paquete QA BtoDicta $VERSION_PAQUETE"
   print "Fecha: $(/bin/date '+%Y-%m-%d %H:%M:%S %Z')"
   print "macOS: $(/usr/bin/sw_vers -productVersion 2>/dev/null || print desconocido)"
   print "Arquitectura: $(/usr/bin/uname -m)"
@@ -80,7 +80,7 @@ fi
 
 copiar_evidencia() {
   local fuente destino
-  for fuente in "$HOME/.betodicta/logs/modos.jsonl" "$HOME/.betodicta/logs/agente.jsonl"; do
+  for fuente in "$HOME/.btodicta/logs/modos.jsonl" "$HOME/.btodicta/logs/agente.jsonl"; do
     [[ -f "$fuente" ]] || continue
     destino="$salida/logs-app/${fuente:t}"
     /usr/bin/tail -n 800 "$fuente" > "$destino"
@@ -124,25 +124,25 @@ ejecutar() {
 }
 
 if [[ "$modo" == "audio" ]]; then
-  ejecutar "audio_elevenlabs_apple" "BETODICTA_MODOAUDIOQA" "1" 900
+  ejecutar "audio_elevenlabs_apple" "BTODICTA_MODOAUDIOQA" "1" 900
 elif [[ "$modo" == "ia" ]]; then
-  ejecutar "ia_arbitro_modos" "BETODICTA_MODOIATEST" "1" 240
+  ejecutar "ia_arbitro_modos" "BTODICTA_MODOIATEST" "1" 240
 else
-  ejecutar "nucleo_agente" "BETODICTA_AGENTCORETEST" "1" 120
-  ejecutar "planificador_natural" "BETODICTA_MODOPLANTEST" "1" 120
-  ejecutar "regresiones_modos" "BETODICTA_MODEREGRESSION" "1" 90
-  ejecutar "matriz_camino_feliz" "BETODICTA_MATRIZTEST" "$QA_DIR/matriz-camino-feliz.tsv" 120
-  ejecutar "matriz_estres" "BETODICTA_MATRIZTEST" "$QA_DIR/matriz-estres.tsv" 120
-  ejecutar "activacion_voz" "BETODICTA_WAKEWORDTEST" "1" 90
-  ejecutar "aplicaciones" "BETODICTA_APPTEST" "1" 120
-  ejecutar "recetas_y_atajos" "BETODICTA_RECIPETEST" "1" 120
-  ejecutar "clima_parser" "BETODICTA_CLIMATEST" "1" 90
-  ejecutar "volumen_parser" "BETODICTA_VOLUMETEST" "1" 90
-  ejecutar "notas_apple_parser" "BETODICTA_NOTASAPPLETEST" "1" 90
-  ejecutar "tareas_recordatorios" "BETODICTA_TASKREMINDERTEST" "1" 90
-  ejecutar "almacen_tareas_notas" "BETODICTA_NOTATEST" "1" 90
-  ejecutar "autoayuda" "BETODICTA_HELPTEST" "1" 90
-  ejecutar "permisos" "BETODICTA_PERMISSIONSTEST" "1" 90
+  ejecutar "nucleo_agente" "BTODICTA_AGENTCORETEST" "1" 120
+  ejecutar "planificador_natural" "BTODICTA_MODOPLANTEST" "1" 120
+  ejecutar "regresiones_modos" "BTODICTA_MODEREGRESSION" "1" 90
+  ejecutar "matriz_camino_feliz" "BTODICTA_MATRIZTEST" "$QA_DIR/matriz-camino-feliz.tsv" 120
+  ejecutar "matriz_estres" "BTODICTA_MATRIZTEST" "$QA_DIR/matriz-estres.tsv" 120
+  ejecutar "activacion_voz" "BTODICTA_WAKEWORDTEST" "1" 90
+  ejecutar "aplicaciones" "BTODICTA_APPTEST" "1" 120
+  ejecutar "recetas_y_atajos" "BTODICTA_RECIPETEST" "1" 120
+  ejecutar "clima_parser" "BTODICTA_CLIMATEST" "1" 90
+  ejecutar "volumen_parser" "BTODICTA_VOLUMETEST" "1" 90
+  ejecutar "notas_apple_parser" "BTODICTA_NOTASAPPLETEST" "1" 90
+  ejecutar "tareas_recordatorios" "BTODICTA_TASKREMINDERTEST" "1" 90
+  ejecutar "almacen_tareas_notas" "BTODICTA_NOTATEST" "1" 90
+  ejecutar "autoayuda" "BTODICTA_HELPTEST" "1" 90
+  ejecutar "permisos" "BTODICTA_PERMISSIONSTEST" "1" 90
 fi
 
 copiar_evidencia

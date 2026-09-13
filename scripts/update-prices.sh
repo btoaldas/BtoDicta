@@ -2,7 +2,7 @@
 #
 # Actualiza los precios de los modelos de IA desde una FUENTE MANTENIDA
 # (LiteLLM model_prices_and_context_window.json) — SIN usar IA/tokens.
-# Escribe DOS archivos en ~/.betodicta/:
+# Escribe DOS archivos en ~/.btodicta/:
 #   precios_ia.json  = { "modelo": [entrada_por_1M, salida_por_1M] }  (CHAT/pulido)
 #   precios_stt.json = { "modelo": usd_por_hora_de_audio }            (TRANSCRIPCIÓN)
 # La app los lee y así CUALQUIER modelo tiene precio real (estadísticas de gasto
@@ -11,8 +11,8 @@
 # Uso: scripts/update-prices.sh
 #
 set -uo pipefail
-DEST="$HOME/.betodicta/precios_ia.json"
-DEST_STT="$HOME/.betodicta/precios_stt.json"
+DEST="$HOME/.btodicta/precios_ia.json"
+DEST_STT="$HOME/.btodicta/precios_stt.json"
 URL="https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 TMP="$(mktemp)"
 
@@ -25,7 +25,7 @@ for i in 1 2 3; do
 done
 [ "$ok" = 1 ] || { echo "❌ no pude bajar/parsear la fuente de precios"; rm -f "$TMP"; exit 1; }
 
-mkdir -p "$HOME/.betodicta" && chmod 700 "$HOME/.betodicta" 2>/dev/null || true
+mkdir -p "$HOME/.btodicta" && chmod 700 "$HOME/.btodicta" 2>/dev/null || true
 python3 - "$TMP" "$DEST" <<'PY'
 import json, sys, os
 src = json.load(open(sys.argv[1]))
@@ -83,7 +83,7 @@ if [ "${1:-}" = "--notify" ]; then
   n=$(python3 -c "import json;print(len(json.load(open('$DEST'))))" 2>/dev/null || echo "?")
   osascript - "Precios de IA actualizados ($n modelos)." >/dev/null 2>&1 <<'A' || true
 on run argv
-  display notification (item 1 of argv) with title "BetoDicta · precios"
+  display notification (item 1 of argv) with title "BtoDicta · precios"
 end run
 A
 fi

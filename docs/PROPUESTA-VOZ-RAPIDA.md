@@ -13,14 +13,14 @@ motor experimental se integró porque todavía no superó la referencia XTTS en 
   (XTTS con GPT en MPS + vocoder CPU dio RTF 1.23 vs 0.52 en CPU puro; Qwen3/F5/fish-speech en MPS: 2.5-10x
   más lentos que tiempo real según issues de terceros). Las vías sanas son **CPU** y **MLX (Metal nativo)**.
 - **Entrenamiento pesado:** solo GPU NVIDIA en nube (RunPod/Vast/Colab, ~5-15 USD por corrida). Aceptado.
-- **App:** BetoDicta (Swift, SwiftPM, sin Xcode-proyecto). Motores Python viven aislados en
-  `~/.betodicta/voz-engine/` (venvs propios, patrón sidecar HTTP local).
+- **App:** BtoDicta (Swift, SwiftPM, sin Xcode-proyecto). Motores Python viven aislados en
+  `~/.btodicta/voz-engine/` (venvs propios, patrón sidecar HTTP local).
 
 ### Lo que YA existe y NO SE TOCA (regla de oro)
 
 | Carril | Motor | Calidad | Velocidad medida (Mac de referencia) | Estado |
 |---|---|---|---|---|
-| Máxima fidelidad | XTTS v2 fine-tune (voz clonada de referencia, `~/.betodicta/voces/voz-referencia`) | **Excelente — es la referencia** | RTF 0.78 streaming vía server residente; primera palabra ≈ colchón (2 s hoy) | Producción (fix d6654cb) |
+| Máxima fidelidad | XTTS v2 fine-tune (voz clonada de referencia, `~/.btodicta/voces/voz-referencia`) | **Excelente — es la referencia** | RTF 0.78 streaming vía server residente; primera palabra ≈ colchón (2 s hoy) | Producción (fix d6654cb) |
 | Equilibrio | Qwen3-TTS sobre mlx-audio (`MlxVozEngine`, venv `mlx-venv`) | Buena | TTFB ~0.1 s reportado | Producción |
 | Rápida | Piper ONNX (`rapida/voz.onnx`) | Robótica (inaceptable como principal) | RTF ~0.2 | Producción |
 | Nube | ElevenLabs WS | Excelente | ~75-130 ms | Producción |
@@ -49,7 +49,7 @@ se apaga el toggle y todo queda EXACTAMENTE como estaba. Cero regresiones posibl
 - **Licencia:** MIT (código y pesos) — la más limpia de todas.
 - **Velocidad:** único candidato **medido en ESTE Mac**: RTF **0.41** (14.1 s de audio en 5.75 s) con
   `mlx-community/chatterbox-fp16` vía mlx-audio, ~4 GB RAM. Evidencia: `~/Downloads/tts-research-2026-07-19/es_clone*.wav`.
-- **Encaje:** corre sobre **mlx-audio, la MISMA librería que BetoDicta ya embarca** para Qwen3
+- **Encaje:** corre sobre **mlx-audio, la MISMA librería que BtoDicta ya embarca** para Qwen3
   (`MlxVozEngine`/`MlxVozServer`). Integración = añadir modelo permitido + parámetro `ref_audio`. Mínima cirugía.
 - **Ruta de entrenamiento si el zero-shot no clava el timbre:** LoRA con `gokhaneraslan/chatterbox-finetuning`
   (GPU nube; con 30-60 min curados sobra) → convertir a MLX con el tooling de mlx-community.
@@ -61,7 +61,7 @@ se apaga el toggle y todo queda EXACTAMENTE como estaba. Cero regresiones posibl
 
 ### 3.2 Qwen3-TTS 1.7B Base fine-tuneado — ★ MEJOR RUTA DE ENTRENAMIENTO FORMAL
 
-- **Qué es:** el modelo que BetoDicta ya usa en el carril equilibrio, pero en variante **Base** fine-tuneada
+- **Qué es:** el modelo que BtoDicta ya usa en el carril equilibrio, pero en variante **Base** fine-tuneada
   con las horas de audio de la voz objetivo. Fine-tune **oficial del vendor** (Apache 2.0 código y pesos).
 - **Velocidad:** TTFB 57-111 ms, RTF ~0.59 con 1.7B-4bit en MLX (gist oficial de Blaizzy, mantenedor de
   mlx-audio). En el Mac de referencia será mejor (sin cifra publicada).
@@ -122,8 +122,8 @@ y compararlo contra el XTTS actual. Medir RTF y tiempo-a-primer-audio reales en 
 - **GO a Fase 2** si algún candidato suena ≥ XTTS (oído + d-vector) y da RTF < 0.5.
 - **NO-GO:** quedarse con XTTS + bajar colchón a 1 s. Nada cambió.
 
-### Fase 2 — Carril experimental en BetoDicta (solo si Fase 1 da GO)
-- Integrar el ganador como carril nuevo **default OFF** (toggle en Ajustes, como todo en BetoDicta).
+### Fase 2 — Carril experimental en BtoDicta (solo si Fase 1 da GO)
+- Integrar el ganador como carril nuevo **default OFF** (toggle en Ajustes, como todo en BtoDicta).
 - Chatterbox: extender `MlxVozEngine.modelosPermitidos` + pasar `ref_audio` de la voz activa.
 - Precalentamiento según spec (sección 6), incluida frase dummy anti-compilación.
 - Botón A/B en la biblioteca: misma frase por XTTS y por el candidato, escuchar lado a lado.
@@ -145,7 +145,7 @@ y motor del Entrenador actual).
 
 | Parámetro (por motor) | Default propuesto | Comportamiento |
 |---|---|---|
-| `voz_warmup_arranque` | ON | Al abrir BetoDicta: levantar el motor de voz activo y dejarlo caliente. |
+| `voz_warmup_arranque` | ON | Al abrir BtoDicta: levantar el motor de voz activo y dejarlo caliente. |
 | `voz_warmup_arranque_min` | **60** | Ventana caliente inicial: 1 hora desde el arranque. Si en esa hora no se usó, se apaga (libera RAM). |
 | `voz_caliente_tras_uso_min` | **15** | Tras CADA uso, mantener caliente 15 min más; luego dormir hasta el próximo uso. |
 | `voz_warmup_dummy` | ON | Al levantar, generar una frase corta muda (compila kernels Metal / llena cachés) para que la primera frase real ya sea rápida. |
@@ -190,7 +190,7 @@ El ahorro global respeta la ventana inicial y, al primer uso real, pasa a contar
 ### 9.1 Fallo real encontrado y corregido en XTTS
 
 El problema de que la voz empezaba bien y luego se cortaba no era una pérdida del checkpoint. Para textos
-largos, Coqui intentaba dividir el texto con `enable_text_splitting=True`, pero el runtime aislado de BetoDicta
+largos, Coqui intentaba dividir el texto con `enable_text_splitting=True`, pero el runtime aislado de BtoDicta
 no incluye spaCy. El servidor ya había respondido HTTP 200 cuando Python lanzaba la excepción; por eso el
 cliente podía confundir audio vacío/truncado con una respuesta correcta.
 
@@ -229,14 +229,14 @@ Se generó el mismo texto con la misma referencia real de 12 s. Resultados:
 
 **Decisión: NO-GO a integración.** Es rápido y estable, pero no iguala la identidad de XTTS; por tanto no
 se añadió un toggle decorativo ni otro servidor pesado. Las muestras quedaron en
-`~/Downloads/Comparativa_Voz_Rapida_BetoDicta_2026-07-19/` para escucharlas.
+`~/Downloads/Comparativa_Voz_Rapida_BtoDicta_2026-07-19/` para escucharlas.
 
 ### 9.3 Qwen3-MLX, F5 y respuestas arquitectónicas
 
 - **Qwen3-MLX:** sigue como carril equilibrado separado. El calentamiento real cargó el servidor en 2,23 s,
   precompiló silenciosamente y completó dos generaciones. Un fine-tune formal queda bloqueado por el gate
   correcto: demostrar primero, con un checkpoint trivial, que la conversión hacia MLX conserva los pesos.
-- **F5-Spanish:** no entra en BetoDicta por ahora. Sus pesos compatibles tienen licencia no comercial; no es
+- **F5-Spanish:** no entra en BtoDicta por ahora. Sus pesos compatibles tienen licencia no comercial; no es
   una base adecuada para un producto que debe poder usarse libremente. No se descargó ni se alteró el Mac.
 - **Arquitectura futura:** un motor experimental iría en proceso/puerto separado, pero solo el activo puede
   permanecer caliente. Así un crash no contamina Qwen y nunca conviven varios modelos de 4 GB.

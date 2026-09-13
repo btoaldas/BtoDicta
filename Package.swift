@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "BetoDicta",
+    name: "BtoDicta",
     platforms: [.macOS(.v14)],
     targets: [
         // Puente ObjC mínimo: @try/@catch para NSException (Swift no las atrapa).
@@ -12,10 +12,10 @@ let package = Package(
             publicHeadersPath: "include"
         ),
         .executableTarget(
-            name: "BetoDicta",
+            name: "BtoDicta",
             dependencies: ["BDObjC"],
-            path: "Sources/BetoDicta"
+            path: "Sources/BtoDicta"
         ),
-        .testTarget(name: "BetoDictaTests", dependencies: ["BetoDicta"], path: "Tests/BetoDictaTests")
+        .testTarget(name: "BtoDictaTests", dependencies: ["BtoDicta"], path: "Tests/BtoDictaTests")
     ]
 )

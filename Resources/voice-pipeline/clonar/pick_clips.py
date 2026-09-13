@@ -5,8 +5,8 @@ project = sys.argv[1]; dataset = os.path.join(project, "dataset")
 wavs = os.path.join(dataset, "wavs"); val = os.path.join(project, "val")
 os.makedirs(val, exist_ok=True)
 count = int(os.environ.get("VAL_N", "10")); target = float(os.environ.get("VAL_SEC", "30"))
-maximum = target + 6; ffmpeg = os.environ.get("BETODICTA_FFMPEG", "ffmpeg")
-ffprobe = os.environ.get("BETODICTA_FFPROBE", "ffprobe")
+maximum = target + 6; ffmpeg = os.environ.get("BTODICTA_FFMPEG", "ffmpeg")
+ffprobe = os.environ.get("BTODICTA_FFPROBE", "ffprobe")
 refs = set(line.strip() for line in open(os.path.join(project, "ref_list.txt"))) \
     if os.path.exists(os.path.join(project, "ref_list.txt")) else set()
 

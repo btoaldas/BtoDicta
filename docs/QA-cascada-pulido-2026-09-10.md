@@ -32,7 +32,7 @@
 ```sh
 swift test --build-path build-agent --filter CascadaTests
 swift build -c release --build-path build-agent
-BETODICTA_QA_BIN="$PWD/build-agent/release/BetoDicta" scripts/qa-paquete.sh --automatico
+BTODICTA_QA_BIN="$PWD/build-agent/release/BtoDicta" scripts/qa-paquete.sh --automatico
 ```
 
 Los tests de formatos requieren ffmpeg existente para generar fixtures: WAV
@@ -45,8 +45,8 @@ sin recorte del plazo, expiración/aislamiento de cuarentena.
 Sonda de protocolos con servidor exclusivamente loopback y control positivo:
 
 ```sh
-python3 scripts/qa-audio-protocolos.py --app build-agent/debug/BetoDicta
-python3 scripts/qa-audio-protocolos.py --extension m3u8 --app build-agent/debug/BetoDicta
+python3 scripts/qa-audio-protocolos.py --app build-agent/debug/BtoDicta
+python3 scripts/qa-audio-protocolos.py --extension m3u8 --app build-agent/debug/BtoDicta
 ```
 
 El control positivo debe producir una petición HTTP; el conversor restringido
@@ -57,9 +57,9 @@ restricción evita depender de las políticas predeterminadas del binario extern
 Integración opt-in (consume los proveedores configurados; no guarda ni pega):
 
 ```sh
-BETODICTA_ARCHIVOCASCADATEST=/ruta/prueba.mp3 /ruta/BetoDicta.app/Contents/MacOS/BetoDicta
-BETODICTA_PULIDOADAPTATIVOTEST=deepseek /ruta/BetoDicta.app/Contents/MacOS/BetoDicta
-BETODICTA_PULIDOADAPTATIVOTEST=groq /ruta/BetoDicta.app/Contents/MacOS/BetoDicta
+BTODICTA_ARCHIVOCASCADATEST=/ruta/prueba.mp3 /ruta/BtoDicta.app/Contents/MacOS/BtoDicta
+BTODICTA_PULIDOADAPTATIVOTEST=deepseek /ruta/BtoDicta.app/Contents/MacOS/BtoDicta
+BTODICTA_PULIDOADAPTATIVOTEST=groq /ruta/BtoDicta.app/Contents/MacOS/BtoDicta
 ```
 
 ## Fuentes y precios (consulta 2026-09-10)
@@ -100,7 +100,7 @@ y aprobación específica. No fusionar esta rama a main sin aprobación separada
 - Revisión independiente de código: PASS. Seguridad: PASS tras comprobar y
   endurecer los protocolos del conversor; no se afirmó una explotación no probada.
 - Suite general repetida: 15/15 en debug. Sondas MP3/HLS: control positivo
-  1 petición HTTP, conversor restringido 0, BetoDicta 0 y rechazo local.
+  1 petición HTTP, conversor restringido 0, BtoDicta 0 y rechazo local.
 - Pipeline con directorio nuevo, QA del bundle final, Ed25519 y publicación
   apuntando al commit exacto. README, Manual y captura del ajuste actualizados.
 - La captura pública corresponde a la compilación de validación instalada

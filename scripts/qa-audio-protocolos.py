@@ -10,7 +10,7 @@ import tempfile
 import threading
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--app", help="Ejecutable de QA de BetoDicta (opcional)")
+parser.add_argument("--app", help="Ejecutable de QA de BtoDicta (opcional)")
 parser.add_argument("--extension", choices=["mp3", "m3u8"], default="mp3")
 args = parser.parse_args()
 peticiones = []
@@ -30,7 +30,7 @@ with http.server.ThreadingHTTPServer(("127.0.0.1", 0), Servidor) as server:
     hilo = threading.Thread(target=server.serve_forever, daemon=True)
     hilo.start()
     try:
-        with tempfile.TemporaryDirectory(prefix="betodicta-qa-protocolos-") as carpeta:
+        with tempfile.TemporaryDirectory(prefix="btodicta-qa-protocolos-") as carpeta:
             origen = pathlib.Path(carpeta) / f"lista-disfrazada.{args.extension}"
             origen.write_text("#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXT-X-MEDIA-SEQUENCE:0\n"
                               "#EXTINF:1,\nhttp://127.0.0.1:"
@@ -51,7 +51,7 @@ with http.server.ThreadingHTTPServer(("127.0.0.1", 0), Servidor) as server:
             if args.app:
                 import os
                 antes = len(peticiones)
-                env = dict(os.environ, BETODICTA_ARCHIVOCASCADATEST=str(origen))
+                env = dict(os.environ, BTODICTA_ARCHIVOCASCADATEST=str(origen))
                 proceso = subprocess.run([args.app], env=env, capture_output=True, timeout=15)
                 resultados.append({"ruta": "app", "http": len(peticiones) - antes,
                                    "exit": proceso.returncode})

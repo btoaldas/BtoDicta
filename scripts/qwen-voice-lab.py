@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Laboratorio reproducible de clonación Qwen/CosyVoice.
 
-Las claves se leen de ~/.betodicta/.env; nunca se imprimen ni se guardan en los
+Las claves se leen de ~/.btodicta/.env; nunca se imprimen ni se guardan en los
 resultados. Los metadatos generados contienen únicamente el voice id, modelo y
 request id. Es una herramienta de QA, no se ejecuta desde la app.
 """
@@ -115,7 +115,7 @@ def temporary_oss_url(key: str, model: str, audio: pathlib.Path, region: str) ->
         "key": object_key,
         "success_action_status": "200",
     }
-    boundary = f"----BetoDicta{secrets.token_hex(12)}"
+    boundary = f"----BtoDicta{secrets.token_hex(12)}"
     chunks: list[bytes] = []
     for name, value in fields.items():
         chunks.extend([
@@ -287,7 +287,7 @@ def synthesize_cosy_ws(metadata: dict, text: str, key: str, args: argparse.Names
     try:
         connection = websocket.create_connection(
             ws_url,
-            header=[f"Authorization: Bearer {key}", "User-Agent: BetoDicta-QA/1"],
+            header=[f"Authorization: Bearer {key}", "User-Agent: BtoDicta-QA/1"],
             timeout=90,
             enable_multithread=False,
         )
@@ -364,7 +364,7 @@ def synthesize(args: argparse.Namespace) -> None:
 
 
 def common(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--env-file", type=pathlib.Path, default=pathlib.Path.home() / ".betodicta/.env")
+    parser.add_argument("--env-file", type=pathlib.Path, default=pathlib.Path.home() / ".btodicta/.env")
     parser.add_argument("--key-name", default="DASHSCOPE_API_KEY")
     parser.add_argument("--region", choices=sorted(API_BASES), default="intl")
 

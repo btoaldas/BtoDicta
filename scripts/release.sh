@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Pipeline de release de BetoDicta — GOBERNANZA (orden obligatorio).
+# Pipeline de release de BtoDicta — GOBERNANZA (orden obligatorio).
 #
 #   1. Code review        (workflow de Claude — fuera de este script)
 #   2. Security review     (workflow de Claude — fuera de este script)
@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-UPDATE_KEY="${BETODICTA_UPDATE_SIGNING_KEY:-$HOME/.betodicta/release-signing/update-ed25519.pem}"
+UPDATE_KEY="${BTODICTA_UPDATE_SIGNING_KEY:-$HOME/.btodicta/release-signing/update-ed25519.pem}"
 UPDATE_PUB="Resources/update-public-key.der"
 
 fail() { echo "❌ $1"; exit 1; }
@@ -50,7 +50,7 @@ bash scripts/check-deps.sh 2>/dev/null || true
 echo ""
 
 # ── Versión coherente (Info.plist usa la base numérica; Swift puede ser beta) ─
-VSWIFT=$(sed -n 's/.*static let numero = "\([^"]*\)".*/\1/p' Sources/BetoDicta/Version.swift | head -1)
+VSWIFT=$(sed -n 's/.*static let numero = "\([^"]*\)".*/\1/p' Sources/BtoDicta/Version.swift | head -1)
 VBASE=${VSWIFT%%-*}
 VPLIST=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
 [ "$VBASE" = "$VPLIST" ] || fail "Versión no coincide: Version.swift=$VSWIFT (base $VBASE) vs Info.plist=$VPLIST"
@@ -59,9 +59,9 @@ IS_PRE=0; [[ "$V" == *-* ]] && IS_PRE=1
 ok "Versión $V (base de bundle $VPLIST)"
 [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || fail "Versión no válida: $V"
 # Cada release tiene un destino NUEVO: no borrar bundles/DMG anteriores.
-BUILD_DIR="${BETODICTA_RELEASE_DIR:-build/releases/v$V}"
+BUILD_DIR="${BTODICTA_RELEASE_DIR:-build/releases/v$V}"
 [[ "$BUILD_DIR" =~ ^build/releases/[A-Za-z0-9._-]+$ ]] || fail "El destino debe estar bajo build/releases/ y no contener espacios"
-[ ! -e "$BUILD_DIR" ] || fail "$BUILD_DIR ya existe; consérvalo y elige otro BETODICTA_RELEASE_DIR"
+[ ! -e "$BUILD_DIR" ] || fail "$BUILD_DIR ya existe; consérvalo y elige otro BTODICTA_RELEASE_DIR"
 git diff --quiet && git diff --cached --quiet || fail "Hay cambios sin commit"
 RELEASE_COMMIT=$(git rev-parse HEAD)
 
@@ -73,12 +73,12 @@ if [ -n "$LASTTAG" ]; then
   [ "$CH" -eq 2 ] || fail "Deben cambiar AMBOS: Manual y README desde $LASTTAG."
   ok "Manual/README actualizados desde $LASTTAG"
 fi
-grep -q "$V" Sources/BetoDicta/Version.swift || fail "El historial de Version.swift no menciona $V"
+grep -q "$V" Sources/BtoDicta/Version.swift || fail "El historial de Version.swift no menciona $V"
 ok "Historial de novedades incluye $V"
 
 # Los instaladores de Atajos son parte del producto. Verificamos firma Apple,
 # estructura y puente antes del build para no publicar un paquete vacío o roto.
-SHORTCUT_LOG=$(mktemp -t betodicta-shortcuts)
+SHORTCUT_LOG=$(mktemp -t btodicta-shortcuts)
 scripts/verify-shortcut-installers.sh >"$SHORTCUT_LOG" 2>&1 \
   || { cat "$SHORTCUT_LOG"; rm -f "$SHORTCUT_LOG"; fail "Instaladores de Atajos inválidos"; }
 cat "$SHORTCUT_LOG"
@@ -104,19 +104,19 @@ git rev-parse -q --verify "refs/tags/v$V" >/dev/null 2>&1 && fail "El tag v$V ya
 mkdir -p "$(dirname "$BUILD_DIR")"
 mkdir "$BUILD_DIR"
 make dmg BUILD_DIR="$BUILD_DIR" >"$BUILD_DIR/build.log" 2>&1 || { tail -20 "$BUILD_DIR/build.log"; fail "make dmg falló"; }
-DMG="$BUILD_DIR/BetoDicta-$VBASE.dmg"
+DMG="$BUILD_DIR/BtoDicta-$VBASE.dmg"
 [ -f "$DMG" ] || fail "No se generó $DMG"
 # Capturamos a variable: con pipefail, `codesign … | grep -q` haría que grep
 # cierre el pipe temprano → codesign recibe SIGPIPE (141) → falso fallo.
-SIG=$(codesign -dvvv "$BUILD_DIR/BetoDicta.app" 2>&1 || true)
+SIG=$(codesign -dvvv "$BUILD_DIR/BtoDicta.app" 2>&1 || true)
 echo "$SIG" | grep -q "Signature=adhoc" \
   && fail "El bundle quedó ad-hoc; esperaba el certificado propio"
-REQ=$(codesign -d -r- "$BUILD_DIR/BetoDicta.app" 2>&1 || true)
+REQ=$(codesign -d -r- "$BUILD_DIR/BtoDicta.app" 2>&1 || true)
 CERT_SHA1=$(security find-certificate -c "BetoDicta Self Signed" -Z 2>/dev/null \
   | sed -n 's/^SHA-1 hash: //p' | head -1 | tr '[:upper:]' '[:lower:]')
 [ -n "$CERT_SHA1" ] || fail "No pude leer la huella del certificado propio"
 echo "$REQ" | tr '[:upper:]' '[:lower:]' | grep -q "$CERT_SHA1" \
-  || fail "El bundle no está firmado por la huella del certificado BetoDicta"
+  || fail "El bundle no está firmado por la huella del certificado BtoDicta"
 TMPCERT=$(mktemp)
 security find-certificate -c "BetoDicta Self Signed" -p 2>/dev/null \
   | openssl x509 -outform DER -out "$TMPCERT" \
@@ -125,8 +125,8 @@ cmp -s "$TMPCERT" Resources/code-signing-cert.der \
   || { rm -f "$TMPCERT"; fail "El certificado del llavero no coincide con el fijado en Resources"; }
 rm -f "$TMPCERT"
 ok "Bundle firmado con el certificado propio exacto y fijado ($CERT_SHA1)"
-codesign --verify --deep --strict "$BUILD_DIR/BetoDicta.app" || fail "Firma del bundle inválida"
-BETODICTA_QA_BIN="$PWD/$BUILD_DIR/BetoDicta.app/Contents/MacOS/BetoDicta" \
+codesign --verify --deep --strict "$BUILD_DIR/BtoDicta.app" || fail "Firma del bundle inválida"
+BTODICTA_QA_BIN="$PWD/$BUILD_DIR/BtoDicta.app/Contents/MacOS/BtoDicta" \
   scripts/qa-paquete.sh --automatico --salida "$PWD/$BUILD_DIR/qa" \
   || fail "La suite del paquete release falló"
 ok "Suite automática del paquete final aprobada"
@@ -141,8 +141,8 @@ openssl pkeyutl -sign -rawin -inkey "$UPDATE_KEY" -in "$DIGEST" -out "$DMG_SIG" 
   || { rm -f "$DIGEST"; fail "No pude firmar el DMG con Ed25519"; }
 rm -f "$DIGEST"
 [ "$(stat -f '%z' "$DMG_SIG")" = "64" ] || fail "La firma Ed25519 no mide 64 bytes"
-if BETODICTA_DMGVERIFYTEST="$DMG" BETODICTA_DMGVERIFY_SIG="$DMG_SIG" \
-   "$BUILD_DIR/BetoDicta.app/Contents/MacOS/BetoDicta" >/dev/null 2>&1; then
+if BTODICTA_DMGVERIFYTEST="$DMG" BTODICTA_DMGVERIFY_SIG="$DMG_SIG" \
+   "$BUILD_DIR/BtoDicta.app/Contents/MacOS/BtoDicta" >/dev/null 2>&1; then
   ok "Firma Ed25519 del DMG verificada por la misma app"
 else
   fail "La app no pudo verificar la firma Ed25519 del DMG"
@@ -159,15 +159,15 @@ VERIFY_OUT=""
 # visibles para Bundle/Security. Reintentamos de forma breve y acotada: una
 # identidad realmente incorrecta seguirá fallando en todos los intentos.
 for intento in 1 2 3 4 5 6; do
-  if VERIFY_OUT=$(BETODICTA_VERIFYTEST="$VOL/BetoDicta.app" \
-      "$BUILD_DIR/BetoDicta.app/Contents/MacOS/BetoDicta" 2>&1); then
+  if VERIFY_OUT=$(BTODICTA_VERIFYTEST="$VOL/BtoDicta.app" \
+      "$BUILD_DIR/BtoDicta.app/Contents/MacOS/BtoDicta" 2>&1); then
     VERIFY_OK=1
     break
   fi
   [ "$intento" -lt 6 ] && sleep 2
 done
 if [ "$VERIFY_OK" -eq 1 ]; then
-  ok "El bundle del DMG conserva bundle id y certificado de BetoDicta"
+  ok "El bundle del DMG conserva bundle id y certificado de BtoDicta"
 else
   echo "$VERIFY_OUT" >&2
   fail "El .app del DMG NO conserva la identidad esperada"
@@ -175,33 +175,33 @@ fi
 hdiutil detach "$VOL" >/dev/null 2>&1 || true; trap - EXIT
 
 # ── Gate 5: publicar (DMG versionado + estable para brew) ──────────────────
-cp "$DMG" "$BUILD_DIR/BetoDicta.dmg"
-cp "$DMG_SIG" "$BUILD_DIR/BetoDicta.dmg.sig"
+cp "$DMG" "$BUILD_DIR/BtoDicta.dmg"
+cp "$DMG_SIG" "$BUILD_DIR/BtoDicta.dmg.sig"
 NOTES="${NOTES:-Ver historial en Créditos.}"
 PRE_FLAG=()
 [ "$IS_PRE" = 1 ] && PRE_FLAG=(--prerelease)
-gh release create "v$V" --target "$RELEASE_COMMIT" --title "BetoDicta $V" --notes "$NOTES" "${PRE_FLAG[@]}" \
-  "$DMG" "$DMG_SIG" "$BUILD_DIR/BetoDicta.dmg" "$BUILD_DIR/BetoDicta.dmg.sig" \
+gh release create "v$V" --target "$RELEASE_COMMIT" --title "BtoDicta $V" --notes "$NOTES" "${PRE_FLAG[@]}" \
+  "$DMG" "$DMG_SIG" "$BUILD_DIR/BtoDicta.dmg" "$BUILD_DIR/BtoDicta.dmg.sig" \
   || fail "gh release create falló"
 ok "Release v$V publicado"
 
 # ── Gate 6: estable verifica latest+brew; beta verifica su tag+asset ───────
 sleep 2
 if [ "$IS_PRE" = 1 ]; then
-  PRE=$(gh api "repos/btoaldas/BetoDicta/releases/tags/v$V" --jq '(.tag_name == "v'"$V"'" and .prerelease == true)')
+  PRE=$(gh api "repos/btoaldas/BtoDicta/releases/tags/v$V" --jq '(.tag_name == "v'"$V"'" and .prerelease == true)')
   [ "$PRE" = "true" ] || fail "v$V no quedó marcado como prerelease"
-  RED=$(curl -sI -o /dev/null -w "%{http_code} %{redirect_url}" "https://github.com/btoaldas/BetoDicta/releases/download/v$V/BetoDicta.dmg")
+  RED=$(curl -sI -o /dev/null -w "%{http_code} %{redirect_url}" "https://github.com/btoaldas/BtoDicta/releases/download/v$V/BtoDicta.dmg")
   echo "$RED" | grep -Eq '^200|^302' || fail "asset beta v$V no responde ($RED)"
-  REDSIG=$(curl -sI -o /dev/null -w "%{http_code} %{redirect_url}" "https://github.com/btoaldas/BetoDicta/releases/download/v$V/BetoDicta.dmg.sig")
+  REDSIG=$(curl -sI -o /dev/null -w "%{http_code} %{redirect_url}" "https://github.com/btoaldas/BtoDicta/releases/download/v$V/BtoDicta.dmg.sig")
   echo "$REDSIG" | grep -Eq '^200|^302' || fail "firma beta v$V no responde ($REDSIG)"
   ok "prerelease v$V · DMG y firma accesibles (latest estable no se altera)"
 else
-  LATEST=$(gh api "repos/btoaldas/BetoDicta/releases/latest" --jq '.tag_name')
+  LATEST=$(gh api "repos/btoaldas/BtoDicta/releases/latest" --jq '.tag_name')
   [ "$LATEST" = "v$V" ] || fail "latest=$LATEST (esperaba v$V)"
-  RED=$(curl -sI -o /dev/null -w "%{http_code} %{redirect_url}" https://github.com/btoaldas/BetoDicta/releases/latest/download/BetoDicta.dmg)
-  echo "$RED" | grep -q "v$V/BetoDicta.dmg" || fail "brew estable no apunta a v$V ($RED)"
-  REDSIG=$(curl -sI -o /dev/null -w "%{http_code} %{redirect_url}" https://github.com/btoaldas/BetoDicta/releases/latest/download/BetoDicta.dmg.sig)
-  echo "$REDSIG" | grep -q "v$V/BetoDicta.dmg.sig" || fail "firma estable no apunta a v$V ($REDSIG)"
+  RED=$(curl -sI -o /dev/null -w "%{http_code} %{redirect_url}" https://github.com/btoaldas/BtoDicta/releases/latest/download/BtoDicta.dmg)
+  echo "$RED" | grep -q "v$V/BtoDicta.dmg" || fail "brew estable no apunta a v$V ($RED)"
+  REDSIG=$(curl -sI -o /dev/null -w "%{http_code} %{redirect_url}" https://github.com/btoaldas/BtoDicta/releases/latest/download/BtoDicta.dmg.sig)
+  echo "$REDSIG" | grep -q "v$V/BtoDicta.dmg.sig" || fail "firma estable no apunta a v$V ($REDSIG)"
   ok "latest=v$V · brew estable y firma → v$V"
 fi
 

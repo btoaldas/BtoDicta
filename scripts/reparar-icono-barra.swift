@@ -6,9 +6,9 @@ import Foundation
 // un status item a la aplicación que lo lanzó (por ejemplo, Codex) y ocultarlo
 // si esa aplicación está desactivada en la barra. La app instalada no debe pedir
 // Acceso total al disco para corregir un bug del sistema; por eso esta reparación
-// corre desde la terminal que compila e instala BetoDicta y NO viaja en el DMG.
+// corre desde la terminal que compila e instala BtoDicta y NO viaja en el DMG.
 
-let bundleBeto = "ec.bto.betodicta"
+let bundleBeto = "ec.bto.btodicta"
 let preferenciasURL = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Group Containers/group.com.apple.controlcenter")
     .appendingPathComponent("Library/Preferences/group.com.apple.controlcenter.plist")
@@ -19,7 +19,7 @@ func bundle(de valor: Any?) -> String? {
     return bundle["_0"] as? String
 }
 
-/// Se niega a modificar si BetoDicta no conserva su propia fila permitida.
+/// Se niega a modificar si BtoDicta no conserva su propia fila permitida.
 func limpiar(
     entradas: [[String: Any]], bundleObjetivo: String
 ) -> (entradas: [[String: Any]], eliminadas: Int)? {
@@ -107,7 +107,7 @@ do {
         from: datosRastreados, options: [], format: nil
     ) as? [[String: Any]],
     let limpieza = limpiar(entradas: entradas, bundleObjetivo: bundleBeto) else {
-        print("MENUBARREPAIR OMITIDO: no existe una fila propia permitida de BetoDicta")
+        print("MENUBARREPAIR OMITIDO: no existe una fila propia permitida de BtoDicta")
         exit(0)
     }
     guard limpieza.eliminadas > 0 else {
@@ -116,7 +116,7 @@ do {
     }
 
     let carpeta = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".betodicta/backups", isDirectory: true)
+        .appendingPathComponent(".btodicta/backups", isDirectory: true)
     try FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
     try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: carpeta.path)
     let formato = DateFormatter()

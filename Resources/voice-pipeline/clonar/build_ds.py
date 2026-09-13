@@ -9,8 +9,8 @@ os.makedirs(WAVS, exist_ok=True)
 SR = 24000; MODEL = "mlx-community/whisper-large-v3-turbo"
 MIN_S, MAX_S = 2.0, 15.0
 EXTS = (".mp3", ".ogg", ".wav", ".opus", ".m4a", ".aac", ".flac")
-FFMPEG = os.environ.get("BETODICTA_FFMPEG", "ffmpeg")
-FFPROBE = os.environ.get("BETODICTA_FFPROBE", "ffprobe")
+FFMPEG = os.environ.get("BTODICTA_FFMPEG", "ffmpeg")
+FFPROBE = os.environ.get("BTODICTA_FFPROBE", "ffprobe")
 files = sorted(f for f in glob.glob(os.path.join(FOLDER, "**", "*"), recursive=True)
                if f.lower().endswith(EXTS))
 print(f"[i] {len(files)} audios en {FOLDER}", flush=True)

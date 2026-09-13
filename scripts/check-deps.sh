@@ -7,7 +7,7 @@
 #
 # Uso:  scripts/check-deps.sh
 #
-# (Se puede correr al empezar a trabajar en BetoDicta, o programar con
+# (Se puede correr al empezar a trabajar en BtoDicta, o programar con
 #  launchd/cron. No toca la app ni instala nada; solo hace `git fetch` y
 #  consulta la API pública de GitHub.)
 #
@@ -81,7 +81,7 @@ if [ "$hay_update" = 1 ]; then
     # AppleScript → evita inyección si un nombre de dep trae comillas/código.
     osascript - "$msg" >/dev/null 2>&1 <<'APPLESCRIPT' || true
 on run argv
-  display notification (item 1 of argv) with title "BetoDicta · dependencias" sound name "Ping"
+  display notification (item 1 of argv) with title "BtoDicta · dependencias" sound name "Ping"
 end run
 APPLESCRIPT
   fi

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fine-tune GPT de XTTS con base y dataset gestionados por BetoDicta."""
+"""Fine-tune GPT de XTTS con base y dataset gestionados por BtoDicta."""
 import math, os, sys, warnings
 warnings.filterwarnings("ignore")
 os.environ["COQUI_TOS_AGREED"] = "1"; os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
@@ -36,7 +36,7 @@ def main():
     candidates = [50,100,150,200,250,300,400,500,750,1000,1500,2000]
     save = min(candidates, key=lambda n: abs(n - steps / 10)); keep = 12
     cfg = GPTTrainerConfig(epochs=epochs, output_path=out, model_args=args, audio=audio,
-        run_name="voz", project_name="betodicta", batch_size=3, batch_group_size=32,
+        run_name="voz", project_name="btodicta", batch_size=3, batch_group_size=32,
         eval_batch_size=3, num_loader_workers=0, eval_split_max_size=128,
         print_step=50, save_step=save, save_n_checkpoints=keep,
         save_checkpoints=True, print_eval=False, optimizer="AdamW",

@@ -4,7 +4,7 @@
 set -eu
 cd "${0:A:h}/.."
 
-TMP="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/betodicta-shortcuts.XXXXXX")"
+TMP="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/btodicta-shortcuts.XXXXXX")"
 trap '/bin/rm -rf "$TMP"' EXIT INT TERM
 OPENSSL="/opt/homebrew/bin/openssl"
 [[ -x "$OPENSSL" ]] || OPENSSL="/usr/bin/openssl"
@@ -59,11 +59,11 @@ verificar() {
   print "SHORTCUTTEST OK · $base"
 }
 
-verificar "Resources/BetoDicta · Escuchar asistente.shortcut" \
-  "/Applications/BetoDicta.app/Contents/Resources/betodicta-siri.sh"
-verificar "Resources/BetoDicta Universal.shortcut" \
-  "/Applications/BetoDicta.app/Contents/Resources/betodicta-universal.sh" 1
-verificar "Resources/BetoDicta-Reproducir-musica.shortcut" \
+verificar "Resources/BtoDicta · Escuchar asistente.shortcut" \
+  "/Applications/BtoDicta.app/Contents/Resources/btodicta-siri.sh"
+verificar "Resources/BtoDicta Universal.shortcut" \
+  "/Applications/BtoDicta.app/Contents/Resources/btodicta-universal.sh" 1
+verificar "Resources/BtoDicta-Reproducir-musica.shortcut" \
   "is.workflow.actions.playmusic"
 
 print "SHORTCUTTEST TODO OK"

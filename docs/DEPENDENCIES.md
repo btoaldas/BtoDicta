@@ -1,11 +1,11 @@
 # Componentes de terceros y sus actualizaciones
 
-BetoDicta no tiene librerías de terceros dentro del binario Swift, pero **sí usa
+BtoDicta no tiene librerías de terceros dentro del binario Swift, pero **sí usa
 motores externos** compilados aparte (y un adaptador para pausar multimedia):
 
 | Componente | Repo | Para qué | Local |
 |---|---|---|---|
-| **transcribe.cpp** | [handy-computer/transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) | Streaming local en vivo (Voxtral Realtime / Nemotron) → `beto-stream` | `~/transcribe.cpp` |
+| **transcribe.cpp** | [handy-computer/transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) | Streaming local en vivo (Voxtral Realtime / Nemotron) → `bto-stream` | `~/transcribe.cpp` |
 | **whisper.cpp** | [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Whisper local (`whisper-cli`, `whisper-server`) | `~/whisper.cpp` |
 | **llama.cpp** | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) | Voxtral Mini 3B local (`llama-server`) | `~/llama.cpp-static` |
 | **mediaremote-adapter** | [ungive/mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) (BSD-3) | Pausar/reanudar música y video al dictar | embarcado |
@@ -17,9 +17,9 @@ tags de ambos proyectos son ligeros (no llevan firma propia), por lo que además
 se verificó el objeto Git, el commit validado por GitHub, la licencia y que el
 binario final solo enlace frameworks del sistema.
 
-| Motor | Revisión verificada | Contratos de BetoDicta comprobados |
+| Motor | Revisión verificada | Contratos de BtoDicta comprobados |
 |---|---|---|
-| **transcribe.cpp** | `8c7ae674ea7b26b0c9074529da99f938553db32f` (motor 0.2.0, diarización MOSS/Granite) | ABI nueva; `transcribe-cli`; `beto-stream` reconstruido; Canary, Nemotron y Voxtral Realtime |
+| **transcribe.cpp** | `8c7ae674ea7b26b0c9074529da99f938553db32f` (motor 0.2.0, diarización MOSS/Granite) | ABI nueva; `transcribe-cli`; `bto-stream` reconstruido; Canary, Nemotron y Voxtral Realtime |
 | **llama.cpp** | `b10068` — `571d0d540df04f25298d0e159e520d9fc62ed121` | `llama-server`; `--mmproj`; chat con audio Voxtral; `/v1/embeddings`; Metal y Accelerate |
 
 QA del 19-07-2026: `transcribe.cpp` pasó **33/33** pruebas upstream y `llama.cpp`
@@ -31,7 +31,7 @@ secuencial (**53/53**, 144,37 s) y otra con paralelismo moderado (**53/53**,
 se probaron con modelos reales los cuatro caminos que sí usa la app: Canary batch,
 Nemotron y Voxtral Realtime por streaming, Voxtral multimodal y BGE-M3 embeddings.
 
-La revisión 8c7ae67 cambia la ABI y añade estructuras de diarización. BetoDicta
+La revisión 8c7ae67 cambia la ABI y añade estructuras de diarización. BtoDicta
 no activa diarización automáticamente: conserva el comportamiento existente y
 solo incorpora el motor actualizado. El puente se recompiló contra la cabecera
 0.2.0 y se verificó con el mismo audio de 16 kHz en Canary, Nemotron y Voxtral
@@ -40,7 +40,7 @@ Realtime; los dos motores en vivo emitieron `READY`, parciales y final válido.
 Para reconstruir el puente después de compilar `~/transcribe.cpp` estático:
 
 ```bash
-make beto-stream
+make bto-stream
 ```
 
 El target valida que existan cabecera y librerías antes de sustituir el binario.
@@ -72,7 +72,7 @@ Hay tres formas, y conviene tener la automática puesta:
    scripts/install-checkdeps-agent.sh            # activar
    scripts/install-checkdeps-agent.sh uninstall  # quitar
    ```
-   Log en `~/Library/Logs/betodicta-checkdeps.log`. Nunca actualiza solo.
+   Log en `~/Library/Logs/btodicta-checkdeps.log`. Nunca actualiza solo.
 3. **En cada release** — `scripts/release.sh` corre el checker como **recordatorio** (no bloquea) antes de publicar, para que no se te pase que hay motores nuevos.
 
 > Todo esto solo LEE (git fetch + API pública de GitHub) y avisa. Actualizar un
