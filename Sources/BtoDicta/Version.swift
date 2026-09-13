@@ -6,11 +6,16 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.56.0"
+    static let numero = "0.56.1"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.56.1", "2026-09-13", [
+            "ARREGLADO el asistente de mudanza, que no llegaba a instalar nada. Dos fallos encadenados: viajaba sin la clave con la que se comprueba la firma de las descargas (toda instalación moría con «firma del release no válida»), y preguntaba si había una versión «más nueva» cuando él viaja dentro del mismo paquete que la aplicación, así que la respuesta era siempre «ya estás al día». Ahora lleva la clave y pide directamente el último paquete publicado",
+            "Probado de punta a punta: el asistente descarga, verifica la firma, instala la aplicación, la abre y se cierra solo",
+            "El constructor del asistente y el publicador comprueban ahora que lleve la clave y el certificado; si faltaran, el paquete no se publica. Hay prueba propia: BTODICTA_PUENTETEST=1",
+        ]),
         ("0.56.0", "2026-09-13", [
             "ASISTENTE DE MUDANZA para quien tenía BetoDicta: el paquete lleva ahora una segunda aplicación con el nombre y el identificador anteriores. La actualización automática de una instalación vieja la encuentra, la instala y abre un asistente que explica el cambio y hace la mudanza en un clic — antes esa actualización se cancelaba con un error de identidad y había que resolverlo a mano",
             "El asistente descarga BtoDicta, comprueba su firma, la instala y la abre; si algo falla, enseña los cuatro pasos para hacerlo a mano y un botón que lleva a la página de descargas",

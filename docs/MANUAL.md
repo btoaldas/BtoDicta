@@ -882,6 +882,8 @@ Todo vive en tu Mac, en `~/.btodicta/`:
 
 ### Vengo de BetoDicta: ¿qué tengo que hacer?
 
+> Si tu asistente dice «firma del release no válida» o «no encontró una versión nueva», es una versión anterior del propio asistente (corregido en 0.56.1). Pulsa **Descargar a mano** y sigue los cuatro pasos: el resultado es el mismo.
+
 Nada especial. Cuando tu BetoDicta avise de una actualización y la aceptes, se instalará un **asistente de mudanza** y se abrirá solo. Te explica el cambio y, con un botón, descarga BtoDicta, comprueba su firma, la instala y la abre. Si prefieres hacerlo tú, el mismo asistente te da los cuatro pasos y un enlace a las descargas.
 
 Lo que ocurre después, sin que hagas nada: tus ajustes, modelos, voces, historial y bitácora se mudan a las carpetas con el nombre nuevo, y tus claves guardadas se recuperan solas.

@@ -15,6 +15,21 @@ import AppKit
 // identificador ANTERIORES, no dicta nada — solo abre el asistente que instala
 // la aplicación nueva. Va lo primero de todo y no toca ni un dato del usuario.
 if AsistenteMudanza.esPuente {
+    // Comprobación del puente sin abrir ventana: BTODICTA_PUENTETEST=1.
+    // Un puente sin la clave pública no puede verificar ninguna descarga y su
+    // instalación automática falla al final, cuando el usuario ya confió en
+    // ella. Se comprueba aquí, en el propio bundle empaquetado.
+    if ProcessInfo.processInfo.environment["BTODICTA_PUENTETEST"] == "1" {
+        let id = Bundle.main.bundleIdentifier ?? "?"
+        let clave = Bundle.main.url(forResource: "update-public-key", withExtension: "der")
+        let cert = Bundle.main.url(forResource: "code-signing-cert", withExtension: "der")
+        print("PUENTETEST identificador=\(id)")
+        print("PUENTETEST clave de verificación: \(clave != nil ? "presente" : "AUSENTE")")
+        print("PUENTETEST certificado de identidad: \(cert != nil ? "presente" : "AUSENTE")")
+        let ok = id == AsistenteMudanza.identificadorAnterior && clave != nil && cert != nil
+        print("PUENTETEST \(ok ? "TODO OK" : "FALLA")")
+        exit(ok ? 0 : 1)
+    }
     MainActor.assumeIsolated {
         let app = NSApplication.shared
         let asistente = AsistenteMudanza()

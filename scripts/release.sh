@@ -177,6 +177,8 @@ PUENTE_DMG="$VOL/BetoDicta.app"
 PID_PUENTE=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PUENTE_DMG/Contents/Info.plist" 2>/dev/null || echo "")
 [ "$PID_PUENTE" = "ec.bto.betodicta" ] || fail "El puente no conserva el identificador anterior (tiene: $PID_PUENTE)"
 codesign --verify --deep "$PUENTE_DMG" 2>/dev/null || fail "El puente del DMG no está firmado"
+[ -f "$PUENTE_DMG/Contents/Resources/update-public-key.der" ] \
+  || fail "El puente viaja SIN la clave pública: no podría verificar ninguna descarga"
 ok "El puente para instalaciones anteriores viaja firmado y con su identificador"
 else
   echo "$VERIFY_OUT" >&2

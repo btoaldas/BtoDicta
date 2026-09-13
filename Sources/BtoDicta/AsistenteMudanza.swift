@@ -96,7 +96,15 @@ final class AsistenteMudanza: NSObject, NSApplicationDelegate {
 
     // MARK: Pasos
 
+    /// ¿Este puente puede verificar lo que descargue? Si le falta la clave
+    /// pública no debe ofrecer una instalación automática que fallará al final:
+    /// más vale enseñar el camino manual desde el principio.
+    private var puedeInstalarSolo: Bool {
+        Bundle.main.url(forResource: "update-public-key", withExtension: "der") != nil
+    }
+
     private func mostrarBienvenida() {
+        guard puedeInstalarSolo else { mostrarSoloManual(); return }
         titulo.stringValue = "BetoDicta ahora se llama BtoDicta"
         cuerpo.stringValue = """
         Esta ventana aparece porque la aplicación cambió de nombre. No es un error \
@@ -121,6 +129,33 @@ final class AsistenteMudanza: NSObject, NSApplicationDelegate {
         botonPrincipal.isEnabled = true
         botonSecundario.title = "Descargar a mano"
         botonSecundario.isHidden = false
+        progreso.isHidden = true
+    }
+
+    /// Sin clave pública: instalación a mano, explicada igual de claro.
+    private func mostrarSoloManual() {
+        titulo.stringValue = "BetoDicta ahora se llama BtoDicta"
+        cuerpo.stringValue = """
+        Esta ventana aparece porque la aplicación cambió de nombre. No es un error \
+        y no has perdido nada.
+
+        Instálala tú en un minuto:
+
+        1. Pulsa «Ir a las descargas»: se abre la página oficial.
+        2. Baja el archivo BtoDicta.dmg y ábrelo.
+        3. Arrastra BtoDicta a tu carpeta de Aplicaciones.
+        4. Ábrela. Tus ajustes, modelos, voces, historial y bitácora se mudan \
+        solos, y tus claves guardadas se recuperan sin escribir ninguna.
+
+        Después macOS te pedirá permiso de micrófono, accesibilidad y \
+        automatización: para el sistema es una aplicación nueva y solo lo pide \
+        la primera vez.
+        """
+        botonPrincipal.title = "Ir a las descargas"
+        botonPrincipal.target = self
+        botonPrincipal.action = #selector(accionSecundaria)
+        botonPrincipal.isEnabled = true
+        botonSecundario.isHidden = true
         progreso.isHidden = true
     }
 
@@ -174,21 +209,57 @@ final class AsistenteMudanza: NSObject, NSApplicationDelegate {
         guard !instalando else { return }
         instalando = true
         mostrarInstalando(nil)
-        Updater.verificar { [weak self] estado in
+        buscarPaquete { [weak self] url, error in
             guard let self else { return }
-            switch estado {
-            case .disponible(_, let dmg, _):
-                self.instalar(dmg)
-            case .alDia:
-                // La última publicada coincide con la versión de este puente:
-                // se instala igualmente desde la página, que siempre existe.
-                self.mostrarError("La descarga automática no encontró una versión nueva que instalar.")
-            case .error(let m):
-                self.mostrarError("No pude consultar las descargas: \(m).")
-            default:
-                self.mostrarError("La comprobación de descargas no respondió.")
+            guard let url else {
+                self.mostrarError(error ?? "No pude encontrar el paquete de descarga.")
+                return
             }
+            self.instalar(url)
         }
+    }
+
+    /// Pide SIEMPRE el último paquete publicado. No sirve preguntar si «hay una
+    /// versión más nueva»: este puente viaja dentro del mismo paquete que la
+    /// aplicación, así que su número de versión es exactamente el de la última
+    /// publicada y la respuesta sería siempre «ya estás al día» — con lo cual el
+    /// asistente no instalaría nunca nada. Lo que hace falta es la aplicación
+    /// nueva, tenga el número que tenga.
+    private func buscarPaquete(completion: @escaping (URL?, String?) -> Void) {
+        guard let api = URL(string: "https://api.github.com/repos/btoaldas/BtoDicta/releases/latest") else {
+            completion(nil, "La dirección de descargas no es válida."); return
+        }
+        var req = URLRequest(url: api)
+        req.timeoutInterval = 20
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("BtoDicta-asistente", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { datos, resp, err in
+            DispatchQueue.main.async {
+                if let err {
+                    completion(nil, "No pude conectar con las descargas: \(err.localizedDescription).")
+                    return
+                }
+                let codigo = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                guard (200..<300).contains(codigo), let datos,
+                      let json = try? JSONSerialization.jsonObject(with: datos) as? [String: Any],
+                      let assets = json["assets"] as? [[String: Any]] else {
+                    completion(nil, "Las descargas respondieron con un error (\(codigo)).")
+                    return
+                }
+                // El paquete «estable» conserva siempre el mismo nombre; si no
+                // estuviera, vale cualquier .dmg del release.
+                let candidato = assets.first { ($0["name"] as? String) == "BtoDicta.dmg" }
+                    ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
+                guard let candidato,
+                      let dir = candidato["browser_download_url"] as? String,
+                      let url = URL(string: dir), url.scheme?.lowercased() == "https" else {
+                    completion(nil, "La última publicación no trae paquete de instalación.")
+                    return
+                }
+                completion(url, nil)
+            }
+        }.resume()
     }
 
     private func instalar(_ dmg: URL) {

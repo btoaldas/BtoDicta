@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.56.1
+
+- **El asistente de mudanza ya instala de verdad.** Viajaba sin la clave con la
+  que se comprueban las firmas y además preguntaba por una versión «más nueva»
+  que nunca podía existir. Probado de punta a punta.
+
 ### Novedades 0.56.0
 
 - **Asistente de mudanza para quien venía de BetoDicta**: el paquete incluye una
