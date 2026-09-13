@@ -880,6 +880,10 @@ Todo vive en tu Mac, en `~/.btodicta/`:
 - **Streaming de ElevenLabs sin cuota a mitad de un dictado**: el servidor cierra la sesión; la app corta el envío de audio de inmediato, pone a ElevenLabs en cuarentena 30 min y el motor local toma el dictado con todo el audio acumulado (línea *"streaming ElevenLabs cerrado a mitad del dictado (…) → plan B"*).
 - **Sin internet**: el pulido no recorre los 16 proveedores de nube uno por uno; salta directo a tu primer motor local (Ollama, LM Studio) o entrega el texto original, y la voz cae a la de macOS durante un minuto.
 
+### Los Atajos de macOS tras el cambio de nombre
+
+Los instaladores de Atajos los firma Apple y guardan dentro la ruta de la aplicación, así que los que ya tenías **siguen apuntando a BetoDicta**. Funcionan mientras conserves la app anterior en tu carpeta de Aplicaciones. Para que apunten a BtoDicta hay que volver a generarlos desde la app Atajos; hasta entonces, el publicador lo avisa en cada versión y aquí queda dicho.
+
 ### No graba nada: ni el dictado ni la bitácora
 
 Si el dictado se queda esperando sin texto y la bitácora repite que no entrega audio, el micrófono está **mudo para la app** aunque funcione en otros programas. Comprueba tu equipo con:

@@ -44,6 +44,8 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 - **Las credenciales del Llavero se migran solas** la primera vez que se usan.
 - **macOS volverá a pedir permisos** (micrófono, accesibilidad, automatización)
   por ser una aplicación nueva para el sistema. Solo la primera vez.
+- **Los Atajos de macOS** que ya tuvieras siguen apuntando a la app anterior:
+  hay que volver a generarlos desde la app Atajos.
 
 ### Novedades 0.54.2
 

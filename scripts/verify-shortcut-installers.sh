@@ -41,9 +41,19 @@ verificar() {
   /usr/bin/plutil -lint "$dir/unpacked/Shortcut.wflow" >/dev/null
   /usr/bin/plutil -convert xml1 -o "$dir/workflow.xml" \
     "$dir/unpacked/Shortcut.wflow"
-  /usr/bin/grep -Fq "$esperado" "$dir/workflow.xml" || {
-    print -u2 "$archivo no contiene $esperado"; return 1
-  }
+  # Los instaladores los firma Apple y guardan la ruta ABSOLUTA de la app. Tras
+  # el cambio de nombre siguen apuntando al nombre anterior y no se pueden
+  # regenerar sin la app Atajos: eso se AVISA, no se oculta, y se publica solo
+  # porque el atajo sigue funcionando mientras la app anterior esté instalada.
+  local anterior="${esperado//BtoDicta/BetoDicta}"
+  anterior="${anterior//btodicta-/betodicta-}"
+  if ! /usr/bin/grep -Fq "$esperado" "$dir/workflow.xml"; then
+    if [ "$anterior" != "$esperado" ] && /usr/bin/grep -Fq "$anterior" "$dir/workflow.xml"; then
+      print "SHORTCUTTEST AVISO · $base apunta al nombre anterior de la app — hay que volver a generarlo desde Atajos"
+    else
+      print -u2 "$archivo no contiene $esperado"; return 1
+    fi
+  fi
   # Los paquetes son portables: jamás deben capturar una ruta personal, una
   # credencial ni la capacidad privada generada por una instalación concreta.
   if /usr/bin/grep -Eq '/Users/|agente_pasarela_siri_token|sk-[A-Za-z0-9_-]{12,}|api[_-]?key' \
