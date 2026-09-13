@@ -880,6 +880,18 @@ Todo vive en tu Mac, en `~/.betodicta/`:
 - **Streaming de ElevenLabs sin cuota a mitad de un dictado**: el servidor cierra la sesión; la app corta el envío de audio de inmediato, pone a ElevenLabs en cuarentena 30 min y el motor local toma el dictado con todo el audio acumulado (línea *"streaming ElevenLabs cerrado a mitad del dictado (…) → plan B"*).
 - **Sin internet**: el pulido no recorre los 16 proveedores de nube uno por uno; salta directo a tu primer motor local (Ollama, LM Studio) o entrega el texto original, y la voz cae a la de macOS durante un minuto.
 
+### No graba nada: ni el dictado ni la bitácora
+
+Si el dictado se queda esperando sin texto y la bitácora repite que no entrega audio, el micrófono está **mudo para la app** aunque funcione en otros programas. Comprueba tu equipo con:
+
+```
+BETODICTA_MICTEST=1 /Applications/BetoDicta.app/Contents/MacOS/BetoDicta
+```
+
+Lista los micrófonos que ve, cuál usa y si entra audio de verdad. Desde 0.54.2 la app **solo fija el micrófono cuando hace falta cambiarlo**: forzarlo cuando el sistema ya tiene ese mismo aparato lo dejaba sin entregar nada. Y la frecuencia del micrófono la pone tu equipo —44 100, 48 000 o 96 000 Hz—: la app la convierte a la suya, así que funciona igual en cualquier Mac.
+
+Un dictado que no recibe audio ya no se queda pensando: a los 6 segundos se cierra y te avisa.
+
 ### La bitácora dice «el motor arrancó pero no entrega audio»
 
 Significa que el micrófono no está dando sonido a BetoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.

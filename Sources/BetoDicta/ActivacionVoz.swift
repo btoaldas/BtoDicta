@@ -454,13 +454,7 @@ final class ActivacionVoz: @unchecked Sendable {
         Self.dbg("inputNode listo; quitando tap anterior")
         input.removeTap(onBus: 0)
         Self.dbg("resolviendo micrófono elegido")
-        if let dev = Microfono.elegido(), let au = input.audioUnit {
-            Self.dbg("fijando dispositivo \(dev)")
-            var id = dev
-            AudioUnitSetProperty(au, kAudioOutputUnitProperty_CurrentDevice,
-                                 kAudioUnitScope_Global, 0, &id,
-                                 UInt32(MemoryLayout<AudioDeviceID>.size))
-        }
+        Microfono.aplicar(a: input.audioUnit)
         Self.dbg("leyendo formato de entrada")
         let entrada = input.outputFormat(forBus: 0)
         Self.dbg("formato entrada \(entrada)")

@@ -11,7 +11,11 @@ final class Recorder {
     // (backlog en vivo): sin este candado es una carrera de datos real.
     private let candado = NSLock()
     private var converter: AVAudioConverter?
-    private let outFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, channels: 1, interleaved: true)!
+    /// Frecuencia INTERNA de la app. El micrófono de cada equipo entrega la
+    /// suya —44 100, 48 000, 96 000 Hz…— y el conversor la lleva siempre aquí,
+    /// así que nada del resto del código depende del hardware de turno.
+    static let frecuenciaInterna: Double = 16000
+    private let outFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: Recorder.frecuenciaInterna, channels: 1, interleaved: true)!
 
     var onChunk: ((Data) -> Void)?
     var onLevel: ((Float) -> Void)?
@@ -22,6 +26,11 @@ final class Recorder {
         candado.lock(); defer { candado.unlock() }
         return samples
     }
+
+    /// Buffers recibidos del micrófono en el dictado en curso. Cero tras unos
+    /// segundos significa que no está entrando NADA: mejor decirlo que dejar al
+    /// usuario hablando contra un micrófono mudo.
+    private(set) var buffersRecibidos = 0
 
     func start(preloadPCM: Data = Data()) throws {
         // Blindaje contra doble arranque: un segundo installTap en el mismo
@@ -34,12 +43,7 @@ final class Recorder {
         input.removeTap(onBus: 0)   // por si quedó un tap de un intento fallido
         // Fijar el micrófono ANTES de leer el formato: sin esto macOS puede
         // enchufarnos el mic del iPhone (Continuity) y grabar silencio.
-        if let dev = Microfono.elegido(), let au = input.audioUnit {
-            var id = dev
-            AudioUnitSetProperty(au, kAudioOutputUnitProperty_CurrentDevice,
-                                 kAudioUnitScope_Global, 0, &id,
-                                 UInt32(MemoryLayout<AudioDeviceID>.size))
-        }
+        Microfono.aplicar(a: input.audioUnit)
         // El formato del micrófono puede llegar INVÁLIDO (0 Hz o 0 canales)
         // cuando el dispositivo está en transición: justo lo que pasa al pulsar
         // la tecla mientras la bitácora acaba de soltar el micrófono. Con ese
@@ -61,9 +65,11 @@ final class Recorder {
         }
         converter = AVAudioConverter(from: inFormat, to: outFormat)
 
+        buffersRecibidos = 0
         let instalar = { [weak self] in
         input.installTap(onBus: 0, bufferSize: 4096, format: inFormat) { [weak self] buffer, _ in
             guard let self, let converter = self.converter else { return }
+            self.buffersRecibidos &+= 1
             let ratio = self.outFormat.sampleRate / inFormat.sampleRate
             let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
             guard let out = AVAudioPCMBuffer(pcmFormat: self.outFormat, frameCapacity: capacity) else { return }

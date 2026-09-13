@@ -6,11 +6,17 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.54.1"
+    static let numero = "0.54.2"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.54.2", "2026-09-13", [
+            "ARREGLADO el micrófono mudo: la app fijaba a la fuerza el aparato de entrada en el motor de audio y eso DEJA EL MICRÓFONO SIN ENTREGAR NADA. Medido en el mismo Mac: sin fijarlo, 24 buffers en 2,5 s; fijándolo, la llamada devuelve «correcto» y llegan CERO. Resultado: la bitácora reiniciándose en bucle y un dictado entero perdido sin un solo byte. Ahora solo se fija cuando de verdad hay que cambiar de aparato — si el sistema ya tiene el que quieres, no se toca nada",
+            "FUNCIONA CON CUALQUIER EQUIPO: la frecuencia del micrófono la pone cada Mac (44 100, 48 000, 96 000 Hz…) y la app la convierte a la suya; ninguna cuenta del código depende ya del hardware de turno",
+            "UN DICTADO SIN AUDIO YA NO SE QUEDA PENSANDO: si a los 6 segundos no ha entrado ni un buffer, se cierra y te avisa («el micrófono no está entregando audio») en vez de esperar indefinidamente",
+            "Prueba nueva BETODICTA_MICTEST=1: lista los micrófonos del equipo, dice cuál se usa y confirma si entra audio de verdad",
+        ]),
         ("0.54.1", "2026-09-13", [
             "ARREGLADO un cierre de la app al empezar a dictar: si el micrófono estaba cambiando de estado justo al pulsar la tecla (la bitácora acababa de soltarlo), macOS devolvía un formato inválido y la app se caía a mitad de la grabación. Ahora se comprueba el formato, se reintenta tras un respiro y, si el micrófono no está, se avisa sin cerrar nada",
             "ARREGLADO un bucle de la bitácora: cuando el motor de audio arrancaba pero no entregaba sonido, se reiniciaba cada 8 segundos sin parar. El contador se reiniciaba al arrancar el motor, y el motor arranca siempre; ahora solo se reinicia cuando llega audio de verdad",

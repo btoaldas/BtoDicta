@@ -228,12 +228,7 @@ final class ContinuoAudio {
                 Log.log(.sistema, "bitácora: no pude activar la cancelación de eco (\(error.localizedDescription)) — sigo sin ella")
             }
         }
-        if let dev = Microfono.elegido(), let au = entrada.audioUnit {
-            var id = dev
-            AudioUnitSetProperty(au, kAudioOutputUnitProperty_CurrentDevice,
-                                 kAudioUnitScope_Global, 0, &id,
-                                 UInt32(MemoryLayout<AudioDeviceID>.size))
-        }
+        Microfono.aplicar(a: entrada.audioUnit)
 
         let formatoEntrada = entrada.outputFormat(forBus: 0)
         guard formatoEntrada.sampleRate > 0 else {

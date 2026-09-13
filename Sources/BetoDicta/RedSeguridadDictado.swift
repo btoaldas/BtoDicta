@@ -22,6 +22,12 @@ import Foundation
 // quedó corto, y reparación SOLO del tramo afectado.
 enum RedSeguridadDictado {
 
+    /// Bytes por segundo del PCM con el que trabaja la app: 16 kHz, mono,
+    /// 16 bits. NO es la frecuencia del micrófono —esa la pone cada equipo y
+    /// puede ser 44 100, 48 000 o 96 000 Hz— sino la de salida del conversor,
+    /// que es igual en todas partes. Las cuentas de tiempo van por aquí.
+    static let bytesPorSegundo = Int(Recorder.frecuenciaInterna) * 2
+
     /// Por qué se sospecha que falta texto. Sin motivo no se hace nada.
     enum Motivo: String {
         case congelado  = "el motor dejó de emitir mientras seguías hablando"
@@ -104,18 +110,18 @@ enum RedSeguridadDictado {
     /// la unión elimina la repetición.
     static func repararCola(vivo: String, pcm: Data, desdeByte: Int, motivo: Motivo,
                             completion: @escaping (String, String?) -> Void) {
-        let solapeBytes = 32_000 * 3            // 3 s a 16 kHz mono int16
+        let solapeBytes = bytesPorSegundo * 3            // 3 s a 16 kHz mono int16
         let inicio = par(max(0, min(desdeByte - solapeBytes, pcm.count)))
         let faltante = pcm.count - inicio
         guard Config.redSeguridadDictado() else { completion(vivo, nil); return }
-        guard faltante > 32_000 else {          // menos de 1 s: nada que ganar
+        guard faltante > bytesPorSegundo else {          // menos de 1 s: nada que ganar
             completion(vivo, nil); return
         }
         guard let motor = motorLotes() else {
             Log.log(.ia, "dictado: \(motivo.rawValue), pero no hay motor local por lotes para recuperarlo")
             completion(vivo, nil); return
         }
-        let segundos = Double(faltante) / 32_000.0
+        let segundos = Double(faltante) / Double(bytesPorSegundo)
         Log.log(.ia, "dictado: \(motivo.rawValue) — recupero los últimos \(Int(segundos)) s con \(motor.nombre) (el resto NO se re-transcribe)")
         let t0 = Date()
         var respondido = false
@@ -187,7 +193,7 @@ enum RedSeguridadDictado {
             guard i < lista.count else {
                 // Al final, la cola: el tramo desde el último texto conocido
                 // hasta el final del audio.
-                guard let desde = colaDesdeByte, pcm.count - desde > 32_000 else { terminar(); return }
+                guard let desde = colaDesdeByte, pcm.count - desde > bytesPorSegundo else { terminar(); return }
                 repararCola(vivo: texto, pcm: pcm, desdeByte: desde, motivo: .congelado) { t2, via in
                     if via != nil, palabras(t2) > palabras(texto) { texto = t2; reparados += 1 }
                     terminar()
@@ -195,13 +201,13 @@ enum RedSeguridadDictado {
                 return
             }
             let h = lista[i]
-            let media = 45 * 32_000                                   // ±45 s alrededor
+            let media = 45 * bytesPorSegundo                                   // ±45 s alrededor
             // SIEMPRE en frontera de muestra: el PCM es de 16 bits, así que
             // empezar en un byte impar parte cada muestra por la mitad y el
             // audio llega como ruido — medido, 9 palabras en 90 s en vez de 250.
             let a = par(max(0, h.byte - media)), b = par(min(pcm.count, h.byte + media))
-            guard b - a > 32_000 else { siguienteHueco(i + 1); return }
-            Log.log(.ia, "dictado: \(h.origen.rawValue) hacia el segundo \(h.byte / 32_000) — reviso ese tramo")
+            guard b - a > bytesPorSegundo else { siguienteHueco(i + 1); return }
+            Log.log(.ia, "dictado: \(h.origen.rawValue) hacia el segundo \(h.byte / bytesPorSegundo) — reviso ese tramo")
             let wavV = HistoryWriter.wavData(pcm: pcm.subdata(in: a..<b))
             TranscribeCpp.run(wav: wavV, modelo: motor.modelo) { r in
                 DispatchQueue.main.async {
@@ -210,17 +216,17 @@ enum RedSeguridadDictado {
                         Log.log(.ia, "dictado: no pude leer ese tramo (\(e.localizedDescription))")
                     case .success(let ventana):
                         guard let corte = h.corteTexto else { break }
-                        Log.debug("dictado: tramo del segundo \(h.byte / 32_000) → \(palabras(ventana)) palabras de referencia")
+                        Log.debug("dictado: tramo del segundo \(h.byte / bytesPorSegundo) → \(palabras(ventana)) palabras de referencia")
                         if let cosido = coser(texto: texto, ventana: ventana, cerca: corte) {
                             if palabras(cosido) > palabras(texto) {
-                                Log.log(.ia, "dictado: cosido el tramo del segundo \(h.byte / 32_000) (+\(palabras(cosido) - palabras(texto)) palabras)")
+                                Log.log(.ia, "dictado: cosido el tramo del segundo \(h.byte / bytesPorSegundo) (+\(palabras(cosido) - palabras(texto)) palabras)")
                                 texto = cosido
                                 reparados += 1
                             } else {
-                                Log.debug("dictado: el tramo del segundo \(h.byte / 32_000) no aportaba texto nuevo")
+                                Log.debug("dictado: el tramo del segundo \(h.byte / bytesPorSegundo) no aportaba texto nuevo")
                             }
                         } else {
-                            Log.log(.ia, "dictado: no encontré dónde coser el tramo del segundo \(h.byte / 32_000) — lo dejo como está")
+                            Log.log(.ia, "dictado: no encontré dónde coser el tramo del segundo \(h.byte / bytesPorSegundo) — lo dejo como está")
                         }
                     }
                     siguienteHueco(i + 1)

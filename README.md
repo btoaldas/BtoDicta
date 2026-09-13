@@ -34,6 +34,16 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.54.2
+
+- **Micrófono mudo, arreglado**: la app fijaba a la fuerza el aparato de entrada
+  y eso dejaba el micrófono sin entregar nada (la llamada del sistema decía
+  «correcto» y no llegaba un solo buffer). Ahora solo se fija cuando hay que
+  cambiar de aparato de verdad.
+- **Funciona en cualquier Mac**: la frecuencia del micrófono la pone cada equipo
+  y la app la convierte a la suya; ninguna cuenta depende ya del hardware.
+- **Un dictado sin audio avisa** a los 6 segundos en vez de quedarse esperando.
+
 ### Novedades 0.54.1
 
 - **La app ya no se cierra al empezar a dictar**: si el micrófono estaba

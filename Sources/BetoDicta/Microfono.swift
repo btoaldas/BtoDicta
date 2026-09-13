@@ -1,3 +1,4 @@
+import AudioToolbox
 import CoreAudio
 import Foundation
 
@@ -16,6 +17,43 @@ struct EntradaAudio: Identifiable, Equatable {
 }
 
 enum Microfono {
+
+    /// Dispositivo de entrada que el SISTEMA tiene por defecto.
+    static func porDefectoDelSistema() -> AudioDeviceID? {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var id: AudioDeviceID = 0
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
+                                         &addr, 0, nil, &size, &id) == noErr, id != 0 else { return nil }
+        return id
+    }
+
+    /// Aplica el micrófono elegido al nodo de entrada, y devuelve si lo forzó.
+    ///
+    /// CLAVE: forzar el dispositivo cuando el sistema YA lo tiene por defecto
+    /// deja el nodo MUDO. Medido el 2026-09-13 con el mismo Mac: sin forzar,
+    /// 24 buffers en 2,5 s; forzando el integrado —que ya era el de por
+    /// defecto—, `AudioUnitSetProperty` devuelve 0 (éxito) y llegan CERO
+    /// buffers. Con eso la app se quedó sin micrófono varias horas: la bitácora
+    /// reiniciándose en bucle y un dictado entero perdido sin un solo byte.
+    /// Por eso solo se fuerza cuando de verdad hace falta cambiar de aparato.
+    @discardableResult
+    static func aplicar(a unidad: AudioUnit?) -> Bool {
+        guard let unidad, let deseado = elegido() else { return false }
+        if let actual = porDefectoDelSistema(), actual == deseado { return false }
+        var id = deseado
+        let estado = AudioUnitSetProperty(unidad, kAudioOutputUnitProperty_CurrentDevice,
+                                          kAudioUnitScope_Global, 0, &id,
+                                          UInt32(MemoryLayout<AudioDeviceID>.size))
+        if estado != noErr {
+            Log.log(.sistema, "micrófono: no pude fijar el aparato elegido (estado \(estado)) — sigo con el del sistema")
+            return false
+        }
+        return true
+    }
 
     /// Todos los dispositivos con canales de ENTRADA.
     static func disponibles() -> [EntradaAudio] {

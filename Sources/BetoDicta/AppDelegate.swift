@@ -1369,6 +1369,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
+        // Micrófono de ESTE equipo con el código real: BETODICTA_MICTEST=1
+        // Comprueba que entra audio sea cual sea la frecuencia del aparato
+        // (44 100, 48 000, 96 000 Hz…) y que fijar el dispositivo no lo enmudece.
+        if ProcessInfo.processInfo.environment["BETODICTA_MICTEST"] == "1" {
+            let porDefecto = Microfono.porDefectoDelSistema()
+            let elegido = Microfono.elegido()
+            print("MICTEST aparatos de entrada:")
+            for d in Microfono.disponibles() {
+                var marcas: [String] = []
+                if d.integrado { marcas.append("integrado") }
+                if d.id == porDefecto { marcas.append("por defecto del sistema") }
+                if d.id == elegido { marcas.append("elegido por la app") }
+                print("MICTEST   \(d.nombre) [\(marcas.joined(separator: ", "))]")
+            }
+            let r = Recorder()
+            var recibidos = 0
+            r.onChunk = { _ in recibidos += 1 }
+            do { try r.start() } catch {
+                print("MICTEST ✗ no pude abrir el micrófono: \(error.localizedDescription)")
+                print("MICTEST FALLA"); exit(1)
+            }
+            print("MICTEST forzado el aparato: \(elegido != nil && elegido != porDefecto ? "sí" : "no (el sistema ya lo tiene)")")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                let leidos = r.buffersRecibidos
+                _ = r.stop()
+                print("MICTEST \(leidos) buffers del micrófono y \(recibidos) trozos convertidos en 3 s")
+                let ok = leidos > 0 && recibidos > 0
+                print("MICTEST \(ok ? "TODO OK — entra audio" : "FALLA — el micrófono está MUDO")")
+                exit(ok ? 0 : 1)
+            }
+            RunLoop.main.run(); return
+        }
         // Regresión de ROBUSTEZ: BETODICTA_ROBUSTEZTEST=1 [BETODICTA_STTWAV=<wav>]
         // Cubre las 4 clases de fallo de ago-2026: NSException de audio (crash 20:00),
         // reproductor desconectado, cuarentena STT (AssemblyAI 400 en bucle) y ElevenLabs
@@ -3899,6 +3931,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if WhisperServer.corriendo { WhisperServer.tocar() }
             if VoxtralServer.corriendo { VoxtralServer.tocar() }
             self.vivoRevisarCongelacion()
+            // Micrófono mudo: el motor arrancó, el dictado está abierto y no ha
+            // entrado un solo buffer. Sin esto el usuario habla, no se graba
+            // nada y la app se queda esperando indefinidamente (pasó el
+            // 2026-09-13: un dictado abierto cinco minutos sin un byte).
+            if self.recorder.isRecording, self.recorder.buffersRecibidos == 0,
+               Date().timeIntervalSince(self.inicioDictado) > 6 {
+                Log.log(.sistema, "dictado: el micrófono no entrega audio — cierro y aviso en vez de seguir esperando")
+                self.panel.update("🎙️ El micrófono no está entregando audio")
+                self.panel.hide(after: 4)
+                self.cancelDictation()
+                self.avisarSiLibre("🎙️ El micrófono no entregó audio — revisa qué app lo está usando o cámbialo en Ajustes")
+                return
+            }
             let quiet = Date().timeIntervalSince(self.lastVoice)
             let limit = Config.maxSilence()
             if quiet >= limit {
@@ -4054,6 +4099,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var vivoBytesAlCrecer = 0       // posición del PCM en ese momento
     private var vivoCongelado = false
     private var vivoRelanzado = 0
+    /// Cuándo empezó el dictado en curso (para el vigía de micrófono mudo).
+    private var inicioDictado = Date()
     /// Tramos que quedaron SIN texto y no se pudieron rescatar en caliente.
     /// Un dictado largo puede romperse varias veces; se reparan todos al
     /// cerrar, cada uno con su ventana de audio, nunca el dictado entero.
@@ -4076,6 +4123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         vivoPrefijo = ""; vivoUltimoLargo = 0; vivoBytesAlCrecer = 0
         vivoUltimoCrecimiento = Date(); vivoCongelado = false; vivoRelanzado = 0
         vivoHuecos = []; vivoRelanzosSecos = 0
+        inicioDictado = Date()
     }
 
     /// ¿El motor en vivo lleva demasiado callado teniendo voz que transcribir?
