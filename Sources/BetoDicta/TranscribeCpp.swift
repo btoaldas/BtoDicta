@@ -25,8 +25,19 @@ enum TranscribeCpp {
         return nil
     }
 
+    /// ¿El archivo de modelo está descargado en la carpeta de modelos?
+    static func descargado(_ archivo: String) -> Bool {
+        !archivo.isEmpty && FileManager.default.fileExists(
+            atPath: modelsDir.appendingPathComponent(archivo).path)
+    }
+
+    /// Los modelos ggml de whisper (.bin) los ejecuta whisper-cli, no
+    /// transcribe-cli: se despacha solo para que quien llama no lo sepa.
     static func run(wav: Data, modelo archivo: String,
                     completion: @escaping (Result<String, Error>) -> Void) {
+        if archivo.hasSuffix(".bin") {
+            WhisperCLI.run(wav: wav, modelo: archivo, completion: completion); return
+        }
         guard let cli = cliURL else {
             completion(.failure(ScribeError.ws("transcribe-cli no encontrado"))); return
         }

@@ -880,6 +880,16 @@ Todo vive en tu Mac, en `~/.betodicta/`:
 - **Streaming de ElevenLabs sin cuota a mitad de un dictado**: el servidor cierra la sesión; la app corta el envío de audio de inmediato, pone a ElevenLabs en cuarentena 30 min y el motor local toma el dictado con todo el audio acumulado (línea *"streaming ElevenLabs cerrado a mitad del dictado (…) → plan B"*).
 - **Sin internet**: el pulido no recorre los 16 proveedores de nube uno por uno; salta directo a tu primer motor local (Ollama, LM Studio) o entrega el texto original, y la voz cae a la de macOS durante un minuto.
 
+### Dicté mucho rato y falta texto (o aparecen «...»)
+
+Los motores de dictado **en vivo** trabajan al ritmo del habla y, en grabaciones largas, pueden saltarse una frase —dejando puntos suspensivos— o dejar de transcribir del todo aunque sigas hablando. No es el micrófono ni el pulido: el audio está entero, es el motor el que se queda atrás. Desde 0.54.0 la app lo resuelve sola:
+
+- **Mientras dictas**: si hay voz y el texto deja de crecer durante unos segundos, el motor se da por colgado y se **relanza desde el punto exacto** en que se quedó. Lo ya transcrito se conserva; en el notch verás un instante *"⏱️ Reanudando el motor…"*. Hasta 8 rescates por dictado (`motor_vivo_relanzos_max`), con freno si el motor no revive.
+- **Al soltar la tecla**: solo si hay una señal real de rotura —el motor mudo con voz, el texto cortado a mitad de frase, o puntos suspensivos que el motor dejó dentro del texto— se revisan **esos tramos y nada más**, con una ventana corta de audio cada uno, y se cosen en su sitio. Un dictado sano **no paga nada**: ni una transcripción de más, ni un segundo de espera.
+- **Cuánto cuesta**: reparar los dos cortes y el final de un dictado de 15 minutos tardó **6,6 s**; rehacer ese dictado entero habría costado 44 s. Corre con tu motor local, sin nube y sin IA.
+- En el registro: *"dictado: el motor se saltó texto hacia el segundo N — reviso ese tramo"* y *"dictado: N tramos recuperados, +N palabras"*.
+- Ajustes: `motor_vivo_sin_texto_s` (segundos sin texto para dar por colgado el motor, 12 por defecto; 0 lo desactiva) y `dictado_red_seguridad` (desactiva la reparación).
+
 ### El disco crece: audio crudo de la bitácora sin comprimir
 
 Cada fragmento de audio se graba en PCM crudo (sobrevive a cualquier corte) y, una vez transcrito en la tanda, se convierte a m4a (unas 8 veces menos) y se libera el crudo. Si en el registro ves *"bitácora: el m4a de … no valida"* repetido, la compresión está fallando y la carpeta crece alrededor de 1 GB por día de uso.

@@ -64,7 +64,22 @@ final class TcppStreamClient {
                              Self.idioma(para: modelo), "400"]
         process.standardInput = entrada
         process.standardOutput = salida
-        process.standardError = FileHandle.nullDevice
+        // El motor avisa por stderr de sus propios truncamientos («output
+        // truncated at the … context cap») y de los fallos de feed/finalize.
+        // Mandarlo a /dev/null dejaba esos avisos invisibles: ahora las líneas
+        // que importan van al registro (el ruido de Metal se filtra).
+        let errores = Pipe()
+        process.standardError = errores
+        errores.fileHandleForReading.readabilityHandler = { h in
+            let d = h.availableData
+            guard !d.isEmpty, let s = String(data: d, encoding: .utf8) else { return }
+            for linea in s.split(separator: "\n") {
+                let l = linea.trimmingCharacters(in: .whitespaces)
+                guard !l.isEmpty, !l.hasPrefix("ggml_"), !l.hasPrefix("load"),
+                      !l.contains("dummy_kernel"), !l.contains("compiling pipeline") else { continue }
+                Log.log(.ia, "beto-stream: \(l.prefix(200))")
+            }
+        }
 
         salida.fileHandleForReading.readabilityHandler = { [weak self] h in
             let data = h.availableData

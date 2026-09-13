@@ -1106,6 +1106,33 @@ struct Config {
         return s.isEmpty ? "apple_speech" : s
     }
 
+    /// RED DE SEGURIDAD del dictado: tras un dictado largo se vuelve a
+    /// transcribir el audio COMPLETO por lotes y se entrega el resultado más
+    /// completo. El motor en vivo puede elidir texto o congelarse en dictados
+    /// largos; esto garantiza que nunca falte lo dictado.
+    static func redSeguridadDictado() -> Bool {
+        (json()["dictado_red_seguridad"] as? Bool) ?? true
+    }
+    /// Desde cuántos segundos se verifica (siempre, aunque no haya sospecha).
+    static func redSeguridadDesdeSegundos() -> Int {
+        min(3600, max(20, (json()["dictado_red_seguridad_desde_s"] as? Int) ?? 90))
+    }
+    /// Cuánto se espera como máximo a la verificación antes de entregar el vivo.
+    static func redSeguridadTopeSegundos() -> Int {
+        min(900, max(20, (json()["dictado_red_seguridad_tope_s"] as? Int) ?? 180))
+    }
+    /// Segundos SIN texto nuevo (teniendo voz) tras los que se da por colgado
+    /// el motor en vivo y se relanza desde ese punto. 0 lo desactiva.
+    /// Cuántas veces puede relanzarse el motor en vivo dentro de un mismo
+    /// dictado. Un dictado largo puede colgarse varias veces.
+    static func motorVivoRelanzosMax() -> Int {
+        min(50, max(0, (json()["motor_vivo_relanzos_max"] as? Int) ?? 8))
+    }
+    static func motorVivoSinTextoSegundos() -> Int {
+        let v = (json()["motor_vivo_sin_texto_s"] as? Int) ?? 12
+        return v <= 0 ? 0 : min(120, max(5, v))
+    }
+
     /// Comprimir el PCM crudo a m4a una vez transcrito.
     static func continuoLoteComprimir() -> Bool {
         (json()["continuo_lote_comprimir"] as? Bool) ?? true

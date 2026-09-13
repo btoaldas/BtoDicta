@@ -6,11 +6,19 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.53.1"
-    static let fecha = "2026-09-10"
+    static let numero = "0.54.0"
+    static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.54.0", "2026-09-13", [
+            "NUNCA MÁS FALTA TEXTO EN UN DICTADO LARGO. Los motores de dictado en vivo pueden saltarse frases (dejando «...») y hasta dejar de transcribir del todo aunque sigas hablando: medido en un dictado real de 15 minutos, se perdieron 120 palabras, el cierre entero incluido. Ahora la app lo detecta y lo recupera sola",
+            "VIGÍA DEL MOTOR: si hay voz y el texto deja de crecer, el motor está colgado — se relanza en caliente DESDE el punto exacto en que se quedó, no desde el principio, y lo ya transcrito se conserva. Hasta 8 rescates por dictado, con freno si el motor no revive",
+            "REPARACIÓN QUIRÚRGICA, NO TRABAJO DOBLE: al terminar solo se revisan los tramos rotos —una ventana corta de audio por cada uno— y se cosen en su sitio por coincidencia de palabras. Un dictado sano no paga NADA: cero re-transcripciones, cero espera. El dictado de 15 minutos se reparó entero en 6,6 s frente a los 44 s de rehacerlo",
+            "VARIAS ROTURAS EN LA MISMA GRABACIÓN: se atienden todas, una por una, más el final; y el texto ya no queda con puntos suspensivos donde el motor se saltó algo",
+            "El registro dice qué pasó y qué se recuperó, y los avisos del motor local (que iban a un agujero negro) ahora se ven",
+            "Detección determinista y recuperación con tu motor local: sin IA, sin nube y sin coste",
+        ]),
         ("0.53.1", "2026-09-10", [
             "DICTADO PROTEGIDO: se excluyen clasificadores como Prompt Guard del pulido; un puntaje o una respuesta inválida pasa al respaldo y nunca sustituye silenciosamente el texto original",
             "ARCHIVOS CON CASCADA: MP3, M4A, MP4, MOV y WAV se normalizan localmente antes de usar los motores STT habilitados en tu orden; ya no van obligatoriamente a ElevenLabs. Conversión sin modificar originales y con protocolos de red restringidos",

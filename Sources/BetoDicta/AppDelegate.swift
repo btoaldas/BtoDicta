@@ -257,6 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         _ = recorder.stop()
         entregaVivo = nil
         audioDictado = Data()
+        vivoReiniciarVigia()
         stream?.disconnect()
         stream = nil
         liveNube?.disconnect()   // sin esto, el WS de un dictado CANCELADO seguía
@@ -1314,6 +1315,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 print("RECOMPTEST \(ok)/\(antes.count) convertidos y verificados · índice al día: \(indiceAlDia ? "sí" : "NO")")
                 let bien = ok == antes.count && indiceAlDia
                 print("RECOMPTEST \(bien ? "TODO OK" : "FALLA")"); exit(bien ? 0 : 1)
+            }
+            RunLoop.main.run(); return
+        }
+        // Detección + reparación de cola con audio REAL:
+        //   BETODICTA_REDTEST=<wav> BETODICTA_REDVIVO=<txt> [BETODICTA_REDDESDE=<segundo>]
+        if let w = ProcessInfo.processInfo.environment["BETODICTA_REDTEST"],
+           let wavD = try? Data(contentsOf: URL(fileURLWithPath: w)) {
+            let vivo = (ProcessInfo.processInfo.environment["BETODICTA_REDVIVO"])
+                .flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let pcm = wavD.count > 44 ? wavD.subdata(in: 44..<wavD.count) : Data()
+            let desdeSeg = Int(ProcessInfo.processInfo.environment["BETODICTA_REDDESDE"] ?? "") ?? 880
+            let desde = min(desdeSeg * 32_000, pcm.count)
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("REDTEST \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            let pv = RedSeguridadDictado.palabras(vivo)
+            // 1) detección: sin voz al final y texto terminado en punto → NO se repara
+            chk(RedSeguridadDictado.motivo(texto: "Esto quedó completo.", congelado: false, vozAlFinal: false) == nil,
+                "texto terminado y sin voz → no se toca nada (cero coste)")
+            chk(RedSeguridadDictado.motivo(texto: "Esto quedó completo.", congelado: false, vozAlFinal: true) == nil,
+                "texto terminado aunque haya voz → no se toca nada")
+            chk(RedSeguridadDictado.motivo(texto: "y quedó a medias...", congelado: false, vozAlFinal: true) == .cortado,
+                "cortado en «...» con voz al final → reparar")
+            chk(RedSeguridadDictado.motivo(texto: "frase normal.", congelado: true, vozAlFinal: false) == .congelado,
+                "motor congelado → reparar")
+            // 2) unión sin duplicar el solape
+            let u = RedSeguridadDictado.unir("uno dos tres cuatro cinco", "tres cuatro cinco seis siete")
+            chk(u == "uno dos tres cuatro cinco seis siete", "unión sin repetir el solape → «\(u)»")
+            let u2 = RedSeguridadDictado.unir("hablo y hablo y...", "y hablo y termino aquí.")
+            chk(!u2.contains("..."), "la cola rota se reemplaza por la buena → «\(u2.suffix(40))»")
+            // 3) elisiones internas detectadas en el propio texto
+            let elisiones = RedSeguridadDictado.elisionesInternas(vivo, pcmBytes: pcm.count)
+            print("REDTEST elisiones internas detectadas: \(elisiones.count) → segundos \(elisiones.map { $0.byte / 32_000 })")
+            chk(!elisiones.isEmpty, "detecta los cortes internos sin IA, leyendo el propio texto")
+            // 4) reparación de TODO: cada hueco con su ventana + la cola
+            print("REDTEST audio=\(pcm.count / 32_000)s · en vivo=\(pv) palabras · huecos=\(elisiones.count) + cola desde \(desde / 32_000)s")
+            let t0 = Date()
+            RedSeguridadDictado.repararTodo(vivo: vivo, pcm: pcm, huecos: elisiones,
+                                            colaDesdeByte: desde) { texto, extra in
+                let pf = RedSeguridadDictado.palabras(texto)
+                let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                print("REDTEST reparado por '\(extra ?? "nadie")': \(pv) → \(pf) palabras (+\(pf - pv)) en \(ms)ms")
+                print("REDTEST '...' que quedan en el texto: \(texto.components(separatedBy: "...").count - 1)")
+                print("REDTEST fin: …\(texto.suffix(140))")
+                chk(pf >= pv, "nunca devuelve menos texto del que había")
+                chk(pf >= pv + 60, "recupera las palabras perdidas (+\(pf - pv))")
+                chk(texto.contains("Security") || texto.contains("Segurity") || texto.contains("ecurity"),
+                    "recupera el tramo interno perdido («Security Data…»)")
+                chk(texto.contains("con tu ayuda"), "recupera el final perdido («…con tu ayuda»)")
+                chk(ms < 60_000, "cuesta \(ms)ms, no los 44 s de rehacer el dictado entero")
+                print("REDTEST \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
             }
             RunLoop.main.run(); return
         }
@@ -3846,6 +3898,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Mientras grabas, los servers locales no deben apagarse (dictados largos).
             if WhisperServer.corriendo { WhisperServer.tocar() }
             if VoxtralServer.corriendo { VoxtralServer.tocar() }
+            self.vivoRevisarCongelacion()
             let quiet = Date().timeIntervalSince(self.lastVoice)
             let limit = Config.maxSilence()
             if quiet >= limit {
@@ -3868,6 +3921,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         entregaVivo = nil
         audioDictado = Data()
+        vivoReiniciarVigia()
         do {
             try recorder.start(preloadPCM: despertarActual?.audioPrevio ?? Data())
             armEsc()
@@ -3989,14 +4043,90 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// cero duplicados, cero pérdidas.
     private var entregaVivo: ((Data) -> Void)?
     private var audioDictado = Data()
+    // VIGÍA DEL MOTOR EN VIVO. Un motor de streaming puede dejar de emitir a
+    // mitad del dictado (medido: Voxtral Realtime se congela tras su token de
+    // fin y ya no vuelve a emitir aunque le sigas hablando). Con estos cuatro
+    // datos se detecta sin IA y sin coste: si hay voz y el texto no crece, el
+    // motor está muerto — y se relanza desde el punto exacto en que se quedó.
+    private var vivoPrefijo = ""            // texto ya confirmado de motores anteriores
+    private var vivoUltimoLargo = 0
+    private var vivoUltimoCrecimiento = Date()
+    private var vivoBytesAlCrecer = 0       // posición del PCM en ese momento
+    private var vivoCongelado = false
+    private var vivoRelanzado = 0
+    /// Tramos que quedaron SIN texto y no se pudieron rescatar en caliente.
+    /// Un dictado largo puede romperse varias veces; se reparan todos al
+    /// cerrar, cada uno con su ventana de audio, nunca el dictado entero.
+    private var vivoHuecos: [Int] = []
+    /// Relanzamientos seguidos que no produjeron ni una palabra: si el motor
+    /// no revive, se deja de insistir y ese tramo se repara al final.
+    private var vivoRelanzosSecos = 0
+
+    /// El motor en vivo acaba de emitir texto nuevo: se anota el instante y la
+    /// posición del audio. Ese punto es por dónde retomar si luego se cuelga.
+    private func vivoLatido(_ texto: String) {
+        guard texto.count > vivoUltimoLargo else { return }
+        vivoUltimoLargo = texto.count
+        vivoUltimoCrecimiento = Date()
+        vivoBytesAlCrecer = audioDictado.count
+    }
+
+    /// Reinicia el vigía al empezar un dictado.
+    private func vivoReiniciarVigia() {
+        vivoPrefijo = ""; vivoUltimoLargo = 0; vivoBytesAlCrecer = 0
+        vivoUltimoCrecimiento = Date(); vivoCongelado = false; vivoRelanzado = 0
+        vivoHuecos = []; vivoRelanzosSecos = 0
+    }
+
+    /// ¿El motor en vivo lleva demasiado callado teniendo voz que transcribir?
+    /// Se llama desde el vigilante de silencio, que ya corre cada 5 s.
+    private func vivoRevisarCongelacion() {
+        guard recorder.isRecording, tcppStream != nil || liveNube != nil else { return }
+        let umbral = Double(Config.motorVivoSinTextoSegundos())
+        guard umbral > 0 else { return }
+        let mudo = Date().timeIntervalSince(vivoUltimoCrecimiento)
+        let hablando = Date().timeIntervalSince(lastVoice) < 2.0
+        guard mudo >= umbral, hablando else { return }
+        vivoCongelado = true
+        guard let tcpp = tcppStream else { return }          // la nube ya tiene su onCierre
+        // Si el motor nuevo tampoco dio texto, insistir no sirve: se apunta el
+        // tramo y se repara al cerrar, sin seguir gastando arranques.
+        if vivoUltimoLargo == 0 && vivoRelanzado > 0 { vivoRelanzosSecos += 1 }
+        guard vivoRelanzado < Config.motorVivoRelanzosMax(), vivoRelanzosSecos < 2 else {
+            if !vivoHuecos.contains(where: { abs($0 - vivoBytesAlCrecer) < 32_000 * 10 }) {
+                vivoHuecos.append(vivoBytesAlCrecer)
+                Log.log(.ia, "dictado: el motor no revive; apunto el tramo del segundo \(vivoBytesAlCrecer / 32_000) para recuperarlo al terminar")
+            }
+            vivoUltimoCrecimiento = Date()   // no repetir el aviso cada 5 s
+            return
+        }
+        vivoRelanzado += 1
+        // RELANZAR EN CALIENTE: se conserva lo transcrito, se mata el motor
+        // colgado y otro toma el relevo DESDE el punto en que se quedó (con
+        // solape), no desde el principio. Nada de re-procesar el dictado entero.
+        let textoHastaAhora = RedSeguridadDictado.unir(vivoPrefijo, lastPartial)
+        let desde = max(0, vivoBytesAlCrecer - 32_000 * 2)
+        Log.log(.ia, "dictado: el motor en vivo lleva \(Int(mudo)) s sin texto y sigues hablando → relanzo desde el segundo \(desde / 32_000) (rescate \(vivoRelanzado)/3)")
+        panel.flash("⏱️ Reanudando el motor…", segundos: 1.5)
+        tcpp.cancel()
+        tcppStream = nil
+        entregaVivo = nil
+        vivoPrefijo = textoHastaAhora
+        vivoUltimoLargo = 0
+        vivoUltimoCrecimiento = Date()
+        vivoBytesAlCrecer = desde
+        vivoCongelado = false
+        guard let history = self.history, let sesion = modoVivoSesion else { return }
+        arrancarTcppVivo(proveedor: tcpp.proveedorId, history: history, sesion: sesion, desdeByte: desde)
+    }
     private func entregarVivo(_ chunk: Data) {
         audioDictado.append(chunk)
         entregaVivo?(chunk)
     }
     /// Fija el motor en vivo mandando primero TODO el audio acumulado
     /// (troceado a ~1 s para no ahogar un WebSocket con un mensaje gigante).
-    private func fijarMotorVivo(_ entrega: @escaping (Data) -> Void) {
-        var i = 0
+    private func fijarMotorVivo(desdeByte: Int = 0, _ entrega: @escaping (Data) -> Void) {
+        var i = max(0, min(desdeByte, audioDictado.count))
         while i < audioDictado.count {
             let fin = min(i + 32000, audioDictado.count)
             entrega(audioDictado.subdata(in: i..<fin))
@@ -4036,23 +4166,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Streaming local nativo (Nemotron/Voxtral RT) con el audio ya acumulado.
-    private func arrancarTcppVivo(proveedor id: String, history: HistoryWriter, sesion: UUID) {
+    private func arrancarTcppVivo(proveedor id: String, history: HistoryWriter, sesion: UUID,
+                                  desdeByte: Int = 0) {
         let client = TcppStreamClient(proveedor: id)
         client.onPartial = { [weak self, weak client] texto in
             // Guard por GENERACIÓN: un parcial rezagado de un dictado ya
             // cerrado no debe pintar ni escribir el historial del siguiente.
             guard let self, let client, self.tcppStream === client,
                   self.recorder.isRecording else { return }
-            self.lastPartial = texto
-            ModoVivo.evaluar(texto, sesion: sesion)
-            self.panel.update(texto)
-            history.savePartial(texto)
+            self.vivoLatido(texto)
+            // Tras un relanzamiento, lo que se ve y se guarda es el dictado
+            // ENTERO: lo ya transcrito más lo que trae el motor nuevo.
+            let completo = self.vivoPrefijo.isEmpty ? texto
+                : RedSeguridadDictado.unir(self.vivoPrefijo, texto)
+            self.lastPartial = completo
+            ModoVivo.evaluar(completo, sesion: sesion)
+            self.panel.update(completo)
+            history.savePartial(completo)
         }
         do {
             try client.start()
             self.tcppStream = client
-            // Backlog del buffer + flujo directo: mismo carril en main.
-            fijarMotorVivo { [weak client] chunk in client?.send(chunk: chunk) }
+            // Backlog del buffer + flujo directo: mismo carril en main. Con
+            // `desdeByte` solo se le manda el audio que le toca a este motor.
+            fijarMotorVivo(desdeByte: desdeByte) { [weak client] chunk in client?.send(chunk: chunk) }
             panel.setMotor(Self.nombreMotor(Providers.cadena().first(where: { $0.id == id })), enVivo: true)
             panel.update("Escuchando (local en vivo)… (\(tecla) termina)")
         } catch {
@@ -4123,6 +4260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.liveNube = cliente
         cliente.onPartial = { [weak self, weak cliente] text in
             guard let self, let cliente, self.liveNube === cliente, self.recorder.isRecording else { return }
+            self.vivoLatido(text)
             self.lastPartial = text
             ModoVivo.evaluar(text, sesion: sesion)
             self.panel.update(text)
@@ -4236,6 +4374,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // tocar el pipe/WS que estamos por cerrar.
         entregaVivo = nil
         audioDictado = Data()
+        vivoReiniciarVigia()
 
         // El HistoryWriter de ESTE dictado viaja capturado por las entregas
         // asíncronas: una entrega tardía jamás toca el historial del próximo.
@@ -4307,12 +4446,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             tcpp.onFinal = { [weak self] final in
                 guard !entregado else { return }
                 entregado = true
-                if final.isEmpty {
-                    rescatarConCascada("Sin texto")
-                } else {
-                    let motor = Self.nombreMotor(id: tcpp.proveedorId)
-                    let mod = Providers.modelo(de: tcpp.proveedorId) ?? ""
-                    self?.deliver(raw: final, wav: wav, via: "\(motor) (en vivo)", modelo: mod,
+                // Nunca se entrega menos de lo que ya se vio en pantalla, y
+                // lo transcrito por un motor anterior (si hubo relanzamiento)
+                // forma parte del dictado.
+                let delMotor = RedSeguridadDictado.unir(self?.vivoPrefijo ?? "", final)
+                let mejorVivo = delMotor.count >= ultimoParcial.count ? delMotor : ultimoParcial
+                let motor = Self.nombreMotor(id: tcpp.proveedorId)
+                let mod = Providers.modelo(de: tcpp.proveedorId) ?? ""
+                // ¿Hace falta reparar? Solo con una señal dura: el motor mudo
+                // con voz, o un texto cortado a mitad de frase mientras aún se
+                // hablaba. Sin señal NO se re-transcribe nada: el camino normal
+                // no paga ni un milisegundo de más.
+                let vozAlFinal = Date().timeIntervalSince(self?.lastVoice ?? .distantPast) < 2.0
+                let motivo = RedSeguridadDictado.motivo(texto: mejorVivo,
+                                                        congelado: self?.vivoCongelado ?? false,
+                                                        vozAlFinal: vozAlFinal)
+                guard let motivo else {
+                    self?.deliver(raw: mejorVivo, wav: wav, via: "\(motor) (en vivo)", modelo: mod,
+                                  history: historyActual, modo: modoDictado,
+                                  contexto: contextoDictado, vivo: vivoDictado,
+                                  activacion: activacionDictado,
+                                  continuacionDictadoAsistido: continuacionDictadoAsistido)
+                    return
+                }
+                if mejorVivo.isEmpty { rescatarConCascada("Sin texto"); return }
+                self?.panel.update("⏳ Recuperando lo que falta…")
+                let pcm = self?.audioDictado ?? Data()
+                let desde = self?.vivoBytesAlCrecer ?? 0
+                // Todos los tramos rotos del dictado: los que el vigía vio
+                // colgarse y los que el motor se saltó dejando "..." dentro
+                // del texto. Cada uno se revisa con su propia ventana corta.
+                var huecos = (self?.vivoHuecos ?? []).map {
+                    RedSeguridadDictado.Hueco(byte: $0, corteTexto: nil, origen: .congelacion)
+                }
+                huecos += RedSeguridadDictado.elisionesInternas(mejorVivo, pcmBytes: pcm.count)
+                _ = motivo
+                RedSeguridadDictado.repararTodo(vivo: mejorVivo, pcm: pcm, huecos: huecos,
+                                                colaDesdeByte: desde) { texto, extra in
+                    let via = extra.map { "\(motor) (en vivo) \($0)" } ?? "\(motor) (en vivo)"
+                    self?.deliver(raw: texto, wav: wav, via: via, modelo: mod,
                                   history: historyActual, modo: modoDictado,
                                   contexto: contextoDictado, vivo: vivoDictado,
                                   activacion: activacionDictado,
@@ -4355,11 +4527,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     rescatarConCascada("\(nombreVivo) sin texto")
                 } else {
                     let mod = Providers.modelo(de: idVivo) ?? ""
-                    self?.deliver(raw: mejor, wav: wav, via: "\(nombreVivo) (en vivo)", modelo: mod,
-                                  history: historyActual, modo: modoDictado,
-                                  contexto: contextoDictado, vivo: vivoDictado,
-                                  activacion: activacionDictado,
-                                  continuacionDictadoAsistido: continuacionDictadoAsistido)
+                    let vozAlFinal = Date().timeIntervalSince(self?.lastVoice ?? .distantPast) < 2.0
+                    let motivo = RedSeguridadDictado.motivo(texto: mejor,
+                                                            congelado: self?.vivoCongelado ?? false,
+                                                            vozAlFinal: vozAlFinal)
+                    guard let motivo else {
+                        self?.deliver(raw: mejor, wav: wav, via: "\(nombreVivo) (en vivo)", modelo: mod,
+                                      history: historyActual, modo: modoDictado,
+                                      contexto: contextoDictado, vivo: vivoDictado,
+                                      activacion: activacionDictado,
+                                      continuacionDictadoAsistido: continuacionDictadoAsistido)
+                        return
+                    }
+                    self?.panel.update("⏳ Recuperando el final…")
+                    let pcmN = self?.audioDictado ?? Data()
+                    var huecosN = (self?.vivoHuecos ?? []).map {
+                        RedSeguridadDictado.Hueco(byte: $0, corteTexto: nil, origen: .congelacion)
+                    }
+                    huecosN += RedSeguridadDictado.elisionesInternas(mejor, pcmBytes: pcmN.count)
+                    _ = motivo
+                    RedSeguridadDictado.repararTodo(vivo: mejor, pcm: pcmN, huecos: huecosN,
+                                                    colaDesdeByte: self?.vivoBytesAlCrecer ?? 0) { texto, extra in
+                        let via = extra.map { "\(nombreVivo) (en vivo) \($0)" } ?? "\(nombreVivo) (en vivo)"
+                        self?.deliver(raw: texto, wav: wav, via: via, modelo: mod,
+                                      history: historyActual, modo: modoDictado,
+                                      contexto: contextoDictado, vivo: vivoDictado,
+                                      activacion: activacionDictado,
+                                      continuacionDictadoAsistido: continuacionDictadoAsistido)
+                    }
                 }
             }
             return
