@@ -880,6 +880,14 @@ Todo vive en tu Mac, en `~/.btodicta/`:
 - **Streaming de ElevenLabs sin cuota a mitad de un dictado**: el servidor cierra la sesión; la app corta el envío de audio de inmediato, pone a ElevenLabs en cuarentena 30 min y el motor local toma el dictado con todo el audio acumulado (línea *"streaming ElevenLabs cerrado a mitad del dictado (…) → plan B"*).
 - **Sin internet**: el pulido no recorre los 16 proveedores de nube uno por uno; salta directo a tu primer motor local (Ollama, LM Studio) o entrega el texto original, y la voz cae a la de macOS durante un minuto.
 
+### Vengo de BetoDicta: ¿qué tengo que hacer?
+
+Nada especial. Cuando tu BetoDicta avise de una actualización y la aceptes, se instalará un **asistente de mudanza** y se abrirá solo. Te explica el cambio y, con un botón, descarga BtoDicta, comprueba su firma, la instala y la abre. Si prefieres hacerlo tú, el mismo asistente te da los cuatro pasos y un enlace a las descargas.
+
+Lo que ocurre después, sin que hagas nada: tus ajustes, modelos, voces, historial y bitácora se mudan a las carpetas con el nombre nuevo, y tus claves guardadas se recuperan solas.
+
+Dos cosas que sí notarás: macOS volverá a pedirte **micrófono, accesibilidad y automatización** (para el sistema es una aplicación nueva), y los **Atajos** que tuvieras apuntan a la app anterior, así que conviene regenerarlos desde la app Atajos antes de borrarla.
+
 ### La bitácora dice que tiene miles de elementos pendientes
 
 Si tras una actualización que mueve carpetas la bitácora anuncia decenas de miles de archivos «huérfanos» o pendientes, su índice se quedó con las rutas anteriores: al no encontrar los archivos los da de alta otra vez, y la siguiente tanda repetiría un trabajo ya hecho. Desde 0.55.1 las rutas del índice se corrigen durante la propia mudanza, antes de que nada lo abra.

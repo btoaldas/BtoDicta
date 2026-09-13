@@ -1,3 +1,19 @@
+¿VIENES DE BetoDicta?
+--------------------
+En este paquete hay dos aplicaciones:
+
+  · BtoDicta      → la aplicación. Arrástrala a Aplicaciones y ábrela.
+  · BetoDicta     → un asistente para quien tenía instalada la versión con el
+                    nombre anterior. Solo explica la mudanza y la hace; no
+                    hace falta si instalas BtoDicta directamente.
+
+Al abrir BtoDicta por primera vez, tus ajustes, modelos, voces, historial y
+bitácora se mudan solos a sus carpetas nuevas, y tus claves guardadas se
+recuperan sin que tengas que escribir ninguna.
+
+macOS te pedirá de nuevo permiso de micrófono, accesibilidad y automatización:
+para el sistema es una aplicación nueva y solo lo pide la primera vez.
+
 BtoDicta — Dictado por voz para macOS
 =======================================
 

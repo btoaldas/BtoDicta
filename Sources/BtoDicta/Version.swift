@@ -6,11 +6,17 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.55.1"
+    static let numero = "0.56.0"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.56.0", "2026-09-13", [
+            "ASISTENTE DE MUDANZA para quien tenía BetoDicta: el paquete lleva ahora una segunda aplicación con el nombre y el identificador anteriores. La actualización automática de una instalación vieja la encuentra, la instala y abre un asistente que explica el cambio y hace la mudanza en un clic — antes esa actualización se cancelaba con un error de identidad y había que resolverlo a mano",
+            "El asistente descarga BtoDicta, comprueba su firma, la instala y la abre; si algo falla, enseña los cuatro pasos para hacerlo a mano y un botón que lleva a la página de descargas",
+            "El puente no toca ni un dato: solo instala. Las carpetas y las claves las muda BtoDicta al abrirse, como hasta ahora",
+            "El publicador verifica en cada versión que el puente viaja firmado y con el identificador anterior: sin eso, quien venga de la versión vieja se quedaría sin camino",
+        ]),
         ("0.55.1", "2026-09-13", [
             "ARREGLADO un efecto del cambio de nombre: al mudarse la carpeta de la bitácora, su índice seguía apuntando a la ruta anterior, daba por perdido todo el material y lo registraba otra vez como pendiente. En una instalación real quedaron 63 567 elementos marcados para reprocesar cuando ya estaban transcritos y leídos. Ahora las rutas del índice se corrigen en el mismo momento de la mudanza, antes de que nada lo abra: ni un segundo de trabajo repetido",
         ]),

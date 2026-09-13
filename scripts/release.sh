@@ -168,6 +168,16 @@ for intento in 1 2 3 4 5 6; do
 done
 if [ "$VERIFY_OK" -eq 1 ]; then
   ok "El bundle del DMG conserva bundle id y certificado de BtoDicta"
+
+# El puente es el único camino de vuelta para quien tenga instalada la versión
+# con el nombre anterior: si falta o pierde su identificador, esa gente se queda
+# sin actualización automática y con un error en pantalla.
+PUENTE_DMG="$VOL/BetoDicta.app"
+[ -d "$PUENTE_DMG" ] || fail "El DMG no lleva el puente BetoDicta.app"
+PID_PUENTE=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PUENTE_DMG/Contents/Info.plist" 2>/dev/null || echo "")
+[ "$PID_PUENTE" = "ec.bto.betodicta" ] || fail "El puente no conserva el identificador anterior (tiene: $PID_PUENTE)"
+codesign --verify --deep "$PUENTE_DMG" 2>/dev/null || fail "El puente del DMG no está firmado"
+ok "El puente para instalaciones anteriores viaja firmado y con su identificador"
 else
   echo "$VERIFY_OUT" >&2
   fail "El .app del DMG NO conserva la identidad esperada"

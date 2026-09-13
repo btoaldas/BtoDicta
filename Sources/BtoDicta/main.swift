@@ -11,6 +11,21 @@
 
 import AppKit
 
+// Puente de mudanza: este mismo binario, metido en un bundle con el nombre y el
+// identificador ANTERIORES, no dicta nada — solo abre el asistente que instala
+// la aplicación nueva. Va lo primero de todo y no toca ni un dato del usuario.
+if AsistenteMudanza.esPuente {
+    MainActor.assumeIsolated {
+        let app = NSApplication.shared
+        let asistente = AsistenteMudanza()
+        // El delegado lo retiene la propia aplicación mientras corre.
+        objc_setAssociatedObject(app, "asistenteMudanza", asistente, .OBJC_ASSOCIATION_RETAIN)
+        app.delegate = asistente
+        app.run()
+    }
+    exit(0)
+}
+
 // La app se llamaba BetoDicta: lo PRIMERO es poner sus carpetas a nombre del
 // nuevo, antes de que nadie lea configuración ni abra un índice. Ver Rebautizo.
 Rebautizo.aplicar()

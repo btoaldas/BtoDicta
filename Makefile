@@ -75,9 +75,15 @@ bundle: $(BUILD_DIR)/release/$(APP)
 	@echo "Listo: $(BUNDLE)"
 
 # Instalador DMG (requiere: brew install create-dmg)
-dmg: bundle
+puente: bundle
+	@./scripts/hacer-puente.sh $(BUILD_DIR)
+
+dmg: bundle puente
 	@V=$$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist); \
 	if [ -e "$(BUILD_DIR)/BtoDicta-$$V.dmg" ]; then echo "El DMG ya existe; usa otro BUILD_DIR para preservarlo."; exit 1; fi; \
+	rm -rf "$(BUILD_DIR)/dmg-stage"; mkdir -p "$(BUILD_DIR)/dmg-stage"; \
+	ditto "$(BUNDLE)" "$(BUILD_DIR)/dmg-stage/BtoDicta.app"; \
+	ditto "$(BUILD_DIR)/BetoDicta.app" "$(BUILD_DIR)/dmg-stage/BetoDicta.app"; \
 	if [ "$${BTODICTA_DMG_HEADLESS:-0}" != 1 ] && \
 	perl -e '$$SIG{ALRM}=sub{exit 1}; alarm 5; exec @ARGV' /usr/bin/osascript -e 'tell application "Finder" to get name of every disk' >/dev/null 2>&1 && \
 	create-dmg \
@@ -85,9 +91,10 @@ dmg: bundle
 		--window-size 560 400 \
 		--icon-size 110 \
 		--icon "BtoDicta.app" 140 160 \
+		--icon "BetoDicta.app" 140 300 \
 		--app-drop-link 420 160 \
 		--add-file "LÉEME primero.txt" packaging/LEEME-primero.txt 280 300 \
-		"$(BUILD_DIR)/BtoDicta-$$V.dmg" "$(BUNDLE)"; then \
+		"$(BUILD_DIR)/BtoDicta-$$V.dmg" "$(BUILD_DIR)/dmg-stage"; then \
 		true; \
 	else \
 		echo "Generando DMG sin AppleScript (modo headless o Finder no disponible)…"; \
@@ -96,7 +103,7 @@ dmg: bundle
 			--volname "BtoDicta $$V" \
 			--app-drop-link 420 160 \
 			--add-file "LÉEME primero.txt" packaging/LEEME-primero.txt 280 300 \
-			"$(BUILD_DIR)/BtoDicta-$$V.dmg" "$(BUNDLE)" || exit 1; \
+			"$(BUILD_DIR)/BtoDicta-$$V.dmg" "$(BUILD_DIR)/dmg-stage" || exit 1; \
 	fi; \
 	echo "DMG listo: $(BUILD_DIR)/BtoDicta-$$V.dmg"
 

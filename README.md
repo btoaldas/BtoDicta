@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.56.0
+
+- **Asistente de mudanza para quien venía de BetoDicta**: el paquete incluye una
+  segunda aplicación con el nombre e identificador anteriores, de modo que la
+  actualización automática de una instalación vieja la instala y abre un
+  asistente que hace la mudanza en un clic. Antes esa actualización se cancelaba
+  con un error de identidad.
+
 ### Novedades 0.55.1
 
 - **El índice de la bitácora se corrige al mudar la carpeta**: antes quedaba
