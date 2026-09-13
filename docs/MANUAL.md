@@ -880,6 +880,10 @@ Todo vive en tu Mac, en `~/.btodicta/`:
 - **Streaming de ElevenLabs sin cuota a mitad de un dictado**: el servidor cierra la sesión; la app corta el envío de audio de inmediato, pone a ElevenLabs en cuarentena 30 min y el motor local toma el dictado con todo el audio acumulado (línea *"streaming ElevenLabs cerrado a mitad del dictado (…) → plan B"*).
 - **Sin internet**: el pulido no recorre los 16 proveedores de nube uno por uno; salta directo a tu primer motor local (Ollama, LM Studio) o entrega el texto original, y la voz cae a la de macOS durante un minuto.
 
+### La bitácora dice que tiene miles de elementos pendientes
+
+Si tras una actualización que mueve carpetas la bitácora anuncia decenas de miles de archivos «huérfanos» o pendientes, su índice se quedó con las rutas anteriores: al no encontrar los archivos los da de alta otra vez, y la siguiente tanda repetiría un trabajo ya hecho. Desde 0.55.1 las rutas del índice se corrigen durante la propia mudanza, antes de que nada lo abra.
+
 ### Los Atajos de macOS tras el cambio de nombre
 
 Los instaladores de Atajos los firma Apple y guardan dentro la ruta de la aplicación, así que los que ya tenías **siguen apuntando a BetoDicta**. Funcionan mientras conserves la app anterior en tu carpeta de Aplicaciones. Para que apunten a BtoDicta hay que volver a generarlos desde la app Atajos; hasta entonces, el publicador lo avisa en cada versión y aquí queda dicho.

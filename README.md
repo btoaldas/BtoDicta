@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.55.1
+
+- **El índice de la bitácora se corrige al mudar la carpeta**: antes quedaba
+  apuntando a la ruta anterior y volvía a marcar como pendiente material ya
+  transcrito y leído. Ahora no se repite ni un segundo de trabajo.
+
 ### Novedades 0.55.0
 
 - **La app pasa a llamarse BtoDicta.** Nombre nuevo en la aplicación, la barra de

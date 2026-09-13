@@ -6,11 +6,14 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.55.0"
+    static let numero = "0.55.1"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.55.1", "2026-09-13", [
+            "ARREGLADO un efecto del cambio de nombre: al mudarse la carpeta de la bitácora, su índice seguía apuntando a la ruta anterior, daba por perdido todo el material y lo registraba otra vez como pendiente. En una instalación real quedaron 63 567 elementos marcados para reprocesar cuando ya estaban transcritos y leídos. Ahora las rutas del índice se corrigen en el mismo momento de la mudanza, antes de que nada lo abra: ni un segundo de trabajo repetido",
+        ]),
         ("0.55.0", "2026-09-13", [
             "LA APP SE LLAMA AHORA BtoDicta. Cambia el nombre en todas partes: la aplicación, la barra de menús, el instalador, la documentación y el repositorio",
             "TUS DATOS SE MUDAN SOLOS: al abrir por primera vez, la carpeta de modelos, voces, historial y ajustes (~/.betodicta) y la de la bitácora pasan a llamarse como la app. Se MUEVEN, no se copian, así que es instantáneo aunque pesen decenas de gigas; si algo no se pudiera mover, se conserva donde está y se registra — nada se borra",
