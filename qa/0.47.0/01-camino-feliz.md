@@ -5,7 +5,7 @@ Los textos “QA” se pueden borrar al terminar.
 
 | ID | Di exactamente | Resultado esperado | Evidencia clave |
 |---|---|---|---|
-| CF-01 | `Este es un dictado normal para comprobar que BetoDicta no inventa ninguna acción.` | Pega el texto pulido en el campo activo; no abre apps ni llama al agente. | `dictado_inicio`, `dictado_cierre`; sin `plan_autonomo`. |
+| CF-01 | `Este es un dictado normal para comprobar que BtoDicta no inventa ninguna acción.` | Pega el texto pulido en el campo activo; no abre apps ni llama al agente. | `dictado_inicio`, `dictado_cierre`; sin `plan_autonomo`. |
 | CF-02 | Activa con la pulsación configurada, dicta `Prueba de activación por función` y detén. | Una o doble Fn respeta Ajustes; una sola Fn siempre detiene. | Notch abre/cierra una vez. |
 | CF-03 | `Oye <AGENTE>`; espera la respuesta; luego `Dime mis tareas de hoy`. | Responde “te escucho” y abre una sola escucha agéntica para el segundo turno. | `activacion_reposo_acuse` y luego `activacion`. |
 | CF-04 | `Oye <AGENTE>, ¿cómo está la computadora?` | Informa batería, disco, CPU, memoria, red y VPN; si no hay VPN lo dice sin fallar. | `plan` + `resultado_herramienta`. |
@@ -18,7 +18,7 @@ Los textos “QA” se pueden borrar al terminar.
 | CF-11 | `Anótame una tarea: revisar el Zentrix mañana a las ocho de la mañana.` | Crea una tarea local con fecha/hora 08:00 y aviso habilitado. | Tareas y Notas + registro de guardado local. |
 | CF-12 | `Oye <AGENTE>, recuérdame mañana a las ocho de la noche llamar a Rafael.` | Crea Recordatorio con 20:00, no 12:00. | `resultado_herramienta` con fecha verificada. |
 | CF-13 | `Oye <AGENTE>, crea un evento de reunión mañana a las diez de la mañana.` | Crea evento a las 10:00 mediante EventKit. | Resultado real de calendario. |
-| CF-14 | `Necesito que guardes una nota: QA, revisar el informe del viernes.` | Guarda una nota dentro de BetoDicta, no abre Notas de Apple. | `guardado_local`, tipo nota. |
+| CF-14 | `Necesito que guardes una nota: QA, revisar el informe del viernes.` | Guarda una nota dentro de BtoDicta, no abre Notas de Apple. | `guardado_local`, tipo nota. |
 | CF-15 | `Oye <AGENTE>, crea una nota de Apple titulada QA Compras: pan, café y arroz.` | Crea una nota con título y lista legible. | `resultado_herramienta`; nota visible en Apple Notes. |
 | CF-16 | `Oye <AGENTE>, abre Outlook y escribe un correo para equipo@example.com, asunto reunión, cuerpo: nos vemos mañana.` | Abre un borrador con Para, Asunto y Cuerpo; no envía. | `borrador_correo` con campos verificados. |
 | CF-17 | `Oye <AGENTE>, abre Word y crea un oficio completo solicitando apoyo para los juegos internos.` | Crea documento nuevo con párrafos/saltos y formato legible, no una sola línea. | `aplicacion` y resultado del documento. |

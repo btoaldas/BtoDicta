@@ -9,7 +9,7 @@ modo resumir este informe contiene cinco conclusiones	resumir	este informe conti
 modo agente dime qué tareas tengo hoy	agente	dime qué tareas tengo hoy
 modo buscar wikipedia Islas Galápagos	buscar	Islas Galápagos	buscador=wikipedia
 modo buscar google mejores rutas hacia Quito	buscar	mejores rutas hacia Quito	buscador=google
-modo música interno reproduce Julio Jaramillo	musica	*	proveedor=betodicta_youtube
+modo música interno reproduce Julio Jaramillo	musica	*	proveedor=btodicta_youtube
 modo música spotify reproduce música andina	musica	*	proveedor=spotify
 modo traducir inglés correo hola equipo	cadena	hola equipo	etapas=traducir+correo
 modo traducir inglés buscar google mejores universidades	cadena	mejores universidades	etapas=traducir+buscar:google
@@ -26,6 +26,6 @@ Quiero que busques en YouTube: música andina ecuatoriana.	plan	*	etapas=buscar:
 Por favor, formaliza y envía por Outlook lo siguiente: solicito permiso para el viernes.	plan	*	etapas=oficio+outlook
 Por favor, pregúntale al agente: qué tareas tengo para hoy.	plan	*	etapas=agente
 Me gustaría que traduzcas al portugués lo siguiente: nos vemos mañana.	plan	*	etapas=traducir
-Por favor puedes abrir Safari: documentación de BetoDicta.	plan	*	etapas=safari
+Por favor puedes abrir Safari: documentación de BtoDicta.	plan	*	etapas=safari
 Envíalo por correo y WhatsApp: esta es la versión final.	plan	*	etapas=correo+whatsapp
 Podemos resumir y después enviar por correo este texto: mañana habrá reunión.	plan	*	etapas=resumir+correo

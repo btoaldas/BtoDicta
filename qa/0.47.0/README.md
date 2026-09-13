@@ -1,9 +1,9 @@
-# Paquete QA BetoDicta 0.47.0
+# Paquete QA BtoDicta 0.47.0
 
 Este paquete separa dos preguntas distintas:
 
 1. **Camino feliz:** ¿la función correcta completa su trabajo de punta a punta?
-2. **Estrés y degradación:** si la frase, permiso, red o proveedor falla, ¿BetoDicta
+2. **Estrés y degradación:** si la frase, permiso, red o proveedor falla, ¿BtoDicta
    evita hacer algo equivocado y vuelve a una salida segura?
 
 ## Preparación segura (3 minutos)

@@ -27,14 +27,14 @@ o explicar el bloqueo sin ejecutar nada distinto.
 | ES-19 | En el mismo modal pulsa X. | Rechaza la acción pero conserva el flujo como dictado normal. |
 | ES-20 | `Resume, formaliza, traduce al inglés y envía por correo y WhatsApp a Andrés: texto QA.` | Presenta todas las etapas en orden; no omite destinatario. |
 | ES-21 | `Por favor traduce al klingon este texto.` | Pide aclarar/usa idioma predeterminado solo con confirmación; no afirma una traducción falsa. |
-| ES-22 | `Modo buscar buscador inventado, BetoDicta.` | No abre una URL arbitraria; ofrece/usa el buscador configurado de forma visible. |
+| ES-22 | `Modo buscar buscador inventado, BtoDicta.` | No abre una URL arbitraria; ofrece/usa el buscador configurado de forma visible. |
 | ES-23 | Dos apps comparten el mismo alias `Editor`; pide `abre Editor`. | Muestra selección, no elige al azar. |
 | ES-24 | Pide `abre Spotify` con Spotify desinstalado. | Explica o aplica failover permitido; no reporta éxito falso. |
 | ES-25 | Deniega Automatización para Outlook y pide crear borrador. | Conserva texto/portapapeles y explica el permiso; no envía. |
-| ES-26 | Deniega Automatización para Notas y pide crear nota Apple. | Explica y ofrece Ajustes; la nota local de BetoDicta no se confunde. |
+| ES-26 | Deniega Automatización para Notas y pide crear nota Apple. | Explica y ofrece Ajustes; la nota local de BtoDicta no se confunde. |
 | ES-27 | `Recuérdame mañana a las 25:80 llamar a Rafael.` | Pide corregir hora; no crea a 12:00 por defecto. |
 | ES-28 | `Crea un evento ayer a las diez.` | Pide confirmación de fecha pasada o rechaza; no agenda silenciosamente hoy. |
-| ES-29 | Crea tarea vencida, cierra BetoDicta, ábrela después de la hora. | Notifica al reabrir una sola vez; no duplica avisos. |
+| ES-29 | Crea tarea vencida, cierra BtoDicta, ábrela después de la hora. | Notifica al reabrir una sola vez; no duplica avisos. |
 | ES-30 | Deniega Ubicación y pregunta `¿qué clima hace hoy?` | Solicita ciudad/permiso; no bloquea el dictado. |
 | ES-31 | Sin red/VPN inestable, pregunta clima de Quito. | Timeout acotado, mensaje claro y app utilizable. |
 | ES-32 | Apaga Ollama y usa una frase que normalmente requiere embeddings. | Salta embeddings sin latencia larga; exacto/difuso/natural siguen funcionando. |

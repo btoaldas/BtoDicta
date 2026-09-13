@@ -1,4 +1,4 @@
-# QA reproducible de BetoDicta
+# QA reproducible de BtoDicta
 
 Cada carpeta versionada contiene matrices automáticas, guiones manuales y una
 hoja de resultados. El paquete vigente es [`0.47.0`](0.47.0/README.md).
