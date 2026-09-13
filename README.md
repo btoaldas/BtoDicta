@@ -34,6 +34,18 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.54.0
+
+- **Que nunca falte texto en un dictado largo**: los motores de dictado en vivo
+  pueden saltarse una frase (dejando «...») o dejar de transcribir aunque sigas
+  hablando. Ahora un vigía lo detecta —hay voz y el texto no crece— y **relanza
+  el motor desde el punto exacto** en que se quedó, conservando lo ya transcrito.
+- **Reparación quirúrgica, no trabajo doble**: al terminar solo se revisan los
+  tramos rotos, cada uno con una ventana corta de audio, y se cosen en su sitio
+  por coincidencia de palabras. Un dictado sano no paga nada: cero
+  re-transcripciones y cero espera. Varias roturas en la misma grabación se
+  atienden todas. Sin IA y sin nube: corre con tu motor local.
+
 ### Novedades 0.53.1
 
 - **Dictado protegido**: los clasificadores como Prompt Guard no sirven para
