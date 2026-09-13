@@ -6,11 +6,16 @@ import Foundation
 // Version.numero al Info.plist del bundle (CFBundleShortVersionString).
 
 enum Version {
-    static let numero = "0.54.0"
+    static let numero = "0.54.1"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.54.1", "2026-09-13", [
+            "ARREGLADO un cierre de la app al empezar a dictar: si el micrófono estaba cambiando de estado justo al pulsar la tecla (la bitácora acababa de soltarlo), macOS devolvía un formato inválido y la app se caía a mitad de la grabación. Ahora se comprueba el formato, se reintenta tras un respiro y, si el micrófono no está, se avisa sin cerrar nada",
+            "ARREGLADO un bucle de la bitácora: cuando el motor de audio arrancaba pero no entregaba sonido, se reiniciaba cada 8 segundos sin parar. El contador se reiniciaba al arrancar el motor, y el motor arranca siempre; ahora solo se reinicia cuando llega audio de verdad",
+            "La bitácora NO se apaga nunca por esto: si el micrófono no responde, baja el ritmo a un intento por minuto y vuelve sola en cuanto esté libre, sin llenar el registro",
+        ]),
         ("0.54.0", "2026-09-13", [
             "NUNCA MÁS FALTA TEXTO EN UN DICTADO LARGO. Los motores de dictado en vivo pueden saltarse frases (dejando «...») y hasta dejar de transcribir del todo aunque sigas hablando: medido en un dictado real de 15 minutos, se perdieron 120 palabras, el cierre entero incluido. Ahora la app lo detecta y lo recupera sola",
             "VIGÍA DEL MOTOR: si hay voz y el texto deja de crecer, el motor está colgado — se relanza en caliente DESDE el punto exacto en que se quedó, no desde el principio, y lo ya transcrito se conserva. Hasta 8 rescates por dictado, con freno si el motor no revive",

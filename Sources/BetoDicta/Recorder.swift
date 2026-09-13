@@ -40,9 +40,28 @@ final class Recorder {
                                  kAudioUnitScope_Global, 0, &id,
                                  UInt32(MemoryLayout<AudioDeviceID>.size))
         }
-        let inFormat = input.outputFormat(forBus: 0)
+        // El formato del micrófono puede llegar INVÁLIDO (0 Hz o 0 canales)
+        // cuando el dispositivo está en transición: justo lo que pasa al pulsar
+        // la tecla mientras la bitácora acaba de soltar el micrófono. Con ese
+        // formato, `installTapOnBus` lanza una NSException que Swift no puede
+        // atrapar y la app ABORTA a mitad del dictado (crash real 2026-09-13).
+        var inFormat = input.outputFormat(forBus: 0)
+        if inFormat.sampleRate <= 0 || inFormat.channelCount == 0 {
+            // Un respiro y una segunda lectura: el dispositivo suele asentarse
+            // en milisegundos. Si sigue mal, se falla limpio y la cascada
+            // normal se encarga; nunca se aborta.
+            engine.stop(); engine.reset()
+            Thread.sleep(forTimeInterval: 0.15)
+            inFormat = input.outputFormat(forBus: 0)
+            Log.log(.sistema, "micrófono en transición — releído a \(Int(inFormat.sampleRate)) Hz, \(inFormat.channelCount) can")
+        }
+        guard inFormat.sampleRate > 0, inFormat.channelCount > 0 else {
+            Log.log(.sistema, "micrófono no disponible (formato \(inFormat.sampleRate) Hz, \(inFormat.channelCount) can) — no arranco el dictado")
+            throw ScribeError.ws("el micrófono no está disponible ahora mismo")
+        }
         converter = AVAudioConverter(from: inFormat, to: outFormat)
 
+        let instalar = { [weak self] in
         input.installTap(onBus: 0, bufferSize: 4096, format: inFormat) { [weak self] buffer, _ in
             guard let self, let converter = self.converter else { return }
             let ratio = self.outFormat.sampleRate / inFormat.sampleRate
@@ -76,14 +95,28 @@ final class Recorder {
             self.onLevel?(boosted)
         }
 
+        }
+        // AVFoundation lanza excepciones de Objective-C que `try` no ve: van por
+        // el atrapador nativo o se llevan la app por delante.
+        if let fallo = AudioSeguro.atrapar(instalar) {
+            input.removeTap(onBus: 0)
+            Log.log(.sistema, "micrófono: no pude instalar la escucha (\(fallo)) — dictado no iniciado")
+            throw ScribeError.ws("el micrófono no aceptó la escucha")
+        }
         engine.prepare()
-        do {
-            try engine.start()
-        } catch {
+        var errorArranque: Error?
+        if let fallo = AudioSeguro.atrapar({
+            do { try self.engine.start() } catch { errorArranque = error }
+        }) {
+            input.removeTap(onBus: 0)
+            Log.log(.sistema, "micrófono: el motor de audio no arrancó (\(fallo))")
+            throw ScribeError.ws("el motor de audio no arrancó")
+        }
+        if let errorArranque {
             // Sin esto el tap queda huérfano y el próximo start crashea
             // (doble installTap en el mismo bus).
             input.removeTap(onBus: 0)
-            throw error
+            throw errorArranque
         }
         isRecording = true
         // La activación manos libres entrega los últimos segundos que estaban

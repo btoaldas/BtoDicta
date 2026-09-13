@@ -46,6 +46,11 @@ final class ContinuoAudio {
     private var montando = false
     /// Intentos de arranque encadenados (micrófono ocupado).
     private var intentos = 0
+    /// Arranques que montaron el motor pero no entregaron un solo buffer. Se
+    /// cuentan APARTE de los intentos de montaje: el motor «arranca» siempre,
+    /// así que reiniciar el contador al montar dejaba un bucle infinito de
+    /// reinicios cada 8 s (visto el 2026-09-13, 15 vueltas seguidas).
+    private var arranquesMudos = 0
     /// Solo para diagnóstico: cuántos buffers ha entregado el tap.
     private var buffersVistos = 0
     private(set) var activo = false
@@ -136,7 +141,7 @@ final class ContinuoAudio {
         var arrancado = false
         DispatchQueue.main.sync { arrancado = self.montarEnMain() }
         guard arrancado else { reintentar(); return }
-        intentos = 0
+        // `intentos` NO se reinicia aquí: solo cuando llegue audio de verdad.
         activo = true
         let marcaBuffers = buffersVistos
         candadoCesion.lock(); let genVigia = generacion; candadoCesion.unlock()
@@ -151,8 +156,27 @@ final class ContinuoAudio {
             // recién re-arrancado tras una cesión.
             self.candadoCesion.lock(); let vigente = self.generacion; self.candadoCesion.unlock()
             guard vigente == genVigia else { return }
-            Log.log(.sistema, "bitácora: el motor arrancó pero no entrega audio — reinicio")
+            self.arranquesMudos += 1
             self.detenerEnCola(cerrandoTrozo: true)
+            // Tras varias vueltas mudas el micrófono no es nuestro (lo tiene
+            // otra app, cambió el dispositivo o quedó en mal estado tras un
+            // cierre brusco). La bitácora NO se apaga —es su razón de ser
+            // estar siempre grabando—: baja el ritmo a un intento por minuto,
+            // deja de llenar el registro y vuelve sola en cuanto el micrófono
+            // responda. Lo que se corrige es el bucle cada 8 s, no la vigilancia.
+            if self.arranquesMudos >= 4 {
+                if self.arranquesMudos == 4 {
+                    Log.log(.sistema, "bitácora: el micrófono no entrega audio tras \(self.arranquesMudos) intentos — sigo intentando cada minuto (revisa si otra app lo está usando)")
+                }
+                self.intentos = 0
+                self.cola.asyncAfter(deadline: .now() + 60) { [weak self] in
+                    guard let self, Config.continuoActivo() else { return }
+                    Log.debug("bitácora: reintento lento del micrófono (\(self.arranquesMudos) arranques mudos)")
+                    self.arrancarEnCola()
+                }
+                return
+            }
+            Log.log(.sistema, "bitácora: el motor arrancó pero no entrega audio — reinicio \(self.arranquesMudos)/3")
             self.reintentar()
         }
     }
@@ -169,7 +193,10 @@ final class ContinuoAudio {
             intentos = 0
             return
         }
-        let espera = Double(intentos) * 2.5
+        // Espera creciente de verdad: 2,5 s, 5 s, 10 s, 20 s… Con incrementos
+        // lineales una app que retiene el micrófono nos tenía preguntando cada
+        // dos segundos y medio durante minutos.
+        let espera = min(60.0, 2.5 * pow(2.0, Double(intentos - 1)))
         candadoCesion.lock(); let gen = generacion; candadoCesion.unlock()
         Log.log(.sistema, "bitácora: micrófono ocupado, reintento \(intentos) en \(espera) s")
         cola.asyncAfter(deadline: .now() + espera) { [weak self] in
@@ -230,6 +257,8 @@ final class ContinuoAudio {
             guard let self else { return }
             self.buffersVistos += 1
             if self.buffersVistos == 1 {
+                // Audio real: aquí sí se limpian los contadores de reintento.
+                self.cola.async { self.intentos = 0; self.arranquesMudos = 0 }
                 Log.log(.sistema, "bitácora: el micrófono entrega audio (\(buffer.frameLength) marcos por buffer)")
             } else if self.buffersVistos % 600 == 0 {
                 Log.debug("bitácora: tap #\(self.buffersVistos)")

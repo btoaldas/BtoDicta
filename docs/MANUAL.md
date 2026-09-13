@@ -880,6 +880,10 @@ Todo vive en tu Mac, en `~/.betodicta/`:
 - **Streaming de ElevenLabs sin cuota a mitad de un dictado**: el servidor cierra la sesión; la app corta el envío de audio de inmediato, pone a ElevenLabs en cuarentena 30 min y el motor local toma el dictado con todo el audio acumulado (línea *"streaming ElevenLabs cerrado a mitad del dictado (…) → plan B"*).
 - **Sin internet**: el pulido no recorre los 16 proveedores de nube uno por uno; salta directo a tu primer motor local (Ollama, LM Studio) o entrega el texto original, y la voz cae a la de macOS durante un minuto.
 
+### La bitácora dice «el motor arrancó pero no entrega audio»
+
+Significa que el micrófono no está dando sonido a BetoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.
+
 ### Dicté mucho rato y falta texto (o aparecen «...»)
 
 Los motores de dictado **en vivo** trabajan al ritmo del habla y, en grabaciones largas, pueden saltarse una frase —dejando puntos suspensivos— o dejar de transcribir del todo aunque sigas hablando. No es el micrófono ni el pulido: el audio está entero, es el motor el que se queda atrás. Desde 0.54.0 la app lo resuelve sola:
