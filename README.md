@@ -34,6 +34,18 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.54.1
+
+- **La app ya no se cierra al empezar a dictar**: si el micrófono estaba
+  cambiando de estado justo al pulsar la tecla (la bitácora acababa de soltarlo),
+  macOS devolvía un formato inválido y el proceso abortaba a mitad de la
+  grabación. Ahora se valida el formato, se reintenta tras un respiro y, si no
+  hay micrófono, se avisa sin cerrar nada.
+- **La bitácora ya no se reinicia en bucle**: cuando el motor de audio arrancaba
+  sin entregar sonido se reiniciaba cada 8 segundos indefinidamente. Sigue
+  vigilando siempre —grabar es su función—, pero baja a un intento por minuto y
+  se recupera sola en cuanto el micrófono responde.
+
 ### Novedades 0.54.0
 
 - **Que nunca falte texto en un dictado largo**: los motores de dictado en vivo
