@@ -1,11 +1,11 @@
 # Spec 002 — Corrección: Cancelar un dictado no puede borrar el audio
 
-- Estado: Borrador
+- Estado: Aprobada · RF-01 implementado en 0.59.1
 - Tipo: correccion
 - Nivel: X
 - Fecha: 2026-09-14
 - Modifica: ninguna
-- Aprobada por: PENDIENTE
+- Aprobada por: Alberto — 2026-09-14 — «vamos de los tres [pendientes] el que sea más rápido»; RF-01 era «de ley»
 
 ## 1. Reproducción
 
@@ -92,14 +92,14 @@ Dos defectos encadenados, ambos confirmados leyendo el código:
 | ID | Dimensión | Requerimiento con cifra u observable | Cómo se mide |
 |---|---|---|---|
 | RNF-01 | Disponibilidad | 0 audios borrados al cancelar, en 10 cancelaciones seguidas | Prueba propia que cancela y comprueba el archivo |
-| RNF-02 | Usabilidad | La confirmación es parametrizable y viene [PENDIENTE DE DECISIÓN: ¿activada o desactivada por defecto?] | Ajuste en Configuración |
-| RNF-03 | Capacidad | El audio conservado se purga con la misma política que el resto del historial, no antes | Revisión de la purga |
+| RNF-02 | Usabilidad | La confirmación es parametrizable; pendiente de implementar (RF-03, P2) | Ajuste en Configuración |
+| RNF-03 | Capacidad | El audio conservado se purga a los 90 días, igual que el resto del historial, ni un día antes | Revisión de la purga |
 
 ## 6. Casos límite y fallos
 
 | Situación | Comportamiento esperado | RF |
 |---|---|---|
-| Se cancela un dictado de medio segundo, por error al pulsar | [PENDIENTE DE DECISIÓN: ¿se guarda igual o hay un mínimo por debajo del cual no vale la pena?] | RF-01 |
+| Se cancela un dictado de medio segundo, por error al pulsar | Se descarta: por debajo de `cancelar_conserva_desde_s` (2 s por defecto) no hay nada que conservar y ensuciaría el historial | RF-01 |
 | Se cancela mientras el motor en vivo ya escribía texto | El texto parcial se conserva junto al audio | RF-01 |
 | El usuario cancela a propósito porque se equivocó de dicción | Puede borrarlo a mano desde el historial, como cualquier otro | RF-01 |
 
@@ -127,3 +127,11 @@ Dos defectos encadenados, ambos confirmados leyendo el código:
 - P: ¿Y la confirmación? → R: idea aparte y parametrizable — «podríamos verle la
   opción de que si yo pongo X y va a cerrar BtoDicta, que me confirme»
   (decisión del responsable del producto)
+
+## 10. Estado de implementación
+
+| RF | Estado | Evidencia |
+|---|---|---|
+| RF-01 — cancelar conserva el audio | **Hecho** en 0.59.1 | `BTODICTA_CANCELTEST=1`, 8 de 8 |
+| RF-02 — Escape no roba la tecla | **Pendiente** | Sigue siendo atajo global; con RF-01 hecho, ya no destruye nada, pero interrumpe |
+| RF-03 — confirmación opcional | **Pendiente** (P2) | — |

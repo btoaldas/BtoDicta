@@ -34,6 +34,16 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.59.1
+
+- **Cancelar un dictado ya no lo borra.** Cancelar ejecutaba un borrado real del
+  audio y del texto. Y como Escape es un atajo **global** mientras grabas,
+  bastaba pulsarlo para cerrar una ventana ajena para perder el dictado entero.
+  Ahora queda guardado en el historial y se recupera como cualquier otro; solo se
+  descarta lo que dura menos de dos segundos.
+- Pendiente: Escape sigue siendo global, así que aún puede interrumpir un
+  dictado. Ya no se pierde nada, pero hay que volver a empezar.
+
 ### Novedades 0.59.0
 
 - **Se acabaron los dictados que no caben.** Cada motor tiene un techo de tamaño

@@ -917,6 +917,22 @@ Un dictado que no recibe audio ya no se queda pensando: a los 6 segundos se cier
 
 Significa que el micrófono no está dando sonido a BtoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.
 
+### Cancelé sin querer y perdí la grabación
+
+Ya no. Hasta 0.59.0, cancelar un dictado **borraba** el audio y el texto del
+disco. Y la tecla **Escape es un atajo global** mientras grabas, así que bastaba
+pulsarla para cerrar una ventana de otra aplicación para perder el dictado.
+
+Desde 0.59.1 un dictado cancelado se cierra como cualquier otro: su `.wav` queda
+en el historial y en la bitácora, con el texto que ya se hubiera transcrito, y se
+recupera desde la pestaña de transcribir. Solo se descarta lo que dura menos de
+dos segundos — una pulsación accidental sin nada dentro. El umbral se ajusta con
+`cancelar_conserva_desde_s` (0 conserva siempre).
+
+**Ojo, sigue pendiente**: Escape continúa siendo global, de modo que puede
+interrumpir un dictado desde otra aplicación. Ya no pierdes nada cuando ocurre,
+pero hay que volver a empezar. Si te molesta, apágalo con `esc_cancela`.
+
 ### Dicté una hora y el motor no lo admitió
 
 Todo motor de transcripción tiene un techo —de tamaño de archivo, de duración o

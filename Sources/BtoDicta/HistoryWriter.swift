@@ -11,7 +11,8 @@ final class HistoryWriter {
 
     var wavURL: URL { base.appendingPathExtension("wav") }
     var txtURL: URL { base.appendingPathExtension("txt") }
-    private var pcmURL: URL { base.appendingPathExtension("pcm") }
+    /// Interno salvo para la prueba propia de cancelación (spec 002).
+    private(set) lazy var pcmURL: URL = base.appendingPathExtension("pcm")
 
     static var historyDir: URL { Config.dir.appendingPathComponent("historial") }
 

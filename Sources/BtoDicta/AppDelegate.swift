@@ -254,7 +254,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         silenceTimer = nil
         liveTimer?.invalidate()
         liveTimer = nil
-        _ = recorder.stop()
+        let wavCancelado = recorder.stop()
+        panel.detenerCronometro()
         entregaVivo = nil
         audioDictado = Data()
         vivoReiniciarVigia()
@@ -264,7 +265,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         liveNube = nil           // vivo y su texto reaparecía en el siguiente dictado
         tcppStream?.cancel()
         tcppStream = nil
-        history?.discard()
+        // CANCELAR NO ES BORRAR. Antes se llamaba a `discard()`, que hace
+        // `removeItem` sobre el .pcm y el .txt: el audio no se abandonaba, se
+        // destruía. Y como Esc es un atajo GLOBAL mientras se graba, bastaba
+        // cerrar con Esc una ventana ajena para perder el dictado entero.
+        // Ahora se cierra como un dictado normal —.wav en el historial y en la
+        // bitácora— y se recupera desde donde se recuperan todos. Solo se
+        // descarta lo que no tiene nada dentro.
+        let segundosCancelado = Double(max(0, wavCancelado.count - 44)) / 32_000.0
+        if segundosCancelado >= Config.cancelarConservaDesdeSegundos() {
+            history?.finish(wav: wavCancelado, finalText: lastPartial)
+            Log.log(.sistema, "dictado cancelado: conservo \(DictationPanel.reloj(segundosCancelado)) en el historial")
+        } else {
+            history?.discard()
+        }
         history = nil
         setIcono(.reposo)
         panel.setModo(modoPendienteVoz ?? ModosStore.activo())
@@ -1395,6 +1409,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 print("REDTEST \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
             }
             RunLoop.main.run(); return
+        }
+        // Cancelar un dictado NO puede borrar el audio (spec 002).
+        //   BTODICTA_CANCELTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_CANCELTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("CANCEL \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            let fm = FileManager.default
+            // 1) Un dictado con contenido: cancelar lo conserva como .wav.
+            let h = HistoryWriter()
+            let seg = 6
+            let pcm = Data(repeating: 3, count: seg * 32_000)
+            h.append(chunk: pcm)
+            h.savePartial("texto a medias", force: true)
+            let wav = HistoryWriter.wavData(pcm: pcm)
+            h.finish(wav: wav, finalText: "texto a medias")
+            chk(fm.fileExists(atPath: h.wavURL.path), "cancelar un dictado con voz deja el .wav en el historial")
+            let marcos = (try? Data(contentsOf: h.wavURL))?.count ?? 0
+            chk(marcos >= wav.count, "y el audio está entero (\(marcos) B de \(wav.count))")
+            chk(fm.fileExists(atPath: h.txtURL.path), "junto con el texto que ya se había transcrito")
+            chk(!fm.fileExists(atPath: h.pcmURL.path), "sin dejar el crudo duplicando espacio")
+            chk(HistoryWriter.esTextoPrincipal(h.txtURL), "y el historial lo reconoce como dictado suyo")
+            try? fm.removeItem(at: h.wavURL); try? fm.removeItem(at: h.txtURL)
+
+            // 2) Una pulsación accidental sin contenido: eso sí se descarta.
+            let h2 = HistoryWriter()
+            h2.append(chunk: Data(repeating: 0, count: 8_000))   // 0,25 s
+            h2.discard()
+            chk(!fm.fileExists(atPath: h2.pcmURL.path), "medio segundo sin nada no ensucia el historial")
+
+            // 3) El umbral es parametrizable y conserva por defecto desde 2 s.
+            let u = Config.cancelarConservaDesdeSegundos()
+            chk(u > 0 && u <= 5, "el umbral por defecto son \(u) s — conserva casi todo")
+            chk(Double(seg) >= u, "un dictado de \(seg) s queda por encima del umbral")
+
+            print("CANCEL \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
         }
         // Troceo adaptativo: que ni el audio ni el texto pierdan nada al partirse.
         //   BTODICTA_PARTIRTEST=1

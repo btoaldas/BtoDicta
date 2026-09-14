@@ -1113,6 +1113,13 @@ struct Config {
     static func redSeguridadDictado() -> Bool {
         (json()["dictado_red_seguridad"] as? Bool) ?? true
     }
+    /// Desde cuántos segundos un dictado CANCELADO se conserva en el historial
+    /// en vez de borrarse. Cancelar nunca debe destruir lo grabado: por debajo
+    /// de este umbral solo se descarta lo que no tiene nada dentro. 0 conserva
+    /// siempre; subirlo evita guardar pulsaciones accidentales de medio segundo.
+    static func cancelarConservaDesdeSegundos() -> Double {
+        min(60, max(0, (json()["cancelar_conserva_desde_s"] as? Double) ?? 2))
+    }
     /// Fish Audio: intentar primero su modelo de voz GRATUITO y caer al de pago
     /// solo si aquel falla. Ahorra crédito sin perder la voz; ponlo en false
     /// para ir siempre directo al modelo elegido.

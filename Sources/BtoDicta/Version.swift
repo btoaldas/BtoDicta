@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.59.0"
+    static let numero = "0.59.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.59.1", "2026-09-14", [
+            "CANCELAR UN DICTADO YA NO LO BORRA. Hasta ahora, cancelar ejecutaba un borrado real del archivo de audio y del texto: no se abandonaba la grabación, se destruía. Y como la tecla Escape queda registrada como atajo GLOBAL mientras grabas, bastaba con pulsarla para cerrar una ventana de otra aplicación para perder el dictado entero. Ahora un dictado cancelado se cierra como cualquier otro —queda su .wav en el historial y en la bitácora, junto al texto que ya se hubiera transcrito— y se recupera desde donde se recuperan todos. Solo se descarta lo que dura menos de dos segundos, que es una pulsación accidental sin nada dentro; el umbral se ajusta con «cancelar_conserva_desde_s»",
+            "Prueba propia: BTODICTA_CANCELTEST=1",
+            "PENDIENTE, y conviene saberlo: Escape sigue siendo un atajo global, así que puede seguir interrumpiendo un dictado desde otra aplicación. Ya no se pierde nada cuando pasa, pero hay que volver a empezar",
+        ]),
         ("0.59.0", "2026-09-14", [
             "SE ACABARON LOS DICTADOS QUE NO CABEN. Todo motor de transcripción tiene un techo de tamaño y ninguno lo anuncia igual: Fish rechaza a partir de unos 25 MB con un «format not recognised» que ni menciona el tamaño. Ahora, cuando un motor rechaza el envío entero de una forma que puede ser de tamaño, la aplicación parte el audio en tramos con solape y lo reintenta CON EL MISMO MOTOR, cosiendo después por coincidencia de palabras. Medido: 20 minutos de dictado que antes fallaban salen ahora completos, 3 348 palabras de las 3 360 habladas",
             "Y lo aprende: el techo de cada motor queda anotado, así que la próxima vez parte de entrada sin pagar el rechazo. Pero solo aprende de lo que dice el SERVIDOR — una caída de internet no deja ninguna medida, porque si no una desconexión de un minuto marcaría al motor con un techo falso durante semanas. Si más adelante entra algo más grande de lo que supuestamente no admitía, la medida se tira entera; y en cualquier caso caduca a las dos semanas",
