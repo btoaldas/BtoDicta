@@ -34,6 +34,20 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.57.0
+
+- **Fish Audio, nuevo proveedor de voz y de transcripción.** Como ElevenLabs,
+  hace las dos cosas con una sola clave (`FISH_API_KEY`): habla con **tu voz
+  clonada** y transcribe. Aparece en los dos catálogos y se configura igual que
+  el resto, con tu propia key.
+- La voz se elige por el **`reference_id`** de tu clon en fish.audio, no por un
+  nombre. Modelos `s2.1-pro`, `s2-pro`, `s1` y `s2.1-pro-free` — este último
+  viene puesto porque **habla sin gastar crédito**.
+- Aviso que ahorra tiempo: en Fish el **crédito de API es una bolsa distinta**
+  de la de la web y empieza en cero. Sin recargarlo, todo lo que no sea el
+  modelo gratuito responde 402; BtoDicta lo detecta, lo pone en cuarentena 30
+  minutos y sigue con el motor siguiente.
+
 ### Novedades 0.56.2
 
 - **El dictado se entrega siempre.** Si la recuperación de texto perdido

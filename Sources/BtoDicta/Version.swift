@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.56.2"
+    static let numero = "0.57.0"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.57.0", "2026-09-13", [
+            "NUEVO PROVEEDOR: Fish Audio, y hace las dos cosas con una sola clave, como ElevenLabs — habla con tu voz clonada y transcribe. Aparece tanto en el catálogo de motores de transcripción como en el de voces de nube, y se configura igual que el resto con tu propia key (FISH_API_KEY)",
+            "La voz se elige por el «reference_id» de tu clon en fish.audio, no por un nombre. Modelos de voz s2.1-pro, s2-pro, s1 y s2.1-pro-free; este último viene puesto por defecto porque habla sin gastar crédito",
+            "En Fish Audio el crédito de API es una bolsa DISTINTA de la de la plataforma web y empieza en cero: la suscripción de la web no paga llamadas de API. Sin recargarlo, todo lo que no sea el modelo gratuito responde 402 — BtoDicta lo pone en cuarentena 30 minutos y sigue con el motor siguiente, sin que el dictado se entere",
+            "Prueba propia reproducible de ida y vuelta (voz → audio → transcripción): BTODICTA_FISHTEST=1",
+        ]),
         ("0.56.2", "2026-09-13", [
             "ARREGLADO: un dictado podía quedarse sin entregar para siempre. Cuando la recuperación de texto perdido arrancaba el motor por lotes y este se atascaba, nadie cortaba la espera: el texto no llegaba nunca y el panel se quedaba en «Recuperando lo que falta». Ahora la recuperación entrega SIEMPRE lo que tenga al cumplirse su tope, y el proceso atascado se detiene solo",
             "ARREGLADO: cada congelación del motor en vivo costaba minuto y medio de audio transcritos para nada. Se pedía la ventana de audio y después se descartaba el resultado por no saber en qué punto del texto coserlo. Ahora ese punto se anota en el momento en que el motor enmudece, así que la ventana se aprovecha y el tramo congelado a mitad del dictado sí se recupera",

@@ -1369,6 +1369,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
+        // Fish Audio de punta a punta por el CÓDIGO DE LA APP (no por curl):
+        // clave, voz clonada, transcripción y comportamiento sin crédito.
+        //   BTODICTA_FISHTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_FISHTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("FISH \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            let key = FishAudio.clave()
+            chk(!key.isEmpty, "la clave se lee del almacén de la app (\(key.count) caracteres)")
+            chk(Providers.cloudDisponibles.contains { $0.id == "fish" }, "aparece en el catálogo de transcripción")
+            chk(TTSCloud.proveedor("fish_tts") != nil, "aparece en el catálogo de voces de nube")
+            let voz = Config.ttsCloudVoz("fish_tts")
+            let mod = Config.ttsCloudModelo("fish_tts")
+            print("FISH voz=\(voz.isEmpty ? "(sin configurar)" : voz) modelo=\(mod.isEmpty ? "(por defecto)" : mod)")
+            guard !key.isEmpty else { print("FISH FALLA"); exit(1) }
+
+            // 1) Voz: por la misma ruta que usa el Modo Agente.
+            TTSCloud.decir("fish_tts", texto: "Probando la voz de Bto en BtoDicta con Fish Audio.") { audio in
+                DispatchQueue.main.async {
+                    let bytes = audio?.count ?? 0
+                    chk(bytes > 2_000, "el TTS devuelve audio (\(bytes) B)")
+                    // Cabecera de MPEG: 0xFF 0xFB/0xF3/0xF2, o etiqueta ID3.
+                    let ok = (audio?.prefix(2).first == 0xFF) || (audio?.prefix(3) == Data("ID3".utf8))
+                    chk(ok, "y es un mp3 de verdad, no un JSON de error")
+
+                    // 2) Transcripción: se le devuelve ESE MISMO audio.
+                    FishTranscribe.run(wav: audio ?? Data(), model: "asr") { r in
+                        DispatchQueue.main.async {
+                            switch r {
+                            case .success(let texto):
+                                print("FISH transcripción: «\(texto)»")
+                                chk(texto.lowercased().contains("bto") || texto.count > 10,
+                                    "la transcripción devuelve el texto dictado")
+                            case .failure(let e):
+                                // Sin crédito de API es el camino ESPERADO hoy.
+                                // Lo que se comprueba es que el fallo sea
+                                // limpio y ponga al proveedor en cuarentena,
+                                // en vez de romper la cascada.
+                                guard case ScribeError.http(let code, _) = e else {
+                                    chk(false, "el fallo llega como error HTTP tratable (\(e.localizedDescription))"); break
+                                }
+                                print("FISH transcripción no disponible: HTTP \(code)")
+                                chk(code == 402 || code == 401,
+                                    "el fallo es de crédito/credencial, no de formato ni de red")
+                                CuarentenaSTT.registrar("fish", nombre: "Fish Audio", error: e)
+                                chk(CuarentenaSTT.activa("fish"),
+                                    "y deja al proveedor en cuarentena: la cascada salta al siguiente")
+                            }
+                            print("FISH \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+                        }
+                    }
+                }
+            }
+            RunLoop.main.run(); return
+        }
         // Los cuatro arreglos de la red de seguridad, sin necesitar el audio
         // del dictado original y sin tocar la configuración real del equipo:
         //   BTODICTA_REDTEST2=1
@@ -4154,6 +4208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "assemblyai": return "AssemblyAI"
         case "speechmatics": return "Speechmatics"
         case "gladia": return "Gladia"
+        case "fish": return "Fish Audio"
         case "fireworks": return "Fireworks"
         case "azure": return "Azure"
         default: return respaldo

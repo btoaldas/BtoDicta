@@ -34,6 +34,7 @@ enum Providers {
         ("assemblyai", "AssemblyAI (Universal)", ["universal-3-5-pro", "universal-2"], "ASSEMBLYAI_API_KEY"),
         ("soniox", "Soniox (premium, ES latino)", ["stt-async-v5", "stt-async-v4"], "SONIOX_API_KEY"),
         ("azure", "Azure AI Speech (es-EC)", ["azure-fast"], "AZURE_SPEECH_KEY"),
+        ("fish", "Fish Audio (voz clonada + ASR)", ["asr"], "FISH_API_KEY"),
         ("gladia", "Gladia (gratis 10h/mes)", ["default"], "GLADIA_API_KEY"),
         ("speechmatics", "Speechmatics (gratis 480min/mes)", ["standard", "enhanced"], "SPEECHMATICS_API_KEY"),
         ("cloudflare_stt", "Cloudflare Workers AI (Whisper)", ["@cf/openai/whisper", "@cf/openai/whisper-large-v3-turbo"], "CLOUDFLARE_API_KEY"),
@@ -74,6 +75,10 @@ enum Providers {
                  orden: 114, modelo: "azure-fast"),
         Provider(id: "gladia", nombre: "Gladia", tipo: "nube", activo: false,
                  orden: 110, modelo: "default"),
+        // Fish Audio: la misma clave sirve para transcribir y para hablar con
+        // una voz clonada. La transcripción no tiene capa gratuita.
+        Provider(id: "fish", nombre: "Fish Audio", tipo: "nube", activo: false,
+                 orden: 115, modelo: "asr"),
         Provider(id: "speechmatics", nombre: "Speechmatics", tipo: "nube", activo: false,
                  orden: 111, modelo: "standard"),
         Provider(id: "cloudflare_stt", nombre: "Cloudflare (Whisper)", tipo: "nube", activo: false,

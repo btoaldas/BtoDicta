@@ -37,6 +37,9 @@ enum TTSCloud {
                          vozDefault: "Ashley", modeloDefault: "inworld-tts-1", nota: "HTTP/batch en BtoDicta; su WS aún no está integrado."),
         TTSNubeProveedor(id: "playht_tts", nombre: "PlayHT", keyEnv: "PLAYHT_API_KEY", ws: false,
                          vozDefault: "", modeloDefault: "Play3.0-mini", nota: "HTTP/batch en BtoDicta; requiere key + PLAYHT_USER_ID."),
+        TTSNubeProveedor(id: "fish_tts", nombre: "Fish Audio", keyEnv: "FISH_API_KEY", ws: false,
+                         vozDefault: "", modeloDefault: "s2.1-pro-free",
+                         nota: "Clona voces. La voz es el reference_id de tu clon en fish.audio. s2.1-pro-free habla sin recargar crédito; los demás modelos lo piden."),
         TTSNubeProveedor(id: "azure_tts", nombre: "Azure Speech", keyEnv: "AZURE_SPEECH_KEY", ws: false,
                          vozDefault: "es-EC-AndreaNeural", modeloDefault: "", nota: "Español EC nativo. Requiere key + región (AZURE_SPEECH_REGION)."),
     ]
@@ -95,6 +98,14 @@ enum TTSCloud {
                 "output_format": ["container": "mp3", "sample_rate": 44100, "bit_rate": 128000]]
             return json("https://api.cartesia.ai/tts/bytes",
                         ["X-API-Key": key, "Cartesia-Version": "2024-06-10"], body).map { ($0, false) }
+        case "fish_tts":
+            // El modelo va en una CABECERA, no en el cuerpo; y la voz es el
+            // reference_id del clon. Sin reference_id, Fish usa su voz genérica.
+            var body: [String: Any] = ["text": texto, "format": "mp3",
+                                       "mp3_bitrate": 128, "latency": "normal"]
+            if !voz.isEmpty { body["reference_id"] = voz }
+            return json("\(FishAudio.base)/v1/tts",
+                        ["Authorization": "Bearer \(key)", "model": modelo], body).map { ($0, false) }
         case "inworld_tts":
             return json("https://api.inworld.ai/tts/v1/voice", ["Authorization": "Bearer \(key)"],
                         ["text": texto, "voiceId": voz, "modelId": modelo]).map { ($0, false) }   // audioContent base64

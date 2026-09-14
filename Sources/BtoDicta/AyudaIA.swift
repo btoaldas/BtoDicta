@@ -35,6 +35,7 @@ enum AyudaIA {
         "HF_API_KEY": ("Hugging Face: Whisper en la capa gratuita (token de acceso 'read').", "https://huggingface.co/settings/tokens"),
         "DEEPGRAM_API_KEY": ("Deepgram (Nova): $200 de crédito gratis. Soporta texto EN VIVO.", "https://console.deepgram.com/"),
         "ASSEMBLYAI_API_KEY": ("AssemblyAI (Universal): $50 de crédito gratis. Soporta EN VIVO.", "https://www.assemblyai.com/app/api-keys"),
+        "FISH_API_KEY": ("Fish Audio: voz clonada y transcripción con la misma clave. El crédito de API es una bolsa aparte del de la plataforma y empieza en cero: el modelo de voz s2.1-pro-free habla sin recargarlo, pero transcribir sí lo necesita.", "https://fish.audio/app/developers"),
         "GLADIA_API_KEY": ("Gladia: 10 horas/mes GRATIS. Soporta EN VIVO.", "https://app.gladia.io/"),
         "SPEECHMATICS_API_KEY": ("Speechmatics: 480 min/mes GRATIS. Soporta EN VIVO.", "https://portal.speechmatics.com/"),
         "CLOUDFLARE_API_KEY": ("Cloudflare Workers AI (Whisper): 10 000 llamadas/día gratis. Necesita también tu Account ID.", "https://dash.cloudflare.com/profile/api-tokens"),
