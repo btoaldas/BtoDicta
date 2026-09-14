@@ -1410,36 +1410,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
-        // Cuarentena del pulido: no volver a llamar al que acaba de fallar.
+        // Cuarentena del pulido: que una espera agotada aparte de verdad.
         //   BTODICTA_PULIDOTEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_PULIDOTEST"] == "1" {
             var mal = 0
             func chk(_ ok: Bool, _ q: String) { print("PULIDO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
-            CuarentenaIA.limpiarTodo()
-            let cadena = ChatIA.cadenaPulido()
-            chk(cadena.count > 1, "hay cascada de pulido: \(cadena.count) proveedores")
-            guard let primero = cadena.first else { print("PULIDO FALLA"); exit(1) }
-            chk(!CuarentenaIA.activa(primero.id), "de entrada nadie está apartado")
-            // Un plazo agotado aparta al proveedor y lo saca de la cascada.
-            CuarentenaIA.registrar(primero.id, motivo: "plazo agotado")
-            chk(CuarentenaIA.activa(primero.id), "tras agotar el plazo queda apartado")
-            let despues = ChatIA.cadenaPulido()
-            chk(despues.first?.id != primero.id, "y la cascada ya no empieza por él (\(despues.first?.id ?? "-"))")
-            chk(!despues.contains { $0.id == primero.id }, "no aparece en ninguna posición")
-            chk(despues.count == cadena.count - 1, "los demás siguen enteros (\(despues.count) de \(cadena.count))")
-            // Una respuesta buena lo devuelve.
-            CuarentenaIA.limpiar(primero.id)
-            chk(ChatIA.cadenaPulido().first?.id == primero.id, "si vuelve a contestar, recupera su puesto")
-            // Los castigos son proporcionales al motivo.
-            CuarentenaIA.limpiarTodo()
-            CuarentenaIA.registrar("a", motivo: "plazo agotado")
-            CuarentenaIA.registrar("b", motivo: "HTTP 401 clave inválida")
-            chk(CuarentenaIA.apartados() == ["a", "b"], "se apartan los dos")
-            // Nunca se deja la cascada vacía.
-            for ia in cadena { CuarentenaIA.registrar(ia.id, motivo: "plazo agotado") }
-            chk(!ChatIA.cadenaPulido().isEmpty,
-                "si TODOS están apartados se usa la cascada entera igual: más vale uno dudoso que no pulir")
-            CuarentenaIA.limpiarTodo()
+            CuarentenaPulido.reiniciarContadores()
+            let id = "prueba|base|modelo|hash"
+            let agotado = URLError(.timedOut)
+
+            // Antes una espera agotada apartaba 15 s, así que el dictado
+            // siguiente volvía a llamar al proveedor caído.
+            let d1 = CuarentenaPulido.duracion(codigo: 0, cuerpo: "", error: agotado, identidad: id)
+            chk(d1 >= 60, "una espera agotada aparta al menos un minuto (\(Int(d1)) s), no quince segundos")
+            let d2 = CuarentenaPulido.duracion(codigo: 0, cuerpo: "", error: agotado, identidad: id)
+            let d3 = CuarentenaPulido.duracion(codigo: 0, cuerpo: "", error: agotado, identidad: id)
+            chk(d2 > d1 && d3 > d2, "y sube si se repite: \(Int(d1)) → \(Int(d2)) → \(Int(d3)) s")
+            chk(d3 >= 900, "una caída sostenida llega a un cuarto de hora (\(Int(d3)) s)")
+            chk(CuarentenaPulido.fallosSeguidos(id) == 3, "lleva la cuenta de los fallos seguidos")
+
+            // Contestar bien borra el historial.
+            CuarentenaPulido.compartida.limpiar(id)
+            chk(CuarentenaPulido.fallosSeguidos(id) == 0, "una respuesta buena perdona el historial")
+            let d4 = CuarentenaPulido.duracion(codigo: 0, cuerpo: "", error: agotado, identidad: id)
+            chk(Int(d4) == Int(d1), "y el siguiente fallo vuelve a empezar por el castigo corto")
+
+            // Lo que NO debe cambiar.
+            chk(CuarentenaPulido.duracion(codigo: 0, cuerpo: "", error: URLError(.cancelled)) == 0,
+                "cancelar a propósito no aparta a nadie")
+            chk(CuarentenaPulido.duracion(codigo: 401, cuerpo: "", error: nil) == 1800,
+                "una clave mala sigue apartando media hora")
+            chk(CuarentenaPulido.duracion(codigo: 429, cuerpo: "", error: nil) == 60,
+                "un límite de ritmo sigue siendo un minuto")
+            chk(CuarentenaPulido.duracion(codigo: 400, cuerpo: "texto largo", error: nil) == 0,
+                "un texto demasiado largo NO invalida al proveedor")
+
+            // Y la guarda de integridad: un pulido que colapsa no se entrega.
+            let largo = String(repeating: "palabra de prueba. ", count: 30)
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: largo, pulido: "ok") != nil,
+                "un pulido que colapsa a dos letras se rechaza")
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: largo, pulido: largo) == nil,
+                "y uno de largo normal se acepta")
+            // El caso que se escapaba: un dictado largo devuelto a la mitad.
+            let dictado = String(repeating: "Esta es una frase del dictado original. ", count: 40)  // ~1600
+            let mitad = String(dictado.prefix(dictado.count / 3))
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: dictado, pulido: mitad) != nil,
+                "un dictado largo devuelto a un tercio se rechaza (\(dictado.count)→\(mitad.count))")
+            let limpiado = dictado.replacingOccurrences(of: "Esta es ", with: "")   // pulido normal
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: dictado, pulido: limpiado) == nil,
+                "pero quitar muletillas de verdad se acepta (\(dictado.count)→\(limpiado.count))")
+
+            CuarentenaPulido.reiniciarContadores()
             print("PULIDO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
         }
         // Correo (spec 003): envío real y, sobre todo, que cada fallo diga POR QUÉ.

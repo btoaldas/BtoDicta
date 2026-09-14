@@ -8,13 +8,18 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.62.0"
+    static let numero = "0.62.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.62.1", "2026-09-14", [
+            "ARREGLADO de raíz que el pulido se volviera lento cuando un proveedor de IA deja de contestar. La aplicación ya apartaba al que fallaba, pero a una espera agotada le daba solo QUINCE SEGUNDOS: al dictado siguiente, un minuto después, volvía a llamarlo y se comía su plazo entero otra vez. Ahora el castigo sube con los fallos seguidos —un minuto, cinco, un cuarto de hora— y se perdona entero en cuanto el proveedor vuelve a contestar. Un mal momento se disculpa; una caída de horas no se paga en cada dictado",
+            "ARREGLADO que un dictado largo pudiera entregarse recortado. La comprobación de integridad exigía que el resultado bajara de 32 caracteres para sospechar, así que un dictado de cinco mil devuelto con ochocientos pasaba como bueno. Ahora se rechaza cualquier pulido que pierda más de la mitad de las letras y se entrega el original. Vale para cualquier proveedor y modelo, sin tener que saber cuál razona ni cuánto gasta pensando antes de escribir",
+            "Prueba propia: BTODICTA_PULIDOTEST=1 (16 comprobaciones)",
+        ]),
         ("0.62.0", "2026-09-14", [
-            "EL PULIDO YA NO REINTENTA AL QUE ACABA DE FALLAR. La transcripción tenía cuarentena desde hace tiempo; el pulido no, y se notaba: cuando un proveedor dejaba de contestar, CADA dictado volvía a llamarlo y pagaba su plazo entero antes de seguir la cascada. Medido en un caso real: pulir 577 caracteres pasó de un segundo a veintitrés, recorriendo siete proveedores. Ahora el que falla se aparta unos minutos —más si el fallo es de clave o de saldo, menos si solo se le agotó el plazo— y vuelve solo en cuanto conteste bien. Si todos estuvieran apartados se usa la cascada entera igual: más vale uno dudoso que no pulir",
+            "El pulido apartaba ya a los proveedores caídos; lo que fallaba era el plazo con que lo hacía. Corregido en 0.62.1",
             "LOS ENVÍOS DE CORREO SON AHORA UNA LISTA, no un horario con un periodo común. Cada línea es un envío independiente con su hora, su periodo y sus días: el resumen de ayer a las 07:00 todos los días, el de hoy a las 20:00, y el de la semana los sábados por la mañana. Se añaden y se quitan desde Configuración, y lo que ya tuvieras configurado se convierte solo",
             "Prueba propia de la cuarentena del pulido: BTODICTA_PULIDOTEST=1",
         ]),

@@ -30,10 +30,30 @@ final class CuarentenaPulido {
         return "\(ia.id)|\(ia.base)|\(ia.modeloEfectivo)|\(credencial)"
     }
 
-    static func duracion(codigo: Int, cuerpo: String, error: Error?) -> TimeInterval {
+    /// Cuántos fallos seguidos lleva cada proveedor. Un servicio que deja de
+    /// responder suele estar así un rato largo, no quince segundos.
+    private static var seguidos: [String: Int] = [:]
+    private static let contador = NSLock()
+
+    static func duracion(codigo: Int, cuerpo: String, error: Error?,
+                         identidad: String = "") -> TimeInterval {
         if let e = error as? URLError {
-            if e.code == .cancelled { return 0 }
-            return 15
+            if e.code == .cancelled { return 0 }   // lo canceló el usuario
+            // Una espera agotada apartaba solo QUINCE SEGUNDOS, de modo que el
+            // dictado siguiente —un minuto después— volvía a llamar al mismo
+            // proveedor caído y se comía su plazo entero otra vez. Medido con un
+            // proveedor que dejó de responder durante horas: cada dictado
+            // pagaba la espera completa y luego recorría la cascada, hasta
+            // veintitrés segundos para pulir dos frases.
+            //
+            // Ahora sube con los fallos seguidos —un minuto, cinco, quince— y
+            // se reinicia en cuanto el proveedor vuelve a contestar. Un mal
+            // momento se perdona; una caída de horas no se paga cada vez.
+            contador.lock()
+            let n = (seguidos[identidad] ?? 0) + 1
+            seguidos[identidad] = n
+            contador.unlock()
+            return n >= 3 ? 900 : (n == 2 ? 300 : 60)
         }
         let b = cuerpo.lowercased()
         if ["insufficient_quota", "quota_exceeded", "insufficient balance",
@@ -59,7 +79,8 @@ final class CuarentenaPulido {
     @discardableResult
     func registrar(_ identidad: String, local: Bool, codigo: Int, cuerpo: String,
                    error: Error?, ahora: Date = Date()) -> TimeInterval {
-        let segundos = Self.duracion(codigo: codigo, cuerpo: cuerpo, error: error)
+        let segundos = Self.duracion(codigo: codigo, cuerpo: cuerpo, error: error,
+                                     identidad: identidad)
         guard segundos > 0 else { return 0 }
         lock.lock(); defer { lock.unlock() }
         hasta[identidad] = ahora.addingTimeInterval(segundos)
@@ -68,8 +89,18 @@ final class CuarentenaPulido {
     }
 
     func limpiar(_ identidad: String) {
-        lock.lock(); defer { lock.unlock() }
-        hasta[identidad] = nil
+        lock.lock(); hasta[identidad] = nil; lock.unlock()
+        // Contestó bien: se le perdona el historial de esperas agotadas.
+        Self.contador.lock(); Self.seguidos[identidad] = nil; Self.contador.unlock()
+    }
+
+    /// Para la prueba propia: cuántos fallos seguidos lleva anotados.
+    static func fallosSeguidos(_ identidad: String) -> Int {
+        contador.lock(); defer { contador.unlock() }
+        return seguidos[identidad] ?? 0
+    }
+    static func reiniciarContadores() {
+        contador.lock(); seguidos.removeAll(); contador.unlock()
     }
 }
 

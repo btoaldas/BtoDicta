@@ -926,6 +926,16 @@ vez. Desde 0.62.0 el que falla se aparta unos minutos —treinta si el problema 
 la clave o el saldo, tres si solo se le agotó el plazo— y vuelve en cuanto
 conteste bien. En el registro: *«pulido: deepseek apartado 3 min (plazo agotado)»*.
 
+Desde 0.62.1 ese castigo **sube si el proveedor sigue caído** —un minuto, cinco,
+un cuarto de hora— y se perdona entero en cuanto vuelve a contestar. Antes eran
+quince segundos fijos, que no alcanzaban ni para el dictado siguiente.
+
+**Y si el pulido te devuelve menos texto del que dictaste**, no se entrega: se
+rechaza y sale el original. Antes esa comprobación solo saltaba si el resultado
+bajaba de 32 caracteres, de modo que un dictado de cinco mil devuelto con
+ochocientos pasaba por bueno. Ahora se rechaza cualquier pérdida de más de la
+mitad, venga del proveedor que venga.
+
 Comprobación: `BTODICTA_PULIDOTEST=1`.
 
 ### Recibir el resumen del día por correo

@@ -415,11 +415,8 @@ struct ChatIA {
 
     static func cadenaPulido() -> [ChatIA] {
         let conex = conectadasPulido
-        let orden = ordenarPulido(conex, preferida: seleccionada()?.id,
-                                  orden: Config.pulidoCascada())
-        // Sin los que acaban de fallar: si uno dejó de contestar, pagar su
-        // plazo otra vez en el dictado siguiente no lo arregla y sí se nota.
-        return CuarentenaIA.filtrar(orden)
+        return ordenarPulido(conex, preferida: seleccionada()?.id,
+                             orden: Config.pulidoCascada())
     }
     /// Sondea LM Studio / Ollama y cachea su modelo cargado (si responden).
     static func detectarLocales(_ done: (() -> Void)? = nil) {
@@ -1017,11 +1014,9 @@ enum LLMPostProcess {
                                           temp: Double, resto: [ChatIA], plazo: Date,
                                           completion: @escaping (String) -> Void) {
         guard let siguiente = resto.first, !prompt.isEmpty else {
-            CuarentenaIA.registrar(ia.id, motivo: motivo)
-            Log.write("pulido: FALLÓ (\(motivo)) → texto original.")
+                Log.write("pulido: FALLÓ (\(motivo)) → texto original.")
             completion(text); return
         }
-        CuarentenaIA.registrar(ia.id, motivo: motivo)
         Log.write("pulido: \(ia.id) falló (\(motivo)) → failover a \(siguiente.id)")
         hacerProveedor(siguiente, textoOriginal: text, inicio: Date(), intento: 1,
                        salvaguarda: salvaguarda, prompt: prompt, temp: temp,
@@ -1040,9 +1035,6 @@ enum LLMPostProcess {
         PeticionPulido.ejecutar(request, session: sesionHTTP) { data, response, error in
             DispatchQueue.main.async {
                 guard Date() < plazo else {
-                    // El que estaba en turno se lleva la nota: es el que se
-                    // comió el plazo de todos.
-                    CuarentenaIA.registrar(ia.id, motivo: "plazo total agotado")
                     Log.write("pulido: plazo total agotado → texto original")
                     completion(text); return
                 }
@@ -1060,7 +1052,6 @@ enum LLMPostProcess {
                     }
                     if let pulido = ia.extraerContenido(data)?
                         .trimmingCharacters(in: .whitespacesAndNewlines), !pulido.isEmpty {
-                        CuarentenaIA.limpiar(ia.id)   // contestó: vuelve a la cascada
                         if let (tin, tout) = ia.tokensUsados(data) {
                             PulidoLog.record(provider: ia.id, modelo: ia.modeloEfectivo, tin: tin, tout: tout)
                         }
@@ -1182,6 +1173,11 @@ enum LLMPostProcess {
         return nil
     }
 
+    /// Puerta para la prueba propia de la guarda de integridad.
+    static func razonPulidoInvalidoQA(original: String, pulido: String) -> String? {
+        razonPulidoInvalido(original: original, pulido: pulido)
+    }
+
     /// Integridad mínima SIEMPRE activa para el pulido normal. A diferencia de
     /// la salvaguarda anti-inyección configurable, evita que una respuesta de
     /// clasificación o una salida colapsada reemplace una transcripción válida.
@@ -1209,6 +1205,16 @@ enum LLMPostProcess {
         }
         if letrasOriginal >= 40, letrasPulido * 5 < letrasOriginal, p.count < 32 {
             return "colapsó \(o.count)→\(p.count) chars"
+        }
+        // Y el caso que se escapaba: un dictado LARGO devuelto a la mitad. La
+        // regla anterior exigía además que el resultado bajara de 32 caracteres,
+        // así que un dictado de cinco mil que volvía con ochocientos se
+        // entregaba tal cual. Pulir quita muletillas —un 5 o 10 %—, no la mitad;
+        // perder más de la mitad de las letras es que el modelo se cortó, no que
+        // limpió. Vale para CUALQUIER proveedor y modelo: no hay que saber cuál
+        // razona ni cuánto presupuesto gasta pensando antes de escribir.
+        if letrasOriginal >= 200, letrasPulido * 2 < letrasOriginal {
+            return "se perdió más de la mitad del texto (\(o.count)→\(p.count) chars)"
         }
         return nil
     }

@@ -34,6 +34,15 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.62.1
+
+- **El pulido lento, de raíz.** Ya se apartaba al proveedor caído, pero solo
+  **quince segundos**: al dictado siguiente volvía a llamarlo. Ahora el castigo
+  sube con los fallos seguidos (1 min → 5 → 15) y se perdona en cuanto conteste.
+- **Un dictado largo ya no puede entregarse recortado.** La comprobación exigía
+  bajar de 32 caracteres para sospechar, así que 5 000 → 800 pasaba como bueno.
+  Ahora se rechaza cualquier pulido que pierda **más de la mitad** de las letras.
+
 ### Novedades 0.62.0
 
 - **El pulido ya no reintenta al que acaba de fallar.** Si un proveedor deja de
