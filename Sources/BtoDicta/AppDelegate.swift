@@ -257,7 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let wavCancelado = recorder.stop()
         panel.detenerCronometro()
         entregaVivo = nil
-        audioDictado = Data()
+        audioBytes = 0
         vivoReiniciarVigia()
         stream?.disconnect()
         stream = nil
@@ -1409,6 +1409,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 print("REDTEST \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
             }
             RunLoop.main.run(); return
+        }
+        // Memoria del dictado largo (spec 001): el audio vive en el archivo,
+        // no en RAM.  BTODICTA_MEMTEST=<horas>  (6 por omisión)
+        if let h = ProcessInfo.processInfo.environment["BTODICTA_MEMTEST"] {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("MEM \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            func rssMB() -> Double {
+                var info = mach_task_basic_info()
+                var n = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+                let r = withUnsafeMutablePointer(to: &info) {
+                    $0.withMemoryRebound(to: integer_t.self, capacity: Int(n)) {
+                        task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &n)
+                    }
+                }
+                return r == KERN_SUCCESS ? Double(info.resident_size) / 1_048_576 : -1
+            }
+            let horas = Double(h) ?? 6
+            let bytes = Int(horas * 3600) * RedSeguridadDictado.bytesPorSegundo
+            let base = rssMB()
+            print("MEM memoria al empezar: \(Int(base)) MB · simulando \(horas) h = \(bytes / 1_048_576) MB de audio")
+            let w = HistoryWriter()
+            let trozo = Data(repeating: 9, count: 32_000)          // 1 s
+            for _ in 0..<(bytes / trozo.count) { w.append(chunk: trozo) }
+            let tras = rssMB()
+            print("MEM memoria tras grabar \(horas) h: \(Int(tras)) MB (subió \(Int(tras - base)) MB)")
+            chk(tras - base <= 200, "grabar \(horas) h no añade más de 200 MB de memoria")
+            chk(w.bytesEscritos == bytes, "el archivo tiene los \(bytes / 1_048_576) MB completos")
+            // Leer tramos sueltos no carga el dictado entero.
+            let antesLeer = rssMB()
+            let medio = w.leerPCM(desde: bytes / 2, hasta: bytes / 2 + 25 * 1_048_576)
+            chk(medio.count == 25 * 1_048_576, "se lee un tramo de 25 MB del medio del archivo")
+            chk(rssMB() - antesLeer <= 60, "y leerlo no dispara la memoria (+\(Int(rssMB() - antesLeer)) MB)")
+            chk(medio.first == 9 && medio.last == 9, "el contenido leído es el audio, no basura")
+            chk(w.leerPCM(desde: bytes - 100).count == 100, "el último tramo se lee entero")
+            chk(w.leerPCM(desde: bytes + 1000).isEmpty, "pedir más allá del final devuelve vacío, no un error")
+            w.discard()
+            print("MEM \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
         }
         // Cancelar un dictado NO puede borrar el audio (spec 002).
         //   BTODICTA_CANCELTEST=1
@@ -4397,7 +4434,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.async { self?.entregarVivo(chunk) }
         }
         entregaVivo = nil
-        audioDictado = Data()
+        audioBytes = 0
         vivoReiniciarVigia()
         do {
             try recorder.start(preloadPCM: despertarActual?.audioPrevio ?? Data())
@@ -4523,7 +4560,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// acumulado como backlog y sigue con el flujo directo — mismo carril,
     /// cero duplicados, cero pérdidas.
     private var entregaVivo: ((Data) -> Void)?
-    private var audioDictado = Data()
+    private var audioBytes = 0
     // VIGÍA DEL MOTOR EN VIVO. Un motor de streaming puede dejar de emitir a
     // mitad del dictado (medido: Voxtral Realtime se congela tras su token de
     // fin y ya no vuelve a emitir aunque le sigas hablando). Con estos cuatro
@@ -4554,7 +4591,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard texto.count > vivoUltimoLargo else { return }
         vivoUltimoLargo = texto.count
         vivoUltimoCrecimiento = Date()
-        vivoBytesAlCrecer = audioDictado.count
+        vivoBytesAlCrecer = audioBytes
     }
 
     /// Reinicia el vigía al empezar un dictado.
@@ -4612,16 +4649,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         arrancarTcppVivo(proveedor: tcpp.proveedorId, history: history, sesion: sesion, desdeByte: desde)
     }
     private func entregarVivo(_ chunk: Data) {
-        audioDictado.append(chunk)
+        // Antes aquí se acumulaba una copia COMPLETA del dictado en memoria,
+        // encima de la que ya guardaba el grabador y de la que ya estaba en
+        // disco. A 32 000 bytes por segundo eso son 691 MB por copia en un
+        // dictado de seis horas. Ahora solo se lleva la cuenta: el audio vive
+        // en el archivo, que es donde ya estaba.
+        audioBytes += chunk.count
         entregaVivo?(chunk)
     }
     /// Fija el motor en vivo mandando primero TODO el audio acumulado
     /// (troceado a ~1 s para no ahogar un WebSocket con un mensaje gigante).
     private func fijarMotorVivo(desdeByte: Int = 0, _ entrega: @escaping (Data) -> Void) {
-        var i = max(0, min(desdeByte, audioDictado.count))
-        while i < audioDictado.count {
-            let fin = min(i + 32000, audioDictado.count)
-            entrega(audioDictado.subdata(in: i..<fin))
+        // Se relee del archivo, de segundo en segundo, en vez de trocear una
+        // copia en memoria. Cada trozo se suelta al terminar su vuelta.
+        let total = history?.bytesEscritos ?? audioBytes
+        var i = max(0, min(desdeByte, total))
+        while i < total {
+            let fin = min(i + 32000, total)
+            let trozo = history?.leerPCM(desde: i, hasta: fin) ?? Data()
+            if trozo.isEmpty { break }
+            entrega(trozo)
             i = fin
         }
         entregaVivo = entrega
@@ -4817,7 +4864,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self else { timer.invalidate(); return }
             guard self.recorder.isRecording else { timer.invalidate(); return }
             guard WhisperServer.corriendo, !self.liveEnVuelo else { return }
-            let pcm = self.recorder.pcmAcumulado
+            // Solo los últimos dos minutos: esto es una vista previa en vivo,
+            // no la transcripción final. Antes copiaba TODO el dictado cada 1,6
+            // segundos, de modo que en una grabación larga la copia crecía sin
+            // techo y se repetía cuarenta veces por minuto.
+            let pcm = self.recorder.pcmReciente(segundos: 120)
             guard pcm.count > 16000 else { return }   // >0.5 s de audio
             self.liveEnVuelo = true
             WhisperServer.transcribe(wav: HistoryWriter.wavData(pcm: pcm)) { [weak self] r in
@@ -4869,7 +4920,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Cortar la entrega en vivo YA: un chunk rezagado en main no debe
         // tocar el pipe/WS que estamos por cerrar.
         entregaVivo = nil
-        audioDictado = Data()
+        audioBytes = 0
         vivoReiniciarVigia()
 
         // El HistoryWriter de ESTE dictado viaja capturado por las entregas
@@ -4967,7 +5018,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 if mejorVivo.isEmpty { rescatarConCascada("Sin texto"); return }
                 self?.panel.update("⏳ Recuperando lo que falta…")
-                let pcm = self?.audioDictado ?? Data()
+                let pcm = historyActual?.leerPCM(desde: 0) ?? Data()
                 let desde = self?.vivoBytesAlCrecer ?? 0
                 // Todos los tramos rotos del dictado: los que el vigía vio
                 // colgarse y los que el motor se saltó dejando "..." dentro
@@ -5036,7 +5087,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         return
                     }
                     self?.panel.update("⏳ Recuperando el final…")
-                    let pcmN = self?.audioDictado ?? Data()
+                    let pcmN = historyActual?.leerPCM(desde: 0) ?? Data()
                     var huecosN = (self?.vivoHuecos ?? []).map {
                         RedSeguridadDictado.Hueco(byte: $0.byte, corteTexto: $0.corte, origen: .congelacion)
                     }

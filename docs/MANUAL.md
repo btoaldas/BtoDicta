@@ -917,6 +917,20 @@ Un dictado que no recibe audio ya no se queda pensando: a los 6 segundos se cier
 
 Significa que el micrófono no está dando sonido a BtoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.
 
+### Dicté horas y la aplicación se puso pesada
+
+Hasta 0.59.3 el audio del dictado se guardaba **dos veces en memoria** —en el
+grabador y en una copia aparte— además del archivo que ya se escribe en disco
+mientras hablas. Son 32 000 bytes por segundo: 691 MB por copia en seis horas.
+
+Desde 0.60.0 el archivo es la única fuente y quien necesita un tramo lo lee de
+ahí. Medido con seis horas simuladas (`BTODICTA_MEMTEST=6`): la memoria **no
+sube**. La vista previa en vivo con motor local toma además solo los últimos dos
+minutos, en vez de copiar el dictado entero cada 1,6 segundos.
+
+Queda una segunda etapa: al mandar el audio a transcribir todavía se hace una
+copia, porque los motores reciben los datos y no el archivo.
+
 ### Cancelé sin querer y perdí la grabación
 
 Ya no. Hasta 0.59.0, cancelar un dictado **borraba** el audio y el texto del

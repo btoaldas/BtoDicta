@@ -170,3 +170,22 @@ consume un dictado no dependerá de su duración.
   toca hacerlo con mucho cuidado». Y el estado de partida que no se puede
   empeorar: «ahorita al sistema lo siento súper ágil». De ahí salen RF-03 y
   RNF-03 (decisión del responsable del producto)
+
+## 10. Estado de implementación
+
+Primera etapa en 0.60.0. Medición con `BTODICTA_MEMTEST=6`: grabar seis horas
+añade **0 MB** de memoria residente.
+
+| RF | Estado | Evidencia |
+|---|---|---|
+| RF-01 — seis horas transcritas completas | **Parcial** | El troceo de 0.59.0 ya parte y cose; falta la entrega desde archivo para que la memoria no suba al transcribir |
+| RF-02 — la memoria no crece con la duración | **Hecho al grabar** | `MEMTEST` con 6 h: +0 MB. Al transcribir todavía se hace una copia |
+| RF-03 — un dictado corto no se vuelve lento | **Hecho** | 45 s por la cascada real: 1 883 ms, dentro de lo medido antes |
+| RF-04 — el audio a salvo ante un cierre | **Hecho, y reforzado** | Es ahora la única fuente; se escribe igual que antes |
+| RF-05 — la reparación sigue funcionando | **Hecho** | `REDTEST2` y `PARTIRTEST` en verde leyendo del archivo |
+
+**Segunda etapa pendiente**: los motores reciben el audio como datos, no como
+archivo, así que al transcribir se hace una copia completa. Para un dictado de
+seis horas eso son 691 MB en el momento del envío. Requiere cambiar la interfaz
+de los doce motores para que transmitan desde disco (`uploadTask(fromFile:)`),
+que es un cambio de mayor alcance y merece su propia tanda.

@@ -8,11 +8,18 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.59.3"
+    static let numero = "0.60.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.60.0", "2026-09-14", [
+            "EL DICTADO DEJA DE VIVIR EN LA MEMORIA. El audio se guardaba por partida doble en RAM —en el grabador y en una copia aparte— además del archivo en disco que ya se escribía mientras hablas. A 32 000 bytes por segundo eso son 691 MB por copia en un dictado de seis horas. Ahora el archivo es la única fuente: quien necesita un tramo lo lee de ahí. Medido con seis horas simuladas, la memoria subió 0 MB",
+            "El grabador suelta el audio en cuanto entrega el .wav, en vez de conservarlo hasta el dictado siguiente: durante toda la transcripción convivían dos copias completas para nada",
+            "La vista previa en vivo con motor local copiaba el dictado ENTERO cada 1,6 segundos para transcribir un adelanto. Ahora toma solo los últimos dos minutos, que es lo único que esa vista necesita",
+            "Prueba propia que mide la memoria de verdad: BTODICTA_MEMTEST=6",
+            "PENDIENTE de la segunda etapa: al mandar el audio a transcribir sigue haciéndose una copia, porque los motores reciben los datos y no el archivo. Eso limita el dictado muy largo hasta que la entrega sea también desde disco",
+        ]),
         ("0.59.3", "2026-09-14", [
             "ARREGLADO: el aviso de «Esc otra vez para cancelar» cerraba el notch. Seguías grabando pero perdías de vista el texto en vivo, el cronómetro y las barras de voz, que es justo lo que hace falta para decidir si cancelar o no. Ahora el aviso sale sin esconder nada y, al pasar, el notch recupera lo que decía",
             "Los ajustes de cancelación ya están en Configuración → Ajustes, justo debajo de «Cancelar con Esc»: pedir dos pulsaciones, confirmar también al tocar el notch, y desde cuántos segundos se guarda lo cancelado. Antes solo existían en el archivo de configuración",
