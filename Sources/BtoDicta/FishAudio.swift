@@ -25,6 +25,10 @@ enum FishAudio {
     /// porque es el único que funciona sin recargar el crédito de API.
     static let modelosVoz = ["s2.1-pro-free", "s2.1-pro", "s2-pro", "s1"]
 
+    /// El único que no consume crédito. Es el primer escalón de la cascada de
+    /// ahorro: si responde, la frase sale gratis.
+    static let modeloGratis = "s2.1-pro-free"
+
     static func clave() -> String {
         if let e = ProcessInfo.processInfo.environment["FISH_API_KEY"], !e.isEmpty { return e }
         return ApiKeys.get("FISH_API_KEY")
@@ -38,7 +42,24 @@ enum FishAudio {
 /// Ojo: este extremo NO tiene capa gratuita. Sin crédito de API responde 402 y
 /// el failover salta al siguiente motor.
 enum FishTranscribe {
+    /// ¿El fallo es del TRANSPORTE —la conexión, no el servidor—? Distinguirlo
+    /// importa: que se atragante un envío no significa que el proveedor esté
+    /// caído, y abandonarlo por eso es un falso positivo que manda el dictado a
+    /// otro motor peor teniendo este perfectamente sano. Un 402 o un 401 sí son
+    /// del servidor y ahí no hay nada que reintentar.
+    private static func esDeLaConexion(_ e: Error) -> Bool {
+        let n = e as NSError
+        guard n.domain == NSURLErrorDomain else { return false }
+        return [NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost,
+                NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost].contains(n.code)
+    }
+
     static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+        intentar(wav: wav, reintentos: 1, completion: completion)
+    }
+
+    private static func intentar(wav: Data, reintentos: Int,
+                                 completion: @escaping (Result<String, Error>) -> Void) {
         let key = FishAudio.clave()
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la key de Fish Audio — ponla en Configuración → Modelos"))); return
@@ -66,15 +87,34 @@ enum FishTranscribe {
         body.append(campo("ignore_timestamps", "true"))
         body.append(Data("--\(boundary)--\r\n".utf8))
 
+        // Plazo proporcional al audio, no un número fijo y grande. Medido sobre
+        // esta API: 72 s de audio se transcriben en 2,8-3,1 s, y 12 s en ~1 s.
+        // Un tope de 60 s no protegía de nada y sí castigaba: una conexión que
+        // se quedó colgada hizo esperar un minuto entero antes de pasar al
+        // siguiente motor. Con esto el failover llega en 20-45 s según el
+        // tamaño —diez veces lo medido— y aun así se reintenta antes de rendirse.
+        let segundos = Double(max(0, wav.count - 44)) / Double(RedSeguridadDictado.bytesPorSegundo)
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
-        req.timeoutInterval = 60
+        req.timeoutInterval = max(15, min(30, segundos * 0.4))
         req.setValue("close", forHTTPHeaderField: "Connection")
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
             DispatchQueue.main.async {
-                if let err { completion(.failure(err)); return }
+                if let err {
+                    // Se reintenta UNA vez, y solo si el fallo fue de la
+                    // conexión. Medido: 72 s de audio se transcriben en ~3 s,
+                    // así que un envío que se cuelga es un tropiezo de red, no
+                    // un motor caído — y cambiar de motor por eso empeora el
+                    // resultado sin motivo.
+                    if reintentos > 0, esDeLaConexion(err) {
+                        Log.log(.ia, "Fish Audio: se cortó el envío (\(err.localizedDescription)) — reintento antes de cambiar de motor")
+                        intentar(wav: wav, reintentos: reintentos - 1, completion: completion)
+                        return
+                    }
+                    completion(.failure(err)); return
+                }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
                 guard let data, (200..<300).contains(code) else {
                     completion(.failure(ScribeError.http(code, data.flatMap { String(data: $0, encoding: .utf8) } ?? "")))

@@ -34,6 +34,20 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.57.1
+
+- **Se acabó el cambio de motor sin motivo.** Un dictado largo con Fish Audio
+  agotaba un plazo fijo de 60 s y se iba a otro motor con el primero sano —y ya
+  transcrito y cobrado, así que se pagaba por texto que no llegaba. El plazo es
+  ahora proporcional al audio y, si el corte fue de la conexión, se reintenta
+  una vez antes de rendirse.
+- **La vista previa en vivo se arregla sola**: si falta el modelo de dictado de
+  macOS, la app lo descarga en segundo plano en lugar de quedarse muda para
+  siempre. Es lo que te enseña que está escuchando con los motores de nube que
+  transcriben por lotes.
+- **Fish Audio ahorra crédito solo**: prueba su modelo de voz gratuito primero y
+  solo paga si aquel falla.
+
 ### Novedades 0.57.0
 
 - **Fish Audio, nuevo proveedor de voz y de transcripción.** Como ElevenLabs,

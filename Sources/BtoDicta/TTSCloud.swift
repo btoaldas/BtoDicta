@@ -54,6 +54,23 @@ enum TTSCloud {
         guard !key.isEmpty else { Log.log(.ia, "TTS \(p.nombre): sin API key"); completion(nil); return }
         let voz = Config.ttsCloudVoz(id).isEmpty ? p.vozDefault : Config.ttsCloudVoz(id)
         let modelo = Config.ttsCloudModelo(id).isEmpty ? p.modeloDefault : Config.ttsCloudModelo(id)
+        // Fish Audio tiene un modelo gratuito equivalente. Con el ahorro puesto
+        // se intenta ESE primero y solo se gasta crédito si falla —por ejemplo
+        // si la capa gratuita está saturada—, en vez de pagar cada frase.
+        let ahorro = p.id == "fish_tts" && Config.fishTtsAhorro()
+            && modelo != FishAudio.modeloGratis
+        let primero = ahorro ? FishAudio.modeloGratis : modelo
+        enviar(p, texto: texto, key: key, voz: voz, modelo: primero) { audio in
+            if audio != nil || !ahorro { completion(audio); return }
+            Log.log(.ia, "TTS \(p.nombre): el modelo gratuito no respondió → repito con \(modelo)")
+            enviar(p, texto: texto, key: key, voz: voz, modelo: modelo, completion: completion)
+        }
+    }
+
+    /// Una petición al proveedor. Devuelve el audio listo o nil (y lo registra).
+    private static func enviar(_ p: TTSNubeProveedor, texto: String, key: String,
+                               voz: String, modelo: String,
+                               completion: @escaping (Data?) -> Void) {
         guard let (req, pcm) = construir(p, texto: texto, key: key, voz: voz, modelo: modelo) else { completion(nil); return }
         URLSession.shared.dataTask(with: req) { data, resp, err in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? -1

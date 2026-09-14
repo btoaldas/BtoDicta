@@ -1113,6 +1113,12 @@ struct Config {
     static func redSeguridadDictado() -> Bool {
         (json()["dictado_red_seguridad"] as? Bool) ?? true
     }
+    /// Fish Audio: intentar primero su modelo de voz GRATUITO y caer al de pago
+    /// solo si aquel falla. Ahorra crédito sin perder la voz; ponlo en false
+    /// para ir siempre directo al modelo elegido.
+    static func fishTtsAhorro() -> Bool {
+        (json()["fish_tts_ahorro"] as? Bool) ?? true
+    }
     /// Desde cuántos segundos se verifica (siempre, aunque no haya sospecha).
     static func redSeguridadDesdeSegundos() -> Int {
         min(3600, max(20, (json()["dictado_red_seguridad_desde_s"] as? Int) ?? 90))

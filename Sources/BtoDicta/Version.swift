@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.57.0"
+    static let numero = "0.57.1"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.57.1", "2026-09-13", [
+            "ARREGLADO un falso positivo que cambiaba de motor sin motivo: un dictado largo con Fish Audio agotaba un plazo de espera fijo de 60 s y el dictado se iba a otro motor teniendo el primero perfectamente sano — encima ya lo había transcrito y cobrado, así que se pagaba por un texto que no llegaba. El plazo es ahora proporcional al audio (15-30 s) y, si el corte fue de la conexión y no del servidor, se reintenta una vez antes de rendirse. Medido: 72 s de audio se transcriben en menos de 3 s",
+            "VISTA PREVIA EN VIVO: cuando falta el modelo de dictado de macOS, la app lo descarga sola en segundo plano en vez de quedarse sin vista previa para siempre y sin decir por qué. Es lo que enseña que te está escuchando con los motores de nube que transcriben por lotes",
+            "Fish Audio ahorra crédito solo: prueba primero su modelo de voz gratuito y solo cae al de pago si aquel falla (se desactiva con «fish_tts_ahorro»)",
+            "El modelo de transcripción de Fish Audio se llama ahora por su nombre real, transcribe-1, en vez de una etiqueta genérica",
+        ]),
         ("0.57.0", "2026-09-13", [
             "NUEVO PROVEEDOR: Fish Audio, y hace las dos cosas con una sola clave, como ElevenLabs — habla con tu voz clonada y transcribe. Aparece tanto en el catálogo de motores de transcripción como en el de voces de nube, y se configura igual que el resto con tu propia key (FISH_API_KEY)",
             "La voz se elige por el «reference_id» de tu clon en fish.audio, no por un nombre. Modelos de voz s2.1-pro, s2-pro, s1 y s2.1-pro-free; este último viene puesto por defecto porque habla sin gastar crédito",

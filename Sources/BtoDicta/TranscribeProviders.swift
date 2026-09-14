@@ -771,7 +771,7 @@ enum Failover {
         case "hf": modeloUsado = p.modelo ?? "openai/whisper-large-v3"
         case "deepgram": modeloUsado = p.modelo ?? "nova-3"
         case "assemblyai": modeloUsado = p.modelo ?? "best"
-        case "fish": modeloUsado = p.modelo ?? "asr"
+        case "fish": modeloUsado = p.modelo ?? "transcribe-1"
         case "gladia": modeloUsado = p.modelo ?? "default"
         case "speechmatics": modeloUsado = p.modelo ?? "standard"
         case "cloudflare_stt": modeloUsado = p.modelo ?? "@cf/openai/whisper"

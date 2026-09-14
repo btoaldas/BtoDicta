@@ -79,6 +79,44 @@ final class PreviewVivo: @unchecked Sendable {
     private static let debug = ProcessInfo.processInfo.environment["BTODICTA_PREVIEWTEST"] != nil
     private static func dbg(_ s: String) { if debug { print("[PV] \(s)") } }
 
+    /// ¿Ya se pidió la descarga del modelo en esta sesión? Solo se toca dentro
+    /// de `cola`, que es quien serializa todo el estado de esta clase.
+    private static var descargaPedida = false
+
+    /// Pide a macOS el modelo de dictado en vivo que falta. No bloquea el
+    /// dictado en curso: baja en segundo plano y avisa en el registro cuando
+    /// queda listo. Si la descarga no completa, se permite reintentar.
+    @available(macOS 26, *)
+    private static func pedirModeloUnaVez(_ transcriber: DictationTranscriber,
+                                          estado: AssetInventory.Status) {
+        guard estado == .supported || estado == .downloading else {
+            Log.log(.ia, "preview vivo: macOS no trae modelo de dictado en vivo para este idioma — sin vista previa")
+            return
+        }
+        let primeraVez: Bool = cola.sync {
+            if descargaPedida { return false }
+            descargaPedida = true
+            return true
+        }
+        guard primeraVez else { return }
+        Log.log(.ia, "preview vivo: falta el modelo de dictado en vivo de macOS — lo bajo en segundo plano; estará listo para el próximo dictado")
+        Task.detached(priority: .utility) {
+            var listo = false
+            do {
+                if let req = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+                    try await req.downloadAndInstall()
+                }
+                listo = await AssetInventory.status(forModules: [transcriber]) == .installed
+                Log.log(.ia, listo
+                        ? "preview vivo: modelo instalado — ya verás el texto mientras hablas, también con los motores de nube por lotes"
+                        : "preview vivo: la descarga del modelo no completó — se reintenta en la próxima sesión")
+            } catch {
+                Log.log(.ia, "preview vivo: no pude bajar el modelo (\(error.localizedDescription))")
+            }
+            if !listo { cola.sync { descargaPedida = false } }
+        }
+    }
+
     @available(macOS 26, *)
     private func arrancarEnCola() {
         tarea = Task { [weak self] in
@@ -100,7 +138,16 @@ final class PreviewVivo: @unchecked Sendable {
             Self.dbg("assets \(estado)")
             guard !Task.isCancelled else { self.abortarArranque(); return }
             guard estado == .installed else {
-                Log.log(.ia, "preview vivo: modelo de idioma no instalado — sin preview")
+                // La vista previa en vivo la da un modelo de macOS que se
+                // descarga aparte. Antes se daba por vencido aquí y el dictado
+                // se quedaba SIN vista previa para siempre, sin decir qué
+                // faltaba ni cómo arreglarlo — y se notaba sobre todo con los
+                // motores de nube que transcriben por lotes, donde esta vista
+                // es lo único que enseña que te está escuchando.
+                // Se pide la descarga UNA vez y en segundo plano: este dictado
+                // sigue sin preview (no se le hace esperar a nadie), el
+                // siguiente ya lo tiene.
+                Self.pedirModeloUnaVez(transcriber, estado: estado)
                 self.abortarArranque()
                 return
             }
