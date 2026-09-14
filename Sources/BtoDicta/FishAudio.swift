@@ -135,11 +135,15 @@ enum FishTranscribe {
                       !texto.isEmpty else {
                     completion(.failure(ScribeError.sinTexto)); return
                 }
-                // Lo normal son 1-3 s. Si tarda mucho más, queda anotado sin
-                // tener que activar el modo desarrollo: es el dato que permite
-                // saber si el plazo se quedó corto o si algo va realmente mal.
-                if ms > 5_000 {
-                    Log.log(.ia, "Fish Audio: tardó \(ms) ms con \(kb) kB — más de lo normal (1-3 s)")
+                // El aviso se mide CONTRA LA DURACIÓN del audio, no contra un
+                // número fijo. Medido en nueve corridas de 52 a 180 s, esta API
+                // tarda un 3-4 % de lo que dura el audio, así que tres minutos
+                // en seis segundos es normal y un umbral fijo de cinco los
+                // marcaría todos. Se avisa al pasar del 10 %: el triple de lo
+                // normal, y nunca por debajo de cinco segundos.
+                let umbral = max(5_000.0, segundos * 100)
+                if Double(ms) > umbral {
+                    Log.log(.ia, "Fish Audio: tardó \(ms) ms con \(kb) kB para \(Int(segundos)) s de audio — el triple de lo normal")
                 }
                 completion(.success(texto))
             }

@@ -34,6 +34,18 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.58.0
+
+- **Cronómetro de grabación en el notch**: bajo las barras de voz ves cuánto
+  llevas grabando. Al terminar, el aviso dice la duración del audio
+  (*"Transcribiendo 3:00…"*), medida del propio audio y no del reloj.
+- **Banco de pruebas sintético**: la app genera dictados con la voz de macOS y
+  los manda por el camino real del motor de nube, a la duración y repeticiones
+  que se le pidan. Sirve para cazar fallos que solo aparecen con audio largo sin
+  tener que dictar a mano veinte veces.
+- Medido con él: la transcripción de Fish Audio tarda un **3-4 % de lo que dura
+  el audio** — tres minutos se transcriben en menos de seis segundos.
+
 ### Novedades 0.57.2
 
 - **Fish Audio mide cada transcripción** (tamaño y tiempo) y anota en el registro

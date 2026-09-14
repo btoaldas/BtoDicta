@@ -65,6 +65,12 @@ final class DictationPanel {
     private let keycap = NSTextField(labelWithString: "fn")
     private let motorLabel = MotorLabel(labelWithString: "")
     private let modoLabel = MotorLabel(labelWithString: "")   // arriba-izq: modo activo
+    /// Cuánto llevas grabando, bajo las barras de voz. Mientras hablas no hay
+    /// otra forma de saberlo, y en un dictado largo es justo el dato que hace
+    /// falta para decidir si cortar ya o seguir.
+    private let cronoLabel = NSTextField(labelWithString: "")
+    private var cronoInicio: Date?
+    private var cronoTimer: Timer?
     private(set) var modoMostradoID = "dictado"                // observable por QA
     private let confirmTitle = NSTextField(labelWithString: "")
     private let confirmBody = NSTextField(wrappingLabelWithString: "")
@@ -262,7 +268,60 @@ final class DictationPanel {
         modoLabel.frame = NSRect(x: 1, y: strip + notchHeight - 11, width: wing - 2, height: 10)
         modoLabel.onClick = onModoClick
         background.addSubview(modoLabel)   // encima del meter (z-order)
+
+        // Ala IZQUIERDA, abajo (bajo las barras de voz): cuánto llevas grabando.
+        // Cifras de ancho fijo para que el rótulo no baile al pasar de 9 a 10.
+        cronoLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 8, weight: .semibold)
+        cronoLabel.textColor = NSColor(calibratedWhite: 0.72, alpha: 1)
+        cronoLabel.alignment = .center
+        cronoLabel.maximumNumberOfLines = 1
+        cronoLabel.setAccessibilityLabel("Tiempo grabado")
+        cronoLabel.toolTip = "Cuánto llevas grabando"
+        cronoLabel.frame = .zero
+        background.addSubview(cronoLabel)
         setModo(ModosStore.activo())
+    }
+
+    // MARK: Cronómetro de grabación
+
+    /// Empieza a contar. Se llama al abrir el micrófono, no al mostrar el panel:
+    /// lo que interesa es el audio grabado, no el tiempo en pantalla.
+    func iniciarCronometro() {
+        cronoInicio = Date()
+        cronoLabel.stringValue = "0:00"
+        relayout()
+        cronoTimer?.invalidate()
+        // Cada medio segundo: el rótulo cambia una vez por segundo, pero así no
+        // se ve saltar dos unidades cuando el reloj y el temporizador se
+        // desfasan.
+        cronoTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self, let inicio = self.cronoInicio else { return }
+            self.cronoLabel.stringValue = Self.reloj(Date().timeIntervalSince(inicio))
+        }
+        if let t = cronoTimer { RunLoop.main.add(t, forMode: .common) }
+    }
+
+    /// Lo que se lee ahora mismo en el cronómetro. Lo usa la prueba propia.
+    var cronoTextoQA: String { cronoLabel.stringValue }
+
+    /// Para el contador y devuelve lo que duró, para poder decirlo al entregar.
+    @discardableResult
+    func detenerCronometro() -> TimeInterval {
+        cronoTimer?.invalidate(); cronoTimer = nil
+        let duracion = cronoInicio.map { Date().timeIntervalSince($0) } ?? 0
+        cronoInicio = nil
+        cronoLabel.stringValue = ""
+        relayout()
+        return duracion
+    }
+
+    /// `m:ss` hasta la hora, `h:mm:ss` a partir de ahí. Un dictado de dos horas
+    /// existe —la bitácora graba de continuo— y «120:00» no se lee.
+    static func reloj(_ segundos: TimeInterval) -> String {
+        let t = max(0, Int(segundos.rounded(.down)))
+        let h = t / 3600, m = (t % 3600) / 60, s = t % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s)
+                     : String(format: "%d:%02d", m, s)
     }
 
     /// Fija el letrero del modo activo (arriba-izq del notch).
@@ -521,7 +580,13 @@ final class DictationPanel {
     private func relayout() {
         panel.contentView?.frame = NSRect(x: 0, y: 0, width: width, height: height)
         let inferior = stripActual
-        meter.frame = NSRect(x: 8, y: inferior + 7, width: wing - 16, height: notchHeight - 14)
+        // El medidor cede diez puntos por abajo para el cronómetro. Solo ocupan
+        // sitio cuando hay algo que contar: si no se graba, el rótulo va vacío.
+        let altoCrono: CGFloat = cronoInicio == nil ? 0 : 10
+        meter.frame = NSRect(x: 8, y: inferior + 7 + altoCrono,
+                             width: wing - 16, height: notchHeight - 14 - altoCrono)
+        cronoLabel.frame = altoCrono == 0 ? .zero
+            : NSRect(x: 2, y: inferior + 2, width: wing - 4, height: altoCrono)
         let capW: CGFloat = 30
         let capH: CGFloat = notchHeight >= 34 ? 18 : 14
         keycap.font = NSFont.systemFont(ofSize: capH >= 18 ? 12 : 10, weight: .semibold)
@@ -785,6 +850,9 @@ final class DictationPanel {
     func hide(after seconds: TimeInterval = 0) {
         guard !resultadoCapturaPersistenteActivo else { return }
         meter.reset()
+        // Red de seguridad: si un camino de salida no paró el contador, aquí no
+        // se queda un temporizador vivo contra un panel escondido.
+        if cronoInicio != nil { detenerCronometro() }
         if seconds == 0 {
             presentacionID &+= 1
             panel.orderOut(nil)

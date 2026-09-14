@@ -1150,6 +1150,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         // Geometría del modal del notch: ninguna combinación de 1…8 etapas puede
         // montar título, cuerpo, contexto o pie. No abre ventanas.
+        // Cronómetro de grabación: formato, conteo real en pantalla y limpieza.
+        //   BTODICTA_CRONOTEST=1 [BTODICTA_CRONOSHOT=<ruta.png>]
+        if ProcessInfo.processInfo.environment["BTODICTA_CRONOTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("CRONO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            chk(DictationPanel.reloj(0) == "0:00", "0 s → 0:00")
+            chk(DictationPanel.reloj(9) == "0:09", "9 s → 0:09 (dos cifras siempre)")
+            chk(DictationPanel.reloj(65) == "1:05", "65 s → 1:05")
+            chk(DictationPanel.reloj(180.5) == "3:00", "180,5 s → 3:00 (no redondea hacia arriba)")
+            chk(DictationPanel.reloj(3661) == "1:01:01", "una hora larga pasa a h:mm:ss")
+            panel.show("Prueba del cronómetro")
+            panel.iniciarCronometro()
+            chk(panel.cronoTextoQA == "0:00", "arranca en 0:00 → «\(panel.cronoTextoQA)»")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.4) {
+                let leido = self.panel.cronoTextoQA
+                chk(leido == "0:03", "a los 3,4 s marca 0:03 → «\(leido)»")
+                if let ruta = ProcessInfo.processInfo.environment["BTODICTA_CRONOSHOT"], !ruta.isEmpty {
+                    let ok = self.panel.guardarSnapshotQA(URL(fileURLWithPath: ruta))
+                    chk(ok, "captura guardada en \(ruta)")
+                }
+                let dur = self.panel.detenerCronometro()
+                chk(dur >= 3.3 && dur < 4.5, "al parar devuelve \(String(format: "%.1f", dur)) s")
+                chk(self.panel.cronoTextoQA.isEmpty, "y el rótulo queda vacío, sin ocupar sitio")
+                print("CRONO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+            }
+            RunLoop.main.run(); return
+        }
         if ProcessInfo.processInfo.environment["BTODICTA_PANELTEST"] == "1" {
             let casos = [
                 ("1. Traducir al inglés", "Texto: “¿qué día es hoy?”"),
@@ -1367,6 +1394,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 chk(ms < 60_000, "cuesta \(ms)ms, no los 44 s de rehacer el dictado entero")
                 print("REDTEST \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
             }
+            RunLoop.main.run(); return
+        }
+        // Banco de pruebas: dictados SINTÉTICOS contra el motor de nube, por el
+        // camino real de la aplicación. Nació de un fallo que no se reproducía
+        // desde fuera —la misma API respondía en 3 s por curl y agotaba el plazo
+        // dentro— y que obligaba a dictar a mano una y otra vez para cazarlo.
+        // La voz la pone macOS, así que las pruebas no cuestan ni un céntimo de
+        // síntesis; solo el audio que se manda a transcribir.
+        //   BTODICTA_STRESS=<segundos>[,<segundos>…]  duraciones a probar
+        //   BTODICTA_STRESS_VECES=<n>                 repeticiones (3 por defecto)
+        //   BTODICTA_STRESS_MOTOR=<id>                fish (por defecto), groq…
+        if let dur = ProcessInfo.processInfo.environment["BTODICTA_STRESS"] {
+            let duraciones = dur.split(separator: ",").compactMap { Double($0) }.filter { $0 > 0 }
+            let veces = Int(ProcessInfo.processInfo.environment["BTODICTA_STRESS_VECES"] ?? "") ?? 3
+            let motor = ProcessInfo.processInfo.environment["BTODICTA_STRESS_MOTOR"] ?? "fish"
+            guard !duraciones.isEmpty else { print("STRESS duraciones inválidas"); exit(1) }
+            print("STRESS motor=\(motor) duraciones=\(duraciones) × \(veces)")
+            var pendientes: [(Double, Int)] = []
+            for d in duraciones { for i in 1...veces { pendientes.append((d, i)) } }
+            var fallos = 0, lento = 0
+            func siguiente() {
+                guard !pendientes.isEmpty else {
+                    print("STRESS \(fallos == 0 ? "TODO OK" : "FALLOS=\(fallos)") · lentos(>5s)=\(lento)")
+                    exit(fallos == 0 ? 0 : 1)
+                }
+                let (seg, n) = pendientes.removeFirst()
+                // La síntesis espera al sintetizador, así que va fuera de la
+                // cola principal; el envío vuelve a ella, como en el dictado.
+                DispatchQueue.global().async {
+                    let wav = VozSintetica.wav(segundos: seg)
+                    DispatchQueue.main.async {
+                        guard let wav else {
+                            print("STRESS ✗ no pude generar \(Int(seg)) s de voz"); fallos += 1; siguiente(); return
+                        }
+                        let kb = wav.count / 1024
+                        let t0 = Date()
+                        let listo: (Result<String, Error>) -> Void = { r in
+                            let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                            switch r {
+                            case .success(let texto):
+                                if ms > 5_000 { lento += 1 }
+                                print("STRESS ✓ \(Int(seg))s #\(n) · \(kb) kB · \(ms) ms · \(RedSeguridadDictado.palabras(texto)) palabras")
+                            case .failure(let e):
+                                fallos += 1
+                                print("STRESS ✗ \(Int(seg))s #\(n) · \(kb) kB · \(ms) ms · \(e.localizedDescription)")
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { siguiente() }
+                        }
+                        if motor == "fish" { FishTranscribe.run(wav: wav, model: "transcribe-1", completion: listo) }
+                        else { GroqTranscribe.run(wav: wav, completion: listo) }
+                    }
+                }
+            }
+            siguiente()
             RunLoop.main.run(); return
         }
         // Fish Audio de punta a punta por el CÓDIGO DE LA APP (no por curl):
@@ -4117,6 +4198,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 mensajeEscucha = "Escuchando… (\(tecla) para terminar)"
             }
             panel.show(mensajeEscucha)
+            // El contador arranca con el micrófono, no con el panel: lo que se
+            // cuenta es audio grabado.
+            panel.iniciarCronometro()
             ModosLog.registrar("dictado_inicio", [
                 "sesion": sesion.uuidString,
                 "modo_activo": Config.modoActivo(),
@@ -4559,7 +4643,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         liveTimer?.invalidate()
         liveTimer = nil
         let wav = recorder.stop()
+        panel.detenerCronometro()
         let seconds = Double(wav.count - 44) / 32000.0
+        // La duración del audio grabado, para decirla mientras se transcribe:
+        // se mide del propio PCM, no del reloj, así que no la falsea una pausa.
+        let duracionDictado = DictationPanel.reloj(seconds)
         // Cortar la entrega en vivo YA: un chunk rezagado en main no debe
         // tocar el pipe/WS que estamos por cerrar.
         entregaVivo = nil
@@ -4631,7 +4719,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 panel.hide(after: 1.2)
                 return
             }
-            panel.update("⏳ Cerrando dictado…")
+            panel.update("⏳ Cerrando dictado · \(duracionDictado) grabados…")
             var entregado = false
             tcpp.onFinal = { [weak self] final in
                 guard !entregado else { return }
@@ -4703,7 +4791,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 panel.update("Muy corto — nada que transcribir"); panel.hide(after: 1.2)
                 return
             }
-            panel.update("⏳ Cerrando dictado…")
+            panel.update("⏳ Cerrando dictado · \(duracionDictado) grabados…")
             live.finalizar()
             // Tras el cierre, el motor finaliza lo pendiente; damos una gracia y
             // entregamos. Usamos el MÁS COMPLETO entre el texto final del motor y
@@ -4759,7 +4847,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 panel.hide(after: 1.2)
                 return
             }
-            panel.update("⏳ Cerrando dictado…")
+            panel.update("⏳ Cerrando dictado · \(duracionDictado) grabados…")
             stream.commit()
             // Esperar el committed final; si no llega en 6 s la red murió a
             // mitad del dictado → el wav completo va por la cascada (no se
@@ -4802,7 +4890,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 panel.hide(after: 1.2)
                 return
             }
-            panel.update("⏳ Transcribiendo…")
+            panel.update("⏳ Transcribiendo \(duracionDictado)…")
             // Failover: recorre los proveedores activos en orden.
             Failover.transcribe(wav: wav) { [weak self] result in
                 switch result {

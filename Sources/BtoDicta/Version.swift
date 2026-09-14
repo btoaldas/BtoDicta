@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.57.2"
-    static let fecha = "2026-09-13"
+    static let numero = "0.58.0"
+    static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.58.0", "2026-09-14", [
+            "CRONÓMETRO DE GRABACIÓN en el notch: bajo las barras de voz aparece cuánto llevas grabando, en minutos y segundos. Al terminar, el aviso dice la duración del audio («Cerrando dictado · 3:00 grabados…», «Transcribiendo 3:00…»), medida del propio audio y no del reloj, así que una pausa no la falsea. Pasada la hora cambia a h:mm:ss",
+            "BANCO DE PRUEBAS SINTÉTICO: la aplicación puede generar dictados con la voz que ya trae macOS y mandarlos por el camino real del motor de nube, a las duraciones que se le pidan y repetidos. Nació de un fallo que no se reproducía desde fuera y que obligaba a dictar a mano una y otra vez. Se usa con BTODICTA_STRESS=<segundos> y no cuesta síntesis, solo el audio transcrito",
+            "Con ese banco quedó medido que la transcripción de Fish Audio tarda un 3-4 % de lo que dura el audio —tres minutos se transcriben en menos de seis segundos—, así que el aviso de lentitud pasa a medirse contra la duración del audio en vez de contra un número fijo que marcaba como lentos los dictados largos normales",
+        ]),
         ("0.57.2", "2026-09-13", [
             "Fish Audio deja constancia de cuánto tarda cada transcripción y con cuántos kilobytes. Desde fuera de la aplicación esa API responde en menos de 3 segundos, pero algún dictado largo agota el plazo dentro de ella: sin la medición el diagnóstico es adivinanza, y ahora cada llamada lenta o fallida queda anotada con su tamaño y su tiempo",
             "El reintento ante un corte de conexión ya se comprobó en uso real: un dictado que habría cambiado de motor se resolvió con Fish Audio al segundo intento",
