@@ -34,6 +34,15 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.61.0
+
+- **La bitácora del día, en tu correo.** BtoDicta junta lo transcrito, lo
+  consolida con tu IA en un solo texto sin repetir ideas y te lo manda desde **tu
+  propia cuenta** de correo. Automático a la hora que fijes, o a mano desde el
+  menú.
+- **La prueba de envío dice por qué falló**, no solo que falló: clave, puerto,
+  destinatario o servidor dan mensajes distintos, cada uno con su consejo.
+
 ### Novedades 0.60.0
 
 - **El dictado deja de vivir en la memoria.** El audio se guardaba por partida

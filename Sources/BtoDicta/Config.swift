@@ -1113,6 +1113,29 @@ struct Config {
     static func redSeguridadDictado() -> Bool {
         (json()["dictado_red_seguridad"] as? Bool) ?? true
     }
+    // MARK: Correo (spec 003)
+    /// Servidor de salida. La clave NO vive aquí: va en el almacén de secretos.
+    static func smtpHost() -> String { (json()["smtp_host"] as? String) ?? "" }
+    static func smtpPuerto() -> Int { min(65535, max(1, (json()["smtp_puerto"] as? Int) ?? 465)) }
+    static func smtpUsuario() -> String { (json()["smtp_usuario"] as? String) ?? "" }
+    static func smtpRemitente() -> String { (json()["smtp_remitente"] as? String) ?? "" }
+    /// A quiénes se envía. Separados por coma en la interfaz.
+    static func correoDestinatarios() -> [String] {
+        ((json()["correo_destinatarios"] as? String) ?? "")
+            .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.contains("@") }
+    }
+    /// Envío automático del resumen y a qué hora (formato "HH:mm", varias
+    /// separadas por coma). Cada hora lleva su periodo en `correo_periodo`.
+    static func correoAutomatico() -> Bool { (json()["correo_automatico"] as? Bool) ?? false }
+    static func correoHorarios() -> [String] {
+        ((json()["correo_horarios"] as? String) ?? "07:00")
+            .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.contains(":") }
+    }
+    /// "hoy" | "ayer" | "semana"
+    static func correoPeriodo() -> String { (json()["correo_periodo"] as? String) ?? "ayer" }
+
     /// Pedir confirmación (repitiendo la acción) también al cancelar desde el
     /// notch, no solo con Escape. Apagado por omisión: la doble pulsación de
     /// Escape ya evita el accidente que motivó esto.

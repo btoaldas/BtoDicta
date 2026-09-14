@@ -64,6 +64,16 @@ final class SettingsModel: ObservableObject {
     @Published var sonidos: Bool { didSet { Config.set("sonidos", to: sonidos) } }
     @Published var escCancela: Bool { didSet { Config.set("esc_cancela", to: escCancela) } }
     @Published var escDoble: Bool { didSet { Config.set("esc_doble", to: escDoble) } }
+    @Published var smtpHost: String { didSet { Config.set("smtp_host", to: smtpHost) } }
+    @Published var smtpPuerto: Int { didSet { Config.set("smtp_puerto", to: smtpPuerto) } }
+    @Published var smtpUsuario: String { didSet { Config.set("smtp_usuario", to: smtpUsuario) } }
+    @Published var smtpRemitente: String { didSet { Config.set("smtp_remitente", to: smtpRemitente) } }
+    @Published var smtpClave: String { didSet { ApiKeys.set("SMTP_PASSWORD", smtpClave) } }
+    @Published var correoDest: String { didSet { Config.set("correo_destinatarios", to: correoDest) } }
+    @Published var correoAuto: Bool { didSet { Config.set("correo_automatico", to: correoAuto) } }
+    @Published var correoHorarios: String { didSet { Config.set("correo_horarios", to: correoHorarios) } }
+    @Published var correoPeriodo: String { didSet { Config.set("correo_periodo", to: correoPeriodo) } }
+    @Published var correoPrueba = ""
     @Published var cancelarConfirma: Bool { didSet { Config.set("cancelar_confirma", to: cancelarConfirma) } }
     @Published var cancelarConserva: Double { didSet { Config.set("cancelar_conserva_desde_s", to: cancelarConserva) } }
     @Published var pausarMultimedia: Bool { didSet { Config.set("atenuar_multimedia", to: pausarMultimedia) } }
@@ -182,6 +192,15 @@ final class SettingsModel: ObservableObject {
         sonidos = Config.sounds()
         escCancela = Config.escCancels()
         escDoble = Config.escDoble()
+        smtpHost = Config.smtpHost()
+        smtpPuerto = Config.smtpPuerto()
+        smtpUsuario = Config.smtpUsuario()
+        smtpRemitente = Config.smtpRemitente()
+        smtpClave = ApiKeys.get("SMTP_PASSWORD")
+        correoDest = (Config.json0("correo_destinatarios") as? String) ?? ""
+        correoAuto = Config.correoAutomatico()
+        correoHorarios = Config.correoHorarios().joined(separator: ", ")
+        correoPeriodo = Config.correoPeriodo()
         cancelarConfirma = Config.cancelarConfirma()
         cancelarConserva = Config.cancelarConservaDesdeSegundos()
         pausarMultimedia = Config.duckMedia()
@@ -671,6 +690,49 @@ struct SettingsView: View {
                 }.padding(.leading, 18)
                 Text("Cancelar NUNCA borra lo grabado: queda en el historial y lo recuperas desde Transcribir. Por debajo de este tiempo se descarta, porque es una pulsación sin nada dentro.")
                     .font(.caption).foregroundStyle(.secondary).padding(.leading, 18)
+
+                Divider().padding(.vertical, 6)
+                Text("Resumen de la bitácora por correo").font(.headline)
+                Text("BtoDicta junta lo transcrito del periodo, lo consolida con tu IA en un solo texto sin repetir ideas y te lo manda. Nada sale de tu equipo hasta que pongas un destinatario.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    TextField("Servidor (mail.tudominio.com)", text: $m.smtpHost)
+                    TextField("Puerto", value: $m.smtpPuerto, format: .number).frame(width: 70)
+                }
+                TextField("Usuario (tu correo completo)", text: $m.smtpUsuario)
+                SecureField("Clave", text: $m.smtpClave)
+                TextField("Remitente (si difiere del usuario)", text: $m.smtpRemitente)
+                TextField("Destinatarios, separados por coma", text: $m.correoDest)
+                Text("Puerto 465 con SSL. Con Gmail hace falta una «contraseña de aplicación», no la de tu cuenta.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Probar envío") {
+                        m.correoPrueba = "Enviando…"
+                        CorreoSMTP.enviar(ResumenCorreo.cuenta(),
+                                          para: Config.correoDestinatarios(),
+                                          asunto: "BtoDicta — prueba de correo",
+                                          cuerpo: "Si lees esto, la configuración de correo de BtoDicta funciona.") { r in
+                            switch r {
+                            case .success: m.correoPrueba = "✓ Enviado. Revisa la bandeja."
+                            case .failure(let e): m.correoPrueba = "✗ \(e.localizedDescription)\n→ \(e.consejo)"
+                            }
+                        }
+                    }
+                    Text(m.correoPrueba).font(.caption)
+                        .foregroundStyle(m.correoPrueba.hasPrefix("✓") ? .green : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Toggle("Enviarlo solo, a su hora", isOn: $m.correoAuto)
+                HStack {
+                    TextField("Horarios (07:00, 20:00)", text: $m.correoHorarios).frame(width: 160)
+                    Picker("Periodo", selection: $m.correoPeriodo) {
+                        Text("el día de hoy").tag("hoy")
+                        Text("el día anterior").tag("ayer")
+                        Text("la semana").tag("semana")
+                    }.frame(width: 220)
+                }.disabled(!m.correoAuto)
+                Text("También puedes mandarlo cuando quieras desde el menú de la barra: «Enviar resumen por correo».")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Mostrar el panel al dictar", isOn: $m.panelVisible)
                 Toggle("Mostrar autoayuda rápida al pasar el cursor", isOn: $m.autoAyuda)
                 Text("Explica al instante para qué sirve cada botón o enlace. VoiceOver conserva estas descripciones aunque ocultes la burbuja.")

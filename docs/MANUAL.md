@@ -917,6 +917,35 @@ Un dictado que no recibe audio ya no se queda pensando: a los 6 segundos se cier
 
 Significa que el micrófono no está dando sonido a BtoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.
 
+### Recibir el resumen del día por correo
+
+Desde 0.61.0, BtoDicta puede mandarte por correo lo que la bitácora transcribió:
+junta el material del periodo, lo **consolida con tu propia IA** en un solo texto
+—si dijiste lo mismo tres veces a lo largo del día, aparece una— y lo envía.
+
+Se configura en **Configuración → Ajustes**, sección *Resumen de la bitácora por
+correo*:
+
+- **Servidor y puerto**: el de tu proveedor. El habitual es el **465 con SSL**.
+- **Usuario y clave**: tu correo completo. Con **Gmail** hace falta una
+  *contraseña de aplicación*, no la de tu cuenta.
+- **Destinatarios**: separados por coma.
+- **Probar envío**: manda un correo de prueba y, si falla, **dice por qué** —
+  clave, puerto, destinatario o servidor dan mensajes distintos, cada uno con lo
+  que hay que mirar.
+- **Enviarlo solo**: uno o varios horarios (`07:00, 20:00`) y el periodo de cada
+  envío: el día de hoy, el anterior o la semana. Si el equipo estaba dormido a esa
+  hora, sale al despertar en vez de perderse el día.
+
+También puedes mandarlo cuando quieras desde el menú de la barra: **Enviar
+resumen por correo**.
+
+**El correo sale de tu cuenta**, no de ninguna infraestructura del proyecto, y
+lleva solo texto: el audio se queda en tu equipo. Si no hay nada transcrito en el
+periodo, no se envía un correo vacío. Cada intento queda en el registro con su
+causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
+clave nunca aparece).
+
 ### Dicté horas y la aplicación se puso pesada
 
 Hasta 0.59.3 el audio del dictado se guardaba **dos veces en memoria** —en el

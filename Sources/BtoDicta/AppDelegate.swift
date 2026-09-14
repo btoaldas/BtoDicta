@@ -1410,6 +1410,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
+        // Correo (spec 003): envío real y, sobre todo, que cada fallo diga POR QUÉ.
+        //   BTODICTA_CORREOTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_CORREOTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("CORREO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            ContinuoIndice.shared.abrir()   // la prueba corre sin arrancar la bitácora
+            let base = CorreoSMTP.Cuenta(host: Config.smtpHost(), puerto: Config.smtpPuerto(),
+                                         usuario: Config.smtpUsuario(), clave: ApiKeys.get("SMTP_PASSWORD"),
+                                         remitente: Config.smtpRemitente())
+            let dest = Config.correoDestinatarios()
+            chk(!base.host.isEmpty && !base.clave.isEmpty, "la cuenta está configurada (\(base.host):\(base.puerto))")
+            chk(!dest.isEmpty, "hay destinatario: \(dest.joined(separator: ", "))")
+            // 1) Envío de verdad.
+            CorreoSMTP.enviar(base, para: dest,
+                              asunto: "BtoDicta — prueba de envío",
+                              cuerpo: "Prueba del cliente de correo de BtoDicta.\n\nSi lees esto, el canal funciona: servidor, puerto, usuario, clave y remitente están bien.\n\n— BtoDicta \(Version.numero)") { r in
+                switch r {
+                case .success(let s): chk(true, "el servidor aceptó el mensaje → \(s.prefix(60))")
+                case .failure(let e): chk(false, "no se pudo enviar: \(e.localizedDescription)")
+                }
+                // 2) Cada fallo tiene que ser DISTINTO y decir qué mirar.
+                var malaClave = base; malaClave.clave = "claveQueNoEs"
+                CorreoSMTP.enviar(malaClave, para: dest, asunto: "x", cuerpo: "x") { r2 in
+                    if case .failure(let e) = r2 {
+                        let esAuth: Bool = { if case .autenticacion = e { return true }; return false }()
+                        chk(esAuth, "clave mala → se identifica como credencial: \(e.localizedDescription)")
+                        chk(e.consejo.contains("contraseña de aplicación") || e.consejo.contains("usuario"),
+                            "y el consejo apunta al usuario/clave")
+                    } else { chk(false, "una clave mala no puede dar por bueno el envío") }
+                    var malPuerto = base; malPuerto.puerto = 2
+                    CorreoSMTP.enviar(malPuerto, para: dest, asunto: "x", cuerpo: "x") { r3 in
+                        if case .failure(let e) = r3 {
+                            let esConex: Bool = { if case .conexion = e { return true }; if case .tiempo = e { return true }; return false }()
+                            chk(esConex, "puerto mal → se identifica como conexión: \(e.localizedDescription)")
+                            chk(e.consejo.contains("puerto"), "y el consejo habla del puerto")
+                        } else { chk(false, "un puerto inexistente no puede dar por bueno el envío") }
+                        CorreoSMTP.enviar(base, para: ["esto-no-es-un-correo"], asunto: "x", cuerpo: "x") { r4 in
+                            if case .failure(let e) = r4 {
+                                chk(e.localizedDescription.contains("destinatario"), "destinatario inválido → lo dice: \(e.localizedDescription)")
+                            } else { chk(false, "un destinatario inválido no puede dar por bueno el envío") }
+                            // 3) Periodos y horarios.
+                            let cal = Calendar.current
+                            let hoyR = ResumenCorreo.Periodo.hoy.rango()
+                            chk(cal.isDateInToday(hoyR.desde), "«hoy» empieza hoy a las 00:00")
+                            let ayerR = ResumenCorreo.Periodo.ayer.rango()
+                            chk(ayerR.hasta == hoyR.desde, "«ayer» acaba justo donde empieza hoy, sin hueco ni solape")
+                            let semR = ResumenCorreo.Periodo.semana.rango()
+                            chk(Int(semR.hasta.timeIntervalSince(semR.desde) / 86_400) == 8, "«la semana» cubre los últimos 7 días más hoy")
+                            // 4) El resumen de verdad, al correo configurado. Se
+                            //    elige el periodo que SÍ tenga material, para que
+                            //    la prueba demuestre el camino completo y no se
+                            //    quede en «no había nada que contar».
+                            let conMaterial: ResumenCorreo.Periodo =
+                                ResumenCorreo.material(.hoy) != nil ? .hoy
+                                : (ResumenCorreo.material(.ayer) != nil ? .ayer : .semana)
+                            let cuanto = ResumenCorreo.material(conMaterial)?.count ?? 0
+                            print("CORREO periodo con material: \(conMaterial.rawValue) (\(cuanto) caracteres)")
+                            chk(cuanto > 0, "hay bitácora que resumir en algún periodo")
+                            ResumenCorreo.enviar(conMaterial) { r5 in
+                                switch r5 {
+                                case .success(let s):
+                                    chk(true, s.hasPrefix("omitido")
+                                        ? "sin material hoy no manda correo vacío (correcto)"
+                                        : "el resumen de hoy salió al correo")
+                                case .failure(let e):
+                                    chk(false, "el resumen no salió: \(e.localizedDescription)")
+                                }
+                                print("CORREO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+                            }
+                        }
+                    }
+                }
+            }
+            RunLoop.main.run(); return
+        }
         // Memoria del dictado largo (spec 001): el audio vive en el archivo,
         // no en RAM.  BTODICTA_MEMTEST=<horas>  (6 por omisión)
         if let h = ProcessInfo.processInfo.environment["BTODICTA_MEMTEST"] {
@@ -2726,6 +2801,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         detenerPantalla.tag = 86
         detenerPantalla.isHidden = true
         menu.addItem(detenerPantalla)
+        let correo = NSMenuItem(title: "Enviar resumen por correo", action: nil, keyEquivalent: "")
+        correo.submenu = NSMenu()
+        for p in ResumenCorreo.Periodo.allCases {
+            let it = NSMenuItem(title: "Resumen \(p.titulo)", action: #selector(enviarResumenCorreo(_:)), keyEquivalent: "")
+            it.representedObject = p.rawValue
+            correo.submenu?.addItem(it)
+        }
+        correo.isHidden = Config.correoDestinatarios().isEmpty
+        menu.addItem(correo)
         menu.addItem(withTitle: "Configuración…", action: #selector(openSettings), keyEquivalent: ",")
         let prov = NSMenuItem(title: "Proveedor principal", action: nil, keyEquivalent: "")
         prov.tag = 83
@@ -2868,6 +2952,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // y matar whisper-servers huérfanos de crashes anteriores.
         DispatchQueue.global(qos: .utility).async {
             HistoryWriter.rescatarHuerfanos()
+            // Reloj del correo: cada minuto mira si toca un envío programado.
+            // Va aparte del de la bitácora, que solo corre si hay rutinas.
+            let relojCorreo = Timer(timeInterval: 60, repeats: true) { _ in
+                ResumenCorreo.revisarHorarios()
+            }
+            RunLoop.main.add(relojCorreo, forMode: .common)
             WhisperServer.limpiarHuerfanos()
             VoxtralServer.limpiarHuerfanos()
         }
@@ -3298,6 +3388,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func exportTodayPublic() { exportToday() }
     func openHistoryPublic() { openHistory() }
     func openLogPublic() { openLog() }
+
+    /// Envío a mano del resumen, desde la barra de menús. Usa exactamente el
+    /// mismo camino que el envío automático: lo que se prueba aquí es lo que
+    /// llegará solo por la mañana.
+    @objc private func enviarResumenCorreo(_ sender: NSMenuItem) {
+        let p = ResumenCorreo.Periodo(rawValue: (sender.representedObject as? String) ?? "") ?? .hoy
+        panel.show("✉️ Preparando el resumen \(p.titulo)…")
+        ResumenCorreo.enviar(p) { [weak self] r in
+            switch r {
+            case .success(let s):
+                self?.panel.update(s.hasPrefix("omitido") ? "✉️ Nada que resumir \(p.titulo)" : "✉️ Resumen \(p.titulo) enviado")
+            case .failure(let e):
+                self?.panel.update("✉️ No se pudo enviar: \(e.localizedDescription)")
+                Log.log(.sistema, "correo: \(e.consejo)")
+            }
+            self?.panel.hide(after: 4)
+        }
+    }
 
     @objc private func openSettings() { Log.log(.ui, "abrir configuración"); SettingsWindowController.shared.show() }
     @objc private func openMusicPlayer() {

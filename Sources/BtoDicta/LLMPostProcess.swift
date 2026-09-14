@@ -739,6 +739,17 @@ enum LLMPostProcess {
     /// Da una forma más natural y breve a un resumen de pendientes ya calculado
     /// localmente. No decide fechas ni acciones: la IA solo reescribe. Ante
     /// cualquier fallo, la cascada devuelve `resumenLocal` intacto.
+    /// Ejecuta un prompt propio por la cascada de IA de pulido, con failover y
+    /// plazo. Si ninguna responde, devuelve `respaldo` — nunca nada.
+    static func conPrompt(_ prompt: String, respaldo: String,
+                          completion: @escaping (String) -> Void) {
+        let cadena = ChatIA.cadenaPulido()
+        guard let ia = cadena.first else { completion(respaldo); return }
+        hacerProveedor(ia, textoOriginal: respaldo, inicio: Date(), intento: 1,
+                       salvaguarda: false, prompt: prompt, temp: 0.2,
+                       resto: Array(cadena.dropFirst()), completion: completion)
+    }
+
     static func resumirPendientes(_ resumenLocal: String,
                                   completion: @escaping (String) -> Void) {
         let cadena = ChatIA.cadenaPulido()

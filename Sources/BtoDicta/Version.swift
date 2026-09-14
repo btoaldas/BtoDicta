@@ -8,11 +8,18 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.60.0"
+    static let numero = "0.61.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.61.0", "2026-09-14", [
+            "LA BITÁCORA DEL DÍA, EN TU CORREO. BtoDicta junta lo transcrito del periodo que elijas, lo consolida con tu propia IA en UN SOLO texto —sin repetir la misma idea porque se dijo tres veces— y te lo manda. En Configuración → Ajustes pones tu servidor, tu usuario y a quién quieres que llegue: el correo sale de TU cuenta, no de ninguna infraestructura del proyecto",
+            "El botón «Probar envío» no dice solo si funcionó: cuando falla dice POR QUÉ y qué mirar. Clave equivocada, puerto cerrado, destinatario inválido y servidor caído dan mensajes distintos, cada uno con su consejo — con Gmail, por ejemplo, avisa de que hace falta una «contraseña de aplicación»",
+            "Envío automático a la hora o las horas que fijes, cada una con su periodo (el día de hoy, el anterior o la semana). Si el equipo estaba dormido, sale al despertar en vez de perderse ese día. Y cuando quieras, a mano desde el menú de la barra",
+            "Cada intento queda en el registro con su causa, y el diálogo completo con el servidor se puede ver con BTODICTA_SMTPDEBUG=1 sin que la clave aparezca nunca",
+            "Prueba propia: BTODICTA_CORREOTEST=1 — envía de verdad y comprueba que cada tipo de fallo se identifica por separado",
+        ]),
         ("0.60.0", "2026-09-14", [
             "EL DICTADO DEJA DE VIVIR EN LA MEMORIA. El audio se guardaba por partida doble en RAM —en el grabador y en una copia aparte— además del archivo en disco que ya se escribía mientras hablas. A 32 000 bytes por segundo eso son 691 MB por copia en un dictado de seis horas. Ahora el archivo es la única fuente: quien necesita un tramo lo lee de ahí. Medido con seis horas simuladas, la memoria subió 0 MB",
             "El grabador suelta el audio en cuanto entrega el .wav, en vez de conservarlo hasta el dictado siguiente: durante toda la transcripción convivían dos copias completas para nada",

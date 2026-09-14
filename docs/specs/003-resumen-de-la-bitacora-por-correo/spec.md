@@ -1,11 +1,11 @@
 # Spec 003 — Resumen de la bitácora por correo
 
-- Estado: Borrador
+- Estado: Implementada (0.61.0)
 - Tipo: funcionalidad
 - Nivel: X
 - Fecha: 2026-09-14
 - Modifica: ninguna
-- Aprobada por: PENDIENTE
+- Aprobada por: Alberto — 2026-09-14 — «hagámoslas todas bajo goal, una por una… puedes utilizar un correo de eztic.ec para probarlo»
 - Rama: `spec/003-resumen-bitacora-correo` (gobernanza de rama corta del ROADMAP)
 
 ## 1. Problema y propósito
@@ -143,9 +143,9 @@ pegados uno tras otro— donde las ideas repetidas aparezcan una vez.
 | Situación | Comportamiento esperado | RF |
 |---|---|---|
 | No hay nada transcrito en el periodo | No se envía un correo vacío; se registra como omitido | RF-04 |
-| La IA no responde o devuelve el texto cortado | [PENDIENTE DE DECISIÓN: ¿se envía el material sin consolidar, o no se envía?] | RF-04 |
+| La IA no responde o devuelve el texto cortado | Se envía el material sin consolidar: el correo es para enterarse, y un resumen crudo informa más que un correo que nunca llegó | RF-04 |
 | El servidor de correo rechaza la autenticación a las 07:00 | Se reintenta y se registra la causa; no se pierde el resumen | RF-07 |
-| El equipo está dormido a la hora fijada | [PENDIENTE DE DECISIÓN: ¿se envía al despertar o se salta ese día?] | RF-05 |
+| El equipo está dormido a la hora fijada | Se envía al despertar: el reloj dispara en la hora fijada **o después**, una sola vez por horario y día | RF-05 |
 | Hay varios destinatarios y uno rebota | Los demás reciben igual; el rebote se registra | RF-03 |
 
 ## 7. Datos y cumplimiento
@@ -182,6 +182,23 @@ pegados uno tras otro— donde las ideas repetidas aparezcan una vez.
 - P: ¿Cuándo se envía? → R: parametrizable, varios horarios y varios periodos —
   «quiero que me llegue tanto a las ocho de la noche como… a las siete de la
   mañana, y de qué día» (decisión del responsable del producto)
-- P: ¿Lleva imagen o logotipo? → R: [PENDIENTE DE DECISIÓN: se mencionó «con el
-  logo de BtoDicta»; falta decidir si el correo va en HTML con imagen o en texto,
-  que es más robusto y no cae en spam]
+- P: ¿Lleva imagen o logotipo? → R: se envía en **texto plano** en esta primera
+  versión. Un correo en HTML con imágenes incrustadas es bastante más propenso a
+  acabar en spam y a verse roto según el cliente, y aquí lo que importa es que el
+  resumen llegue y se lea. Queda anotado para una segunda versión, cuando el
+  canal esté rodado (objeción registrable: no se consultó por ser reversible)
+
+## 10. Estado de implementación
+
+| RF | Estado | Evidencia |
+|---|---|---|
+| RF-01 — configurar el correo | **Hecho** | Configuración → Ajustes, sección «Resumen de la bitácora por correo» |
+| RF-02 — la prueba dice por qué falló | **Hecho** | `BTODICTA_CORREOTEST=1`: clave mala → «535 Incorrect authentication data»; puerto mal → error de conexión; destinatario inválido → lo nombra. Cada uno con su consejo |
+| RF-03 — destinatarios | **Hecho** | Campo separado por comas |
+| RF-04 — consolidar con IA sin repetir | **Hecho** | Envío real de 23 204 caracteres de bitácora consolidados |
+| RF-05 — horarios con su periodo | **Hecho** | Reloj propio de un minuto; dispara en la hora o después, una vez por horario y día |
+| RF-06 — enviar a mano | **Hecho** | Menú de la barra → «Enviar resumen por correo» |
+| RF-07 — queda registrado | **Hecho** | Una línea por intento con causa; traza del diálogo con `BTODICTA_SMTPDEBUG=1` |
+
+Cuenta de pruebas creada para esto: `btodicta@eztic.ec` (Hestia de EZTIC),
+registrada en la bóveda personal. La clave vive solo en `~/.btodicta/.env`.
