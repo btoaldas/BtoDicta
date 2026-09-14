@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.57.2
+
+- **Fish Audio mide cada transcripción** (tamaño y tiempo) y anota en el registro
+  las que tardan más de lo normal o fallan. Desde fuera de la app esa API
+  responde en menos de 3 segundos; si dentro tarda más, ahora queda constancia
+  con el dato exacto en vez de una suposición.
+
 ### Novedades 0.57.1
 
 - **Se acabó el cambio de motor sin motivo.** Un dictado largo con Fish Audio

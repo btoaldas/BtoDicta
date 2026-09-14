@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.57.1"
+    static let numero = "0.57.2"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.57.2", "2026-09-13", [
+            "Fish Audio deja constancia de cuánto tarda cada transcripción y con cuántos kilobytes. Desde fuera de la aplicación esa API responde en menos de 3 segundos, pero algún dictado largo agota el plazo dentro de ella: sin la medición el diagnóstico es adivinanza, y ahora cada llamada lenta o fallida queda anotada con su tamaño y su tiempo",
+            "El reintento ante un corte de conexión ya se comprobó en uso real: un dictado que habría cambiado de motor se resolvió con Fish Audio al segundo intento",
+        ]),
         ("0.57.1", "2026-09-13", [
             "ARREGLADO un falso positivo que cambiaba de motor sin motivo: un dictado largo con Fish Audio agotaba un plazo de espera fijo de 60 s y el dictado se iba a otro motor teniendo el primero perfectamente sano — encima ya lo había transcrito y cobrado, así que se pagaba por un texto que no llegaba. El plazo es ahora proporcional al audio (15-30 s) y, si el corte fue de la conexión y no del servidor, se reintenta una vez antes de rendirse. Medido: 72 s de audio se transcriben en menos de 3 s",
             "VISTA PREVIA EN VIVO: cuando falta el modelo de dictado de macOS, la app lo descarga sola en segundo plano en vez de quedarse sin vista previa para siempre y sin decir por qué. Es lo que enseña que te está escuchando con los motores de nube que transcriben por lotes",

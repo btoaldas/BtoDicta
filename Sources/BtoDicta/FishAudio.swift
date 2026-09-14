@@ -100,9 +100,19 @@ enum FishTranscribe {
         req.setValue("close", forHTTPHeaderField: "Connection")
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        // Medir SIEMPRE, no solo cuando falla. Medido desde fuera de la app
+        // —misma máquina, mismo audio, misma hora— la subida va a 800 kB/s y la
+        // respuesta llega en menos de 3 s; dentro de la app, en cambio, algunos
+        // dictados largos agotan el plazo. Sin estos números el diagnóstico es
+        // adivinanza, así que cada llamada deja su tamaño y su tiempo.
+        let kb = body.count / 1024
+        let t0 = Date()
         URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
+            let ms = Int(Date().timeIntervalSince(t0) * 1000)
             DispatchQueue.main.async {
+                Log.debug("Fish Audio: \(kb) kB de audio, plazo \(Int(req.timeoutInterval)) s → \(ms) ms")
                 if let err {
+                    Log.log(.ia, "Fish Audio: falló tras \(ms) ms con \(kb) kB (plazo \(Int(req.timeoutInterval)) s)")
                     // Se reintenta UNA vez, y solo si el fallo fue de la
                     // conexión. Medido: 72 s de audio se transcriben en ~3 s,
                     // así que un envío que se cuelga es un tropiezo de red, no
@@ -124,6 +134,12 @@ enum FishTranscribe {
                       let texto = (json["text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
                       !texto.isEmpty else {
                     completion(.failure(ScribeError.sinTexto)); return
+                }
+                // Lo normal son 1-3 s. Si tarda mucho más, queda anotado sin
+                // tener que activar el modo desarrollo: es el dato que permite
+                // saber si el plazo se quedó corto o si algo va realmente mal.
+                if ms > 5_000 {
+                    Log.log(.ia, "Fish Audio: tardó \(ms) ms con \(kb) kB — más de lo normal (1-3 s)")
                 }
                 completion(.success(texto))
             }
