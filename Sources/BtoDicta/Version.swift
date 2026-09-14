@@ -8,11 +8,18 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.58.0"
+    static let numero = "0.59.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.59.0", "2026-09-14", [
+            "SE ACABARON LOS DICTADOS QUE NO CABEN. Todo motor de transcripción tiene un techo de tamaño y ninguno lo anuncia igual: Fish rechaza a partir de unos 25 MB con un «format not recognised» que ni menciona el tamaño. Ahora, cuando un motor rechaza el envío entero de una forma que puede ser de tamaño, la aplicación parte el audio en tramos con solape y lo reintenta CON EL MISMO MOTOR, cosiendo después por coincidencia de palabras. Medido: 20 minutos de dictado que antes fallaban salen ahora completos, 3 348 palabras de las 3 360 habladas",
+            "Y lo aprende: el techo de cada motor queda anotado, así que la próxima vez parte de entrada sin pagar el rechazo. Pero solo aprende de lo que dice el SERVIDOR — una caída de internet no deja ninguna medida, porque si no una desconexión de un minuto marcaría al motor con un techo falso durante semanas. Si más adelante entra algo más grande de lo que supuestamente no admitía, la medida se tira entera; y en cualquier caso caduca a las dos semanas",
+            "Lo mismo con el pulido: si la IA devuelve la respuesta cortada por falta de contexto, se aprende su techo y a partir de entonces el texto se pule por tramos partidos POR FRASES, nunca a mitad de palabra. Un dictado de dos horas se pule entero en vez de quedarse en crudo",
+            "ARREGLADO un cuelgue intermitente que afectaba a LOS DOCE motores de transcripción de nube: todos mandaban «Connection: close» sobre la conexión compartida, así que el servidor la cerraba al responder pero la aplicación se la quedaba igual, y el dictado siguiente escribía contra un socket muerto hasta agotar el plazo. Medido con ocho dictados de 40 segundos separados por 45: SEIS tardaban 18,7 segundos en vez de 1,8. Con la conexión que se renueva sola tras veinte segundos de reposo, los mismos ocho bajaron a 1,5-2,5 segundos y ninguno se colgó. Nunca se perdió texto —el reintento siempre rescataba—, pero costaba diecisiete segundos de espera",
+            "Prueba propia del troceo, con 24 comprobaciones: BTODICTA_PARTIRTEST=1",
+        ]),
         ("0.58.0", "2026-09-14", [
             "CRONÓMETRO DE GRABACIÓN en el notch: bajo las barras de voz aparece cuánto llevas grabando, en minutos y segundos. Al terminar, el aviso dice la duración del audio («Cerrando dictado · 3:00 grabados…», «Transcribiendo 3:00…»), medida del propio audio y no del reloj, así que una pausa no la falsea. Pasada la hora cambia a h:mm:ss",
             "BANCO DE PRUEBAS SINTÉTICO: la aplicación puede generar dictados con la voz que ya trae macOS y mandarlos por el camino real del motor de nube, a las duraciones que se le pidan y repetidos. Nació de un fallo que no se reproducía desde fuera y que obligaba a dictar a mano una y otra vez. Se usa con BTODICTA_STRESS=<segundos> y no cuesta síntesis, solo el audio transcrito",

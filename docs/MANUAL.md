@@ -917,6 +917,51 @@ Un dictado que no recibe audio ya no se queda pensando: a los 6 segundos se cier
 
 Significa que el micrófono no está dando sonido a BtoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.
 
+### Dicté una hora y el motor no lo admitió
+
+Todo motor de transcripción tiene un techo —de tamaño de archivo, de duración o
+de ambos— y ninguno lo anuncia igual: uno devuelve `413`, otro `400`, y Fish
+Audio rechaza a partir de unos 25 MB con un *«format not recognised»* que ni
+siquiera menciona el tamaño. BtoDicta **no lleva una lista de límites**, que
+envejecería mal y fallaría con el proveedor que aún no conoce. Desde 0.59.0:
+
+- Manda el dictado entero. Si el motor lo rechaza de una forma que **puede** ser
+  de tamaño, **parte el audio en tramos con solape y reintenta con el mismo
+  motor**; si un tramo tampoco entra, ese tramo se vuelve a partir. El límite se
+  descubre chocando con él, que es la única forma de saberlo para un proveedor
+  cualquiera. Los tramos se cosen por coincidencia de palabras —el mismo cosido
+  que rescata los dictados rotos—, así que en la costura no se pierde ni se
+  repite nada. Medido: **20 minutos de dictado devolvieron 3 348 palabras de las
+  3 360 habladas**.
+- **Lo aprende**: el techo de cada motor queda anotado en
+  `~/.btodicta/limites-motores.json` y la próxima vez se parte de entrada, sin
+  pagar el rechazo.
+- **Y se desdice solo**, que es lo importante. Solo aprende de lo que responde el
+  **servidor**: una caída de internet o una conexión colgada **no dejan ninguna
+  medida**, porque si no, una desconexión de un minuto marcaría al motor con un
+  techo falso durante semanas. Si más adelante entra algo más grande de lo que
+  supuestamente no admitía, la medida se tira entera. Y en cualquier caso caduca
+  a las dos semanas: los proveedores amplían cupos.
+- **Nunca se parte por un fallo que no sea de tamaño**: sin saldo, con la clave
+  mala o con un audio sin voz, partir no arregla nada y no se intenta.
+- **El pulido, igual**: si la IA devuelve la respuesta cortada por falta de
+  contexto, se aprende su techo y el texto pasa a pulirse por tramos partidos
+  **por frases**, nunca a mitad de palabra. Un dictado de dos horas se pule
+  entero en vez de quedarse en crudo.
+- Todo esto ocurre **por debajo**: tú sueltas la tecla y recibes el texto. En el
+  registro se ve (*«lo parto en 3 y sigo con el mismo motor»*), en la pantalla no.
+- Para comprobarlo sin dictar: `BTODICTA_PARTIRTEST=1` (24 comprobaciones) y
+  `BTODICTA_STRESS=1200` (un dictado sintético de 20 minutos).
+
+**Y si a ratos tardaba mucho, era esto.** Hasta 0.58.0 los doce motores de nube
+compartían una misma conexión y le pedían al servidor que la cerrara al
+responder; el cliente se la quedaba igual, así que el dictado siguiente escribía
+contra un socket muerto y esperaba hasta agotar el plazo. Medido con ocho
+dictados de 40 segundos separados por 45: **seis tardaban 18,7 segundos en vez de
+1,8**, y siempre se salvaban en el reintento —nunca se perdió texto, solo tiempo—.
+Desde 0.59.0 la conexión se reaprovecha mientras está caliente y se renueva tras
+veinte segundos parada: los mismos ocho dictados bajaron a 1,5-2,5 segundos.
+
 ### Dicté mucho rato y falta texto (o aparecen «...»)
 
 Los motores de dictado **en vivo** trabajan al ritmo del habla y, en grabaciones largas, pueden saltarse una frase —dejando puntos suspensivos— o dejar de transcribir del todo aunque sigas hablando. No es el micrófono ni el pulido: el audio está entero, es el motor el que se queda atrás. Desde 0.54.0 la app lo resuelve sola:

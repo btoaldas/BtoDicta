@@ -34,6 +34,25 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.59.0
+
+- **Se acabaron los dictados que no caben.** Cada motor tiene un techo de tamaño
+  y ninguno lo anuncia igual. Ahora, si un motor rechaza el envío entero, la app
+  **parte el audio en tramos con solape y reintenta con el mismo motor**,
+  cosiendo después. Medido: 20 minutos que antes fallaban salen completos —
+  3 348 palabras de las 3 360 habladas.
+- **Lo aprende, y se desdice solo.** El techo de cada motor queda anotado para no
+  volver a pagar el rechazo. Pero solo aprende de lo que dice el servidor: una
+  caída de internet **no** deja medida. Si luego entra algo más grande, la medida
+  se tira; y caduca a las dos semanas.
+- **El pulido igual**: si la IA corta la respuesta por contexto, el texto se pule
+  por tramos partidos por frases. Un dictado de dos horas se pule entero.
+- **Arreglado un cuelgue intermitente en los doce motores de nube**: todos
+  mandaban `Connection: close` sobre la conexión compartida, así que el dictado
+  siguiente heredaba un socket ya cerrado y esperaba en balde hasta agotar el
+  plazo. Medido: de ocho dictados separados por 45 s, **seis tardaban 18,7 s en
+  vez de 1,8**. Ahora la conexión se renueva sola y ninguno se cuelga.
+
 ### Novedades 0.58.0
 
 - **Cronómetro de grabación en el notch**: bajo las barras de voz ves cuánto

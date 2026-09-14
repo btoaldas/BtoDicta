@@ -97,7 +97,12 @@ enum FishTranscribe {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.timeoutInterval = max(15, min(30, segundos * 0.4))
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // SIN `Connection: close`. Lo tenía, y era la causa de que un dictado se
+        // colgara justo el tiempo del plazo mientras el anterior y el siguiente
+        // salían en un segundo: el servidor cerraba la conexión al responder y
+        // el banco del cliente se la quedaba igualmente, de modo que el envío
+        // siguiente esperaba a un socket que ya no existía. Se deja que
+        // URLSession gobierne la conexión, como ya se aprendió en el pulido.
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         // Medir SIEMPRE, no solo cuando falla. Medido desde fuera de la app
@@ -107,8 +112,17 @@ enum FishTranscribe {
         // adivinanza, así que cada llamada deja su tamaño y su tiempo.
         let kb = body.count / 1024
         let t0 = Date()
-        URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
+        // El primer envío aprovecha el banco compartido (conexión ya caliente);
+        // el reintento estrena la suya, porque si el primero se colgó lo más
+        // probable es que la culpa sea justo de esa conexión.
+        // Primer envío: la conexión compartida del dictado, que se renueva
+        // sola si lleva rato parada. Reintento: siempre una nueva.
+        let sesion = reintentos > 0 ? RedDictado.sesion() : RedDictado.sesionNueva()
+        sesion.uploadTask(with: req, from: body) { data, resp, err in
             let ms = Int(Date().timeIntervalSince(t0) * 1000)
+            // La sesión de un solo uso se cierra en cuanto contesta; la
+            // compartida es de toda la aplicación y no se toca.
+            if !RedDictado.esCompartida(sesion) { sesion.finishTasksAndInvalidate() }
             DispatchQueue.main.async {
                 Log.debug("Fish Audio: \(kb) kB de audio, plazo \(Int(req.timeoutInterval)) s → \(ms) ms")
                 if let err {

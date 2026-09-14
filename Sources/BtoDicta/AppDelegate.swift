@@ -1396,6 +1396,102 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
+        // Troceo adaptativo: que ni el audio ni el texto pierdan nada al partirse.
+        //   BTODICTA_PARTIRTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_PARTIRTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("TROCEO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+
+            // 1) Audio: los tramos cubren TODO y se solapan (nada entre dos).
+            let pcm = Data(repeating: 7, count: 600 * RedSeguridadDictado.bytesPorSegundo)  // 600 s
+            let wav = HistoryWriter.wavData(pcm: pcm)
+            let partes = Troceo.tramos(wav, bytesPorTramo: 120 * RedSeguridadDictado.bytesPorSegundo)
+            let audioPorParte = partes.map { ($0.count - 44) / RedSeguridadDictado.bytesPorSegundo }
+            print("TROCEO 600 s → \(partes.count) tramos de \(audioPorParte) s")
+            chk(partes.count >= 5, "600 s en tramos de 120 s dan al menos 5 partes")
+            let sumado = partes.reduce(0) { $0 + ($1.count - 44) }
+            chk(sumado >= pcm.count, "los tramos suman \(sumado / RedSeguridadDictado.bytesPorSegundo) s ≥ los 600 originales (hay solape, nunca hueco)")
+            chk(partes.allSatisfy { ($0.count - 44) % 2 == 0 }, "todos empiezan y acaban en frontera de muestra")
+            chk(partes.allSatisfy { $0.prefix(4) == Data("RIFF".utf8) }, "cada tramo es un WAV completo y válido")
+            let uno = Troceo.tramos(HistoryWriter.wavData(pcm: Data(repeating: 1, count: 32_000)), bytesPorTramo: 999_999)
+            chk(uno.count == 1, "lo que cabe entero no se parte")
+
+            // 2) Texto: partir y volver a unir no puede cambiar ni una palabra.
+            let frase = "Esta es una oración de prueba con tilde y ñ. ¿Y una pregunta? ¡Y una exclamación! "
+            let largo = String(repeating: frase, count: 200)
+            let trozos = Troceo.partirTexto(largo, maxBytes: 3_000)
+            print("TROCEO texto \(largo.utf8.count) B → \(trozos.count) tramos")
+            chk(trozos.count > 1, "un texto largo se parte")
+            chk(trozos.allSatisfy { $0.utf8.count <= 3_100 }, "ningún tramo pasa del tope")
+            let pal = { (s: String) in s.split(whereSeparator: { $0.isWhitespace }).map(String.init) }
+            chk(pal(trozos.joined(separator: " ")) == pal(largo),
+                "unir los tramos devuelve EXACTAMENTE las mismas palabras (\(pal(largo).count))")
+            chk(trozos.allSatisfy { !$0.hasPrefix(" ") && !$0.hasSuffix(" ") }, "no quedan bordes sucios")
+            // Un dictado sin puntuación: se reparte por palabras, sin cortar ninguna.
+            let sinPuntos = String(repeating: "palabra ", count: 2_000)
+            let t2 = Troceo.partirTexto(sinPuntos, maxBytes: 2_000)
+            chk(t2.count > 1 && pal(t2.joined(separator: " ")) == pal(sinPuntos),
+                "un texto sin puntuación se parte por palabras sin romper ninguna")
+            chk(Troceo.partirTexto("corto", maxBytes: 3_000) == ["corto"], "lo corto se deja en paz")
+
+            // 3) Qué fallos merecen partir y cuáles no.
+            let grande = 300 * RedSeguridadDictado.bytesPorSegundo
+            chk(Troceo.pareceDeTamano(ScribeError.http(400, "format not recognised"), bytes: grande),
+                "un 400 con audio grande sí merece partirse (es el caso real medido)")
+            chk(Troceo.pareceDeTamano(ScribeError.http(413, ""), bytes: grande), "un 413 también")
+            chk(!Troceo.pareceDeTamano(ScribeError.http(402, "sin crédito"), bytes: grande),
+                "sin saldo NO se parte: partir no paga la factura")
+            chk(!Troceo.pareceDeTamano(ScribeError.http(401, ""), bytes: grande), "credencial mala tampoco")
+            chk(!Troceo.pareceDeTamano(ScribeError.sinTexto, bytes: grande), "audio sin voz tampoco")
+            chk(!Troceo.pareceDeTamano(ScribeError.http(400, ""), bytes: 1_000),
+                "y con audio pequeño nunca: ahí el problema es otro")
+
+            // 4) Lo aprendido se desdice solo. Es el caso que preocupa: si el
+            //    internet se cae a mitad de un envío, el motor NO puede quedar
+            //    marcado para siempre con un techo falso.
+            let falso = "prueba-limites-\(UUID().uuidString.prefix(8))"
+            Troceo.anotarRechazo(falso, bytes: 3_000_000)
+            chk(Troceo.tamanoSeguro(falso, minimo: 1_000) != nil, "un rechazo deja medida")
+            Troceo.anotarExito(falso, bytes: 5_000_000)
+            chk(Troceo.tamanoSeguro(falso, minimo: 1_000) == nil,
+                "y si después entra algo MÁS grande, la medida falsa se tira entera")
+            Troceo.anotarRechazo(falso, bytes: 2_000_000)
+            Troceo.anotarExito(falso, bytes: 1_000_000)
+            chk(Troceo.tamanoSeguro(falso, minimo: 1_000) != nil,
+                "un éxito por debajo del techo no lo borra: eso sí es información buena")
+            Troceo.olvidar(falso, porque: "fin de la prueba")
+            chk(Troceo.tamanoSeguro(falso, minimo: 1_000) == nil, "olvidar deja el motor como nuevo")
+
+            // 5) EL CASO QUE IMPORTA: se cae el internet a mitad de un envío
+            //    grande. Debe reintentarse partido —por si acaso— pero NO puede
+            //    quedar ninguna medida: si no, una caída de un minuto marcaría
+            //    al motor con un techo falso durante semanas.
+            let red = "prueba-red-\(UUID().uuidString.prefix(8))"
+            let grandote = HistoryWriter.wavData(pcm: Data(count: 300 * RedSeguridadDictado.bytesPorSegundo))
+            let cortada = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut,
+                                  userInfo: [NSLocalizedDescriptionKey: "The request timed out."])
+            var intentos = 0
+            Troceo.enviarPartiendo(grandote, motor: red,
+                                   enviar: { _, cb in intentos += 1; cb(.failure(cortada)) }) { r in
+                if case .success = r { chk(false, "sin red no puede haber éxito") }
+            }
+            chk(intentos > 1, "sin red lo intenta partido por si acaso (\(intentos) envíos)")
+            chk(Troceo.tamanoSeguro(red, minimo: 1_000) == nil,
+                "y NO aprende ningún techo de una caída de internet")
+            // El mismo tamaño, pero rechazado por el SERVIDOR, sí enseña.
+            let serv = "prueba-serv-\(UUID().uuidString.prefix(8))"
+            Troceo.enviarPartiendo(grandote, motor: serv,
+                                   enviar: { d, cb in
+                                       d.count > 200 * RedSeguridadDictado.bytesPorSegundo
+                                           ? cb(.failure(ScribeError.http(400, "format not recognised")))
+                                           : cb(.success("tramo"))
+                                   }) { _ in }
+            chk(Troceo.tamanoSeguro(serv, minimo: 1_000) != nil,
+                "un rechazo del servidor sí deja techo: esa información es real")
+            Troceo.olvidar(red, porque: "fin de la prueba"); Troceo.olvidar(serv, porque: "fin de la prueba")
+
+            print("TROCEO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+        }
         // Banco de pruebas: dictados SINTÉTICOS contra el motor de nube, por el
         // camino real de la aplicación. Nació de un fallo que no se reproducía
         // desde fuera —la misma API respondía en 3 s por curl y agotaba el plazo
@@ -1440,10 +1536,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                 fallos += 1
                                 print("STRESS ✗ \(Int(seg))s #\(n) · \(kb) kB · \(ms) ms · \(e.localizedDescription)")
                             }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { siguiente() }
+                                    // Pausa entre envíos. Con pausas largas se reproduce
+                            // el caso real: la conexión ociosa se muere y el
+                            // siguiente dictado la hereda si no se gobierna bien.
+                            let pausa = Double(ProcessInfo.processInfo.environment["BTODICTA_STRESS_PAUSA"] ?? "") ?? 0.5
+                            DispatchQueue.main.asyncAfter(deadline: .now() + pausa) { siguiente() }
                         }
-                        if motor == "fish" { FishTranscribe.run(wav: wav, model: "transcribe-1", completion: listo) }
-                        else { GroqTranscribe.run(wav: wav, completion: listo) }
+                        // Por el MISMO camino que el dictado real: Troceo decide
+                        // si cabe entero o si hay que partirlo.
+                        let enviar: (Data, @escaping (Result<String, Error>) -> Void) -> Void = { datos, cb in
+                            if motor == "fish" { FishTranscribe.run(wav: datos, model: "transcribe-1", completion: cb) }
+                            else { GroqTranscribe.run(wav: datos, completion: cb) }
+                        }
+                        Troceo.enviarPartiendo(wav, motor: motor, enviar: enviar, completion: listo)
                     }
                 }
             }

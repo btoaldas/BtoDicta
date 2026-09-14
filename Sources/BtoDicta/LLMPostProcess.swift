@@ -760,7 +760,45 @@ enum LLMPostProcess {
                        resto: Array(cadena.dropFirst()), completion: completion)
     }
 
+    /// Pule el dictado. Si el texto no cabe en el contexto de la IA elegida
+    /// —cosa que se aprende cuando una respuesta vuelve cortada, no de una lista
+    /// de límites que envejece— se parte por frases y se pule tramo a tramo, en
+    /// serie, uniendo después. Así un dictado de dos horas se pule entero en vez
+    /// de quedarse en crudo por no caber de una vez.
     static func enhance(_ text: String, completion: @escaping (String) -> Void) {
+        guard let ia = ChatIA.cadenaPulido().first else { enhanceTramo(text, completion: completion); return }
+        let clave = Troceo.claveIA(ia.id)
+        let bytes = text.utf8.count
+        guard let seguro = Troceo.tamanoSeguro(clave, minimo: Troceo.minimoTextoParaPartir),
+              bytes > seguro else {
+            // Cabe (o no se sabe todavía): camino normal, y si sale bien se
+            // anota que este tamaño sí entra.
+            enhanceTramo(text) { pulido in
+                if pulido != text { Troceo.anotarExito(clave, bytes: bytes) }
+                completion(pulido)
+            }
+            return
+        }
+        let partes = Troceo.partirTexto(text, maxBytes: seguro)
+        guard partes.count > 1 else { enhanceTramo(text, completion: completion); return }
+        Log.write("pulido: \(bytes) caracteres pasan del contexto de \(ia.id) — lo pulo en \(partes.count) tramos")
+        var salida: [String] = []
+        func siguiente(_ i: Int) {
+            guard i < partes.count else {
+                completion(salida.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines))
+                return
+            }
+            enhanceTramo(partes[i]) { pulido in
+                // Un tramo que falle devuelve su original: se conserva igual, que
+                // es la regla de siempre — nunca se entrega menos de lo dictado.
+                salida.append(pulido.trimmingCharacters(in: .whitespacesAndNewlines))
+                siguiente(i + 1)
+            }
+        }
+        siguiente(0)
+    }
+
+    private static func enhanceTramo(_ text: String, completion: @escaping (String) -> Void) {
         let cadena = ChatIA.cadenaPulido()
         guard let ia = cadena.first else {
             Log.write("pulido: SIN IA de chat conectada (pon una key en Modelos) — texto original")
@@ -992,6 +1030,10 @@ enum LLMPostProcess {
                 if let data,
                    let code = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(code) {
                     if ia.fueTruncado(data) {
+                        // Se aprende el techo REAL de esta IA: la próxima vez un
+                        // texto así de largo se manda partido y no se pierde el
+                        // pulido entero por no caber.
+                        Troceo.anotarRechazo(Troceo.claveIA(ia.id), bytes: text.utf8.count)
                         continuarFailover(desde: ia, motivo: "respuesta truncada", textoOriginal: text,
                                           salvaguarda: salvaguarda, prompt: prompt, temp: temp,
                                           resto: resto, plazo: plazo, completion: completion)

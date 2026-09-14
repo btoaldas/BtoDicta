@@ -24,14 +24,13 @@ enum OpenAICompatible {
         body.append(wav)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
 
-        var req = URLRequest(url: URL(string: endpoint)!); req.setValue("close", forHTTPHeaderField: "Connection")
-        req.httpMethod = "POST"
+        var req = URLRequest(url: URL(string: endpoint)!); req.httpMethod = "POST"
         // Corto a propósito: mejor saltar al siguiente de la cascada que colgar.
         req.timeoutInterval = 15
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         if !key.isEmpty { req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }  // locales sin auth
 
-        URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
+        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -97,12 +96,11 @@ enum GroqTranscribe {
         body.append(wav)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
 
-        var req = URLRequest(url: URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!); req.setValue("close", forHTTPHeaderField: "Connection")
-        req.httpMethod = "POST"; req.timeoutInterval = 60
+        var req = URLRequest(url: URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!); req.httpMethod = "POST"; req.timeoutInterval = 60
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
 
-        URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
+        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -148,10 +146,9 @@ enum RawAudioSTT {
                     extraer: @escaping ([String: Any]) -> String?,
                     completion: @escaping (Result<String, Error>) -> Void) {
         guard let u = URL(string: url) else { completion(.failure(ScribeError.ws("URL inválida"))); return }
-        var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = timeout; req.setValue("close", forHTTPHeaderField: "Connection")
-        req.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = timeout; req.setValue(contentType, forHTTPHeaderField: "Content-Type")
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
-        URLSession.shared.uploadTask(with: req, from: wav) { data, resp, err in
+        RedDictado.sesion().uploadTask(with: req, from: wav) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -182,9 +179,8 @@ enum STTPoll {
             completion(.failure(ScribeError.ws("La transcripción tardó demasiado"))); return
         }
         guard let u = URL(string: url) else { completion(.failure(ScribeError.ws("URL inválida"))); return }
-        var req = URLRequest(url: u); req.timeoutInterval = 15; req.setValue("close", forHTTPHeaderField: "Connection")
-        for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
-        URLSession.shared.dataTask(with: req) { data, resp, err in
+        var req = URLRequest(url: u); req.timeoutInterval = 15; for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
+        RedDictado.sesion().dataTask(with: req) { data, resp, err in
             if let err { DispatchQueue.main.async { completion(.failure(err)) }; return }
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard let data, (200..<300).contains(code),
@@ -214,11 +210,11 @@ private func postJSON(url: String, headers: [String: String], cuerpo: [String: A
                       timeout: TimeInterval = 20,
                       completion: @escaping (Result<[String: Any], Error>) -> Void) {
     guard let u = URL(string: url) else { completion(.failure(ScribeError.ws("URL inválida"))); return }
-    var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = timeout; req.setValue("close", forHTTPHeaderField: "Connection")
+    var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = timeout
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
     req.httpBody = try? JSONSerialization.data(withJSONObject: cuerpo)
-    URLSession.shared.dataTask(with: req) { data, resp, err in
+    RedDictado.sesion().dataTask(with: req) { data, resp, err in
         if let err { completion(.failure(err)); return }
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard let data, (200..<300).contains(code),
@@ -306,11 +302,10 @@ enum SonioxTranscribe {
         body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
         body.append(wav)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        var up = URLRequest(url: URL(string: "https://api.soniox.com/v1/files")!); up.setValue("close", forHTTPHeaderField: "Connection")
-        up.httpMethod = "POST"; up.timeoutInterval = 30
+        var up = URLRequest(url: URL(string: "https://api.soniox.com/v1/files")!); up.httpMethod = "POST"; up.timeoutInterval = 30
         up.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         up.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        URLSession.shared.uploadTask(with: up, from: body) { data, resp, err in
+        RedDictado.sesion().uploadTask(with: up, from: body) { data, resp, err in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard err == nil, let data, (200..<300).contains(code),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -341,10 +336,10 @@ enum SonioxTranscribe {
                         case .failure(let e): completion(.failure(e))
                         case .success:
                             // 4) bajar el texto
-                            var t = URLRequest(url: URL(string: "https://api.soniox.com/v1/transcriptions/\(id)/transcript")!); t.setValue("close", forHTTPHeaderField: "Connection")
+                            var t = URLRequest(url: URL(string: "https://api.soniox.com/v1/transcriptions/\(id)/transcript")!)
                             t.timeoutInterval = 15
                             t.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-                            URLSession.shared.dataTask(with: t) { d, rp, e in
+                            RedDictado.sesion().dataTask(with: t) { d, rp, e in
                                 DispatchQueue.main.async {
                                     let c = (rp as? HTTPURLResponse)?.statusCode ?? 0
                                     guard e == nil, let d, (200..<300).contains(c),
@@ -384,11 +379,10 @@ enum AzureTranscribe {
         body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
         body.append(wav)
         body.append("\r\n--\(boundary)\r\nContent-Disposition: form-data; name=\"definition\"\r\nContent-Type: application/json\r\n\r\n\(definition)\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        var req = URLRequest(url: URL(string: url)!); req.setValue("close", forHTTPHeaderField: "Connection")
-        req.httpMethod = "POST"; req.timeoutInterval = 20
+        var req = URLRequest(url: URL(string: url)!); req.httpMethod = "POST"; req.timeoutInterval = 20
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.setValue(key, forHTTPHeaderField: "Ocp-Apim-Subscription-Key")
-        URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
+        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -480,11 +474,10 @@ enum GladiaTranscribe {
         body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
         body.append(wav)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        var up = URLRequest(url: URL(string: "https://api.gladia.io/v2/upload")!); up.setValue("close", forHTTPHeaderField: "Connection")
-        up.httpMethod = "POST"; up.timeoutInterval = 30
+        var up = URLRequest(url: URL(string: "https://api.gladia.io/v2/upload")!); up.httpMethod = "POST"; up.timeoutInterval = 30
         up.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         up.setValue(key, forHTTPHeaderField: "x-gladia-key")
-        URLSession.shared.uploadTask(with: up, from: body) { data, resp, err in
+        RedDictado.sesion().uploadTask(with: up, from: body) { data, resp, err in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard err == nil, let data, (200..<300).contains(code),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -536,11 +529,10 @@ enum SpeechmaticsTranscribe {
         body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"data_file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
         body.append(wav)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        var req = URLRequest(url: URL(string: "https://asr.api.speechmatics.com/v2/jobs")!); req.setValue("close", forHTTPHeaderField: "Connection")
-        req.httpMethod = "POST"; req.timeoutInterval = 30
+        var req = URLRequest(url: URL(string: "https://asr.api.speechmatics.com/v2/jobs")!); req.httpMethod = "POST"; req.timeoutInterval = 30
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
+        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard err == nil, let data, (200..<300).contains(code),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -564,10 +556,10 @@ enum SpeechmaticsTranscribe {
                 case .failure(let e): completion(.failure(e))
                 case .success:
                     // bajar el transcript en texto plano
-                    var t = URLRequest(url: URL(string: "https://asr.api.speechmatics.com/v2/jobs/\(id)/transcript?format=txt")!); t.setValue("close", forHTTPHeaderField: "Connection")
+                    var t = URLRequest(url: URL(string: "https://asr.api.speechmatics.com/v2/jobs/\(id)/transcript?format=txt")!)
                     t.timeoutInterval = 15
                     t.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-                    URLSession.shared.dataTask(with: t) { d, rp, e in
+                    RedDictado.sesion().dataTask(with: t) { d, rp, e in
                         DispatchQueue.main.async {
                             let c = (rp as? HTTPURLResponse)?.statusCode ?? 0
                             guard e == nil, let d, (200..<300).contains(c),
@@ -604,15 +596,14 @@ enum GatewayTranscribe {
         body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
         body.append(wav)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = 20; req.setValue("close", forHTTPHeaderField: "Connection")
-        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = 20; req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         if segura {
             if !gw.apiKey.isEmpty {
                 req.setValue(gw.authPrefix + gw.apiKey, forHTTPHeaderField: gw.authHeader.isEmpty ? "Authorization" : gw.authHeader)
             }
             for (h, v) in gw.headers { req.setValue(v, forHTTPHeaderField: h) }
         }
-        URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
+        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -795,68 +786,75 @@ enum Failover {
                 intentar(wav: wav, cadena: cadena, idx: idx + 1, ultimoError: e, completion: completion)
             }
         }
-        switch p.id {
-        case "elevenlabs": transcribeBatch(wav: wav, model: elevenModel(p)) { siguiente($0) }
-        case "groq": GroqTranscribe.run(wav: wav, model: p.modelo ?? "whisper-large-v3") { siguiente($0) }
-        case "apple_speech": AppleSpeechSTT.run(wav: wav, idioma: p.modelo) { siguiente($0) }
-        case "whisper_local": WhisperLocal.run(wav: wav) { siguiente($0) }
-        case "voxtral_local":
-            // La familia Voxtral tiene dos motores: el Mini 3B corre en
-            // llama.cpp (server residente); el Realtime 4B en transcribe.cpp.
-            if TcppStreamClient.esModeloStreaming(p.modelo ?? "") {
-                TranscribeCpp.run(wav: wav, modelo: p.modelo ?? "") { siguiente($0) }
-            } else if VoxtralServer.corriendo {
-                VoxtralServer.transcribe(wav: wav) { siguiente($0) }
-            } else if VoxtralServer.diagnostico == nil {
-                // No precalentó (p.ej. se activó recién): arrancar y transcribir.
-                VoxtralServer.precalentar()
-                VoxtralServer.transcribe(wav: wav) { siguiente($0) }
-            } else {
-                siguiente(.failure(ScribeError.ws(VoxtralServer.diagnostico ?? "voxtral no disponible")))
+        // Un SOLO punto de envío por motor. Troceo lo usa para reintentar el
+        // mismo motor con el audio partido cuando el techo del proveedor —que
+        // nadie declara igual— rechaza el envío entero.
+        let enviarAlMotor: (Data, @escaping (Result<String, Error>) -> Void) -> Void = { datos, cb in
+            switch p.id {
+
+            case "elevenlabs": transcribeBatch(wav: datos, model: elevenModel(p)) { cb($0) }
+            case "groq": GroqTranscribe.run(wav: datos, model: p.modelo ?? "whisper-large-v3") { cb($0) }
+            case "apple_speech": AppleSpeechSTT.run(wav: datos, idioma: p.modelo) { cb($0) }
+            case "whisper_local": WhisperLocal.run(wav: datos) { cb($0) }
+            case "voxtral_local":
+                // La familia Voxtral tiene dos motores: el Mini 3B corre en
+                // llama.cpp (server residente); el Realtime 4B en transcribe.cpp.
+                if TcppStreamClient.esModeloStreaming(p.modelo ?? "") {
+                    TranscribeCpp.run(wav: datos, modelo: p.modelo ?? "") { cb($0) }
+                } else if VoxtralServer.corriendo {
+                    VoxtralServer.transcribe(wav: datos) { cb($0) }
+                } else if VoxtralServer.diagnostico == nil {
+                    // No precalentó (p.ej. se activó recién): arrancar y transcribir.
+                    VoxtralServer.precalentar()
+                    VoxtralServer.transcribe(wav: datos) { cb($0) }
+                } else {
+                    cb(.failure(ScribeError.ws(VoxtralServer.diagnostico ?? "voxtral no disponible")))
+                }
+            case "nemotron_local", "canary_local":
+                TranscribeCpp.run(wav: datos, modelo: p.modelo ?? "") { cb($0) }
+            case "openai":
+                OpenAITranscribe.run(wav: datos, model: p.modelo ?? "gpt-4o-mini-transcribe") { cb($0) }
+            case "mistral":
+                MistralTranscribe.run(wav: datos, model: p.modelo ?? "voxtral-mini-latest") { cb($0) }
+            case "fireworks":
+                FireworksTranscribe.run(wav: datos, model: p.modelo ?? "whisper-v3") { cb($0) }
+            case "hf":
+                HFTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "deepgram":
+                DeepgramTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "assemblyai":
+                AssemblyAITranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "fish":
+                FishTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "gladia":
+                GladiaTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "speechmatics":
+                SpeechmaticsTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "cloudflare_stt":
+                CloudflareTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "soniox":
+                SonioxTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "azure":
+                AzureTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+            case "ollama_stt":
+                // Detección inteligente: solo si Ollama tiene un modelo que escuche.
+                if let m = ChatIA.sttLocalModelo["ollama"] {
+                    LocalTranscribe.run(base: "http://localhost:11434/v1", model: m, wav: datos) { cb($0) }
+                } else { cb(.failure(ScribeError.ws("Ollama no tiene un modelo whisper (haz: ollama pull whisper)"))) }
+            case "lmstudio_stt":
+                if let m = ChatIA.sttLocalModelo["lmstudio"] {
+                    LocalTranscribe.run(base: "http://localhost:1234/v1", model: m, wav: datos) { cb($0) }
+                } else { cb(.failure(ScribeError.ws("LM Studio no tiene un modelo whisper cargado"))) }
+            case let g where g.hasPrefix("gw:"):
+                // Gateway personalizado marcado "para voz": busca su config y transcribe.
+                let uuid = String(g.dropFirst(3))
+                if let gw = PersonalizadaStore.cargar().first(where: { $0.id == uuid }) {
+                    GatewayTranscribe.run(gw: gw, wav: datos) { cb($0) }
+                } else { cb(.failure(ScribeError.ws("El gateway de voz ya no existe"))) }
+            default: cb(.failure(ScribeError.sinTexto))
             }
-        case "nemotron_local", "canary_local":
-            TranscribeCpp.run(wav: wav, modelo: p.modelo ?? "") { siguiente($0) }
-        case "openai":
-            OpenAITranscribe.run(wav: wav, model: p.modelo ?? "gpt-4o-mini-transcribe") { siguiente($0) }
-        case "mistral":
-            MistralTranscribe.run(wav: wav, model: p.modelo ?? "voxtral-mini-latest") { siguiente($0) }
-        case "fireworks":
-            FireworksTranscribe.run(wav: wav, model: p.modelo ?? "whisper-v3") { siguiente($0) }
-        case "hf":
-            HFTranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "deepgram":
-            DeepgramTranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "assemblyai":
-            AssemblyAITranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "fish":
-            FishTranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "gladia":
-            GladiaTranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "speechmatics":
-            SpeechmaticsTranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "cloudflare_stt":
-            CloudflareTranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "soniox":
-            SonioxTranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "azure":
-            AzureTranscribe.run(wav: wav, model: p.modelo ?? "") { siguiente($0) }
-        case "ollama_stt":
-            // Detección inteligente: solo si Ollama tiene un modelo que escuche.
-            if let m = ChatIA.sttLocalModelo["ollama"] {
-                LocalTranscribe.run(base: "http://localhost:11434/v1", model: m, wav: wav) { siguiente($0) }
-            } else { siguiente(.failure(ScribeError.ws("Ollama no tiene un modelo whisper (haz: ollama pull whisper)"))) }
-        case "lmstudio_stt":
-            if let m = ChatIA.sttLocalModelo["lmstudio"] {
-                LocalTranscribe.run(base: "http://localhost:1234/v1", model: m, wav: wav) { siguiente($0) }
-            } else { siguiente(.failure(ScribeError.ws("LM Studio no tiene un modelo whisper cargado"))) }
-        case let g where g.hasPrefix("gw:"):
-            // Gateway personalizado marcado "para voz": busca su config y transcribe.
-            let uuid = String(g.dropFirst(3))
-            if let gw = PersonalizadaStore.cargar().first(where: { $0.id == uuid }) {
-                GatewayTranscribe.run(gw: gw, wav: wav) { siguiente($0) }
-            } else { siguiente(.failure(ScribeError.ws("El gateway de voz ya no existe"))) }
-        default: siguiente(.failure(ScribeError.sinTexto))
         }
+        Troceo.enviarPartiendo(wav, motor: p.id, enviar: enviarAlMotor) { siguiente($0) }
     }
 
     private static func elevenModel(_ p: Provider) -> String {
