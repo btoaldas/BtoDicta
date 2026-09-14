@@ -1410,6 +1410,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
+        // Cuarentena del pulido: no volver a llamar al que acaba de fallar.
+        //   BTODICTA_PULIDOTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_PULIDOTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("PULIDO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            CuarentenaIA.limpiarTodo()
+            let cadena = ChatIA.cadenaPulido()
+            chk(cadena.count > 1, "hay cascada de pulido: \(cadena.count) proveedores")
+            guard let primero = cadena.first else { print("PULIDO FALLA"); exit(1) }
+            chk(!CuarentenaIA.activa(primero.id), "de entrada nadie está apartado")
+            // Un plazo agotado aparta al proveedor y lo saca de la cascada.
+            CuarentenaIA.registrar(primero.id, motivo: "plazo agotado")
+            chk(CuarentenaIA.activa(primero.id), "tras agotar el plazo queda apartado")
+            let despues = ChatIA.cadenaPulido()
+            chk(despues.first?.id != primero.id, "y la cascada ya no empieza por él (\(despues.first?.id ?? "-"))")
+            chk(!despues.contains { $0.id == primero.id }, "no aparece en ninguna posición")
+            chk(despues.count == cadena.count - 1, "los demás siguen enteros (\(despues.count) de \(cadena.count))")
+            // Una respuesta buena lo devuelve.
+            CuarentenaIA.limpiar(primero.id)
+            chk(ChatIA.cadenaPulido().first?.id == primero.id, "si vuelve a contestar, recupera su puesto")
+            // Los castigos son proporcionales al motivo.
+            CuarentenaIA.limpiarTodo()
+            CuarentenaIA.registrar("a", motivo: "plazo agotado")
+            CuarentenaIA.registrar("b", motivo: "HTTP 401 clave inválida")
+            chk(CuarentenaIA.apartados() == ["a", "b"], "se apartan los dos")
+            // Nunca se deja la cascada vacía.
+            for ia in cadena { CuarentenaIA.registrar(ia.id, motivo: "plazo agotado") }
+            chk(!ChatIA.cadenaPulido().isEmpty,
+                "si TODOS están apartados se usa la cascada entera igual: más vale uno dudoso que no pulir")
+            CuarentenaIA.limpiarTodo()
+            print("PULIDO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+        }
         // Correo (spec 003): envío real y, sobre todo, que cada fallo diga POR QUÉ.
         //   BTODICTA_CORREOTEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_CORREOTEST"] == "1" {
@@ -1477,7 +1509,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                 case .failure(let e):
                                     chk(false, "el resumen no salió: \(e.localizedDescription)")
                                 }
-                                print("CORREO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+                                // 5) Reglas de envío: independientes y aditivas.
+                            let r1 = ResumenCorreo.Regla(hora: "07:00", periodo: "ayer", dias: "diario")
+                            let r2 = ResumenCorreo.Regla(hora: "20:00", periodo: "hoy", dias: "diario")
+                            let r3 = ResumenCorreo.Regla(hora: "07:00", periodo: "semana", dias: "sab")
+                            chk(r1.id != r2.id, "cada regla tiene identidad propia")
+                            chk(r1.periodo != r2.periodo, "dos reglas a horas distintas llevan periodos distintos")
+                            let cal = Calendar.current
+                            var sab = DateComponents(); sab.year = 2026; sab.month = 9; sab.day = 12  // sábado
+                            var mie = DateComponents(); mie.year = 2026; mie.month = 9; mie.day = 16  // miércoles
+                            let dSab = cal.date(from: sab)!, dMie = cal.date(from: mie)!
+                            chk(cal.component(.weekday, from: dSab) == 7, "la fecha de referencia es sábado")
+                            chk(r3.tocaHoy(dSab), "la regla de los sábados toca en sábado")
+                            chk(!r3.tocaHoy(dMie), "y NO toca un miércoles")
+                            chk(r1.tocaHoy(dSab) && r1.tocaHoy(dMie), "«cada día» toca siempre")
+                            let semana = ResumenCorreo.Regla(hora: "18:00", periodo: "hoy", dias: "lun,mar,mie,jue,vie")
+                            chk(semana.tocaHoy(dMie) && !semana.tocaHoy(dSab), "«entre semana» distingue sábado de miércoles")
+                            // Se guardan y se releen enteras.
+                            let previas = ResumenCorreo.reglas()
+                            ResumenCorreo.guardarReglas([r1, r2, r3])
+                            let leidas = ResumenCorreo.reglas()
+                            chk(leidas.count == 3, "las tres reglas se guardan y se releen (\(leidas.count))")
+                            chk(leidas.map(\.periodo) == ["ayer", "hoy", "semana"], "cada una conserva su periodo")
+                            chk(leidas.first?.descripcion.contains("07:00") == true,
+                                "y se describen para el registro → «\(leidas.first?.descripcion ?? "")»")
+                            ResumenCorreo.guardarReglas(previas)
+
+                            print("CORREO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
                             }
                         }
                     }

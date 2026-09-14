@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.61.0"
+    static let numero = "0.62.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.62.0", "2026-09-14", [
+            "EL PULIDO YA NO REINTENTA AL QUE ACABA DE FALLAR. La transcripción tenía cuarentena desde hace tiempo; el pulido no, y se notaba: cuando un proveedor dejaba de contestar, CADA dictado volvía a llamarlo y pagaba su plazo entero antes de seguir la cascada. Medido en un caso real: pulir 577 caracteres pasó de un segundo a veintitrés, recorriendo siete proveedores. Ahora el que falla se aparta unos minutos —más si el fallo es de clave o de saldo, menos si solo se le agotó el plazo— y vuelve solo en cuanto conteste bien. Si todos estuvieran apartados se usa la cascada entera igual: más vale uno dudoso que no pulir",
+            "LOS ENVÍOS DE CORREO SON AHORA UNA LISTA, no un horario con un periodo común. Cada línea es un envío independiente con su hora, su periodo y sus días: el resumen de ayer a las 07:00 todos los días, el de hoy a las 20:00, y el de la semana los sábados por la mañana. Se añaden y se quitan desde Configuración, y lo que ya tuvieras configurado se convierte solo",
+            "Prueba propia de la cuarentena del pulido: BTODICTA_PULIDOTEST=1",
+        ]),
         ("0.61.0", "2026-09-14", [
             "LA BITÁCORA DEL DÍA, EN TU CORREO. BtoDicta junta lo transcrito del periodo que elijas, lo consolida con tu propia IA en UN SOLO texto —sin repetir la misma idea porque se dijo tres veces— y te lo manda. En Configuración → Ajustes pones tu servidor, tu usuario y a quién quieres que llegue: el correo sale de TU cuenta, no de ninguna infraestructura del proyecto",
             "El botón «Probar envío» no dice solo si funcionó: cuando falla dice POR QUÉ y qué mirar. Clave equivocada, puerto cerrado, destinatario inválido y servidor caído dan mensajes distintos, cada uno con su consejo — con Gmail, por ejemplo, avisa de que hace falta una «contraseña de aplicación»",

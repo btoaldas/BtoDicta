@@ -34,6 +34,16 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.62.0
+
+- **El pulido ya no reintenta al que acaba de fallar.** Si un proveedor deja de
+  contestar, cada dictado pagaba su plazo otra vez: pulir 577 caracteres pasó de
+  un segundo a **veintitrés**. Ahora se aparta unos minutos y vuelve solo en
+  cuanto conteste bien.
+- **Los envíos de correo son una lista**, no un horario con un periodo común:
+  cada línea con su hora, su periodo y sus días. El de ayer a las 07:00, el de
+  hoy a las 20:00 y el de la semana los sábados.
+
 ### Novedades 0.61.0
 
 - **La bitácora del día, en tu correo.** BtoDicta junta lo transcrito, lo

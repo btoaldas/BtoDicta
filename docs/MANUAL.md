@@ -917,6 +917,17 @@ Un dictado que no recibe audio ya no se queda pensando: a los 6 segundos se cier
 
 Significa que el micrófono no está dando sonido a BtoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.
 
+### El pulido tarda mucho de pronto
+
+Si el pulido pasa de un segundo a veinte, casi siempre es que **un proveedor de
+IA dejó de contestar** y la cascada va cayendo por los siguientes. Hasta 0.61.0
+eso se pagaba en **cada** dictado, porque se volvía a llamar al caído una y otra
+vez. Desde 0.62.0 el que falla se aparta unos minutos —treinta si el problema es
+la clave o el saldo, tres si solo se le agotó el plazo— y vuelve en cuanto
+conteste bien. En el registro: *«pulido: deepseek apartado 3 min (plazo agotado)»*.
+
+Comprobación: `BTODICTA_PULIDOTEST=1`.
+
 ### Recibir el resumen del día por correo
 
 Desde 0.61.0, BtoDicta puede mandarte por correo lo que la bitácora transcribió:
@@ -933,9 +944,12 @@ correo*:
 - **Probar envío**: manda un correo de prueba y, si falla, **dice por qué** —
   clave, puerto, destinatario o servidor dan mensajes distintos, cada uno con lo
   que hay que mirar.
-- **Enviarlo solo**: uno o varios horarios (`07:00, 20:00`) y el periodo de cada
-  envío: el día de hoy, el anterior o la semana. Si el equipo estaba dormido a esa
-  hora, sale al despertar en vez de perderse el día.
+- **Enviarlo solo**: una **lista de envíos**, y cada línea es independiente —su
+  hora, su periodo (hoy, el día anterior o la semana) y sus días (cada día, uno
+  concreto o «entre semana»)—. Así puedes tener el resumen de ayer a las 07:00
+  todos los días, el de hoy a las 20:00 y el de la semana los sábados por la
+  mañana. Se añaden con **+** y se quitan con **−**. Si el equipo estaba dormido a
+  esa hora, sale al despertar en vez de perderse el día.
 
 También puedes mandarlo cuando quieras desde el menú de la barra: **Enviar
 resumen por correo**.

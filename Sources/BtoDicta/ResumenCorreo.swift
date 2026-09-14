@@ -142,26 +142,80 @@ enum ResumenCorreo {
         }
     }
 
+    // MARK: Reglas de envío
+
+    /// Una regla: a tal hora, tal día, mándame tal periodo.
+    ///
+    /// Se guardan como LISTA, no como un horario con un periodo común: el mismo
+    /// usuario quiere el resumen del día anterior a primera hora, el del día en
+    /// curso al cerrar la tarde y el de la semana los sábados. Con un solo
+    /// periodo para todos los horarios eso no se puede expresar.
+    struct Regla: Codable, Identifiable, Equatable {
+        var id = UUID().uuidString
+        var hora: String          // "HH:mm"
+        var periodo: String       // hoy | ayer | semana
+        var dias: String          // "diario" o "lun,mar,…,dom"
+        var activa: Bool = true
+
+        static let nombresDia = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"]
+
+        /// ¿Toca hoy? `dias` vacío o "diario" significa todos los días.
+        func tocaHoy(_ fecha: Date) -> Bool {
+            let d = dias.trimmingCharacters(in: .whitespaces).lowercased()
+            if d.isEmpty || d == "diario" { return true }
+            let idx = Calendar.current.component(.weekday, from: fecha) - 1   // 0 = domingo
+            guard idx >= 0, idx < Regla.nombresDia.count else { return true }
+            return d.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                    .contains(Regla.nombresDia[idx])
+        }
+
+        var descripcion: String {
+            let p = Periodo(rawValue: periodo)?.titulo ?? periodo
+            let cuando = (dias.isEmpty || dias == "diario") ? "cada día" : dias
+            return "\(cuando) a las \(hora) · el resumen \(p)"
+        }
+    }
+
+    /// Las reglas guardadas. Si no hay ninguna pero sí la configuración
+    /// antigua —un horario y un periodo sueltos—, se convierte sola: nadie
+    /// pierde lo que ya tenía puesto.
+    static func reglas() -> [Regla] {
+        if let datos = (Config.json0("correo_reglas") as? String)?.data(using: .utf8),
+           let lista = try? JSONDecoder().decode([Regla].self, from: datos), !lista.isEmpty {
+            return lista
+        }
+        let periodo = Config.correoPeriodo()
+        return Config.correoHorarios().map { Regla(hora: $0, periodo: periodo, dias: "diario") }
+    }
+
+    static func guardarReglas(_ lista: [Regla]) {
+        guard let d = try? JSONEncoder().encode(lista),
+              let s = String(data: d, encoding: .utf8) else { return }
+        Config.set("correo_reglas", to: s)
+    }
+
     // MARK: Horarios
 
-    private static var ultimoEnvio: [String: String] = [:]   // "HH:mm" → "yyyy-MM-dd"
+    private static var ultimoEnvio: [String: String] = [:]   // id de regla → "yyyy-MM-dd"
 
-    /// Se llama desde el reloj que ya recorre la aplicación. Envía cuando toca y
-    /// una sola vez por horario y día, aunque el equipo despierte más tarde.
+    /// Se llama desde el reloj que ya recorre la aplicación. Recorre TODAS las
+    /// reglas y envía las que toquen, una sola vez cada una por día, aunque el
+    /// equipo despierte más tarde de la hora fijada.
     static func revisarHorarios(ahora: Date = Date()) {
         guard Config.correoAutomatico(), !Config.correoDestinatarios().isEmpty else { return }
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let d = DateFormatter(); d.dateFormat = "yyyy-MM-dd"
         let hhmm = f.string(from: ahora), hoy = d.string(from: ahora)
-        let periodo = Periodo(rawValue: Config.correoPeriodo()) ?? .ayer
-        for h in Config.correoHorarios() {
-            guard ultimoEnvio[h] != hoy else { continue }
+        for regla in reglas() where regla.activa {
+            guard regla.tocaHoy(ahora) else { continue }
+            guard ultimoEnvio[regla.id] != hoy else { continue }
             // Se dispara en la hora fijada o después: si el equipo estaba
             // dormido a las 07:00, el resumen sale al despertar en vez de
             // perderse ese día.
-            guard hhmm >= h else { continue }
-            ultimoEnvio[h] = hoy
-            Log.log(.sistema, "correo: toca el envío de las \(h) (\(periodo.rawValue))")
+            guard hhmm >= regla.hora else { continue }
+            ultimoEnvio[regla.id] = hoy
+            let periodo = Periodo(rawValue: regla.periodo) ?? .ayer
+            Log.log(.sistema, "correo: toca «\(regla.descripcion)»")
             enviar(periodo, ahora: ahora) { _ in }
         }
     }

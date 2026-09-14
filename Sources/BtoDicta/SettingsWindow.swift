@@ -71,8 +71,7 @@ final class SettingsModel: ObservableObject {
     @Published var smtpClave: String { didSet { ApiKeys.set("SMTP_PASSWORD", smtpClave) } }
     @Published var correoDest: String { didSet { Config.set("correo_destinatarios", to: correoDest) } }
     @Published var correoAuto: Bool { didSet { Config.set("correo_automatico", to: correoAuto) } }
-    @Published var correoHorarios: String { didSet { Config.set("correo_horarios", to: correoHorarios) } }
-    @Published var correoPeriodo: String { didSet { Config.set("correo_periodo", to: correoPeriodo) } }
+    @Published var correoReglas: [ResumenCorreo.Regla] { didSet { ResumenCorreo.guardarReglas(correoReglas) } }
     @Published var correoPrueba = ""
     @Published var cancelarConfirma: Bool { didSet { Config.set("cancelar_confirma", to: cancelarConfirma) } }
     @Published var cancelarConserva: Double { didSet { Config.set("cancelar_conserva_desde_s", to: cancelarConserva) } }
@@ -199,8 +198,7 @@ final class SettingsModel: ObservableObject {
         smtpClave = ApiKeys.get("SMTP_PASSWORD")
         correoDest = (Config.json0("correo_destinatarios") as? String) ?? ""
         correoAuto = Config.correoAutomatico()
-        correoHorarios = Config.correoHorarios().joined(separator: ", ")
-        correoPeriodo = Config.correoPeriodo()
+        correoReglas = ResumenCorreo.reglas()
         cancelarConfirma = Config.cancelarConfirma()
         cancelarConserva = Config.cancelarConservaDesdeSegundos()
         pausarMultimedia = Config.duckMedia()
@@ -723,14 +721,45 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Toggle("Enviarlo solo, a su hora", isOn: $m.correoAuto)
-                HStack {
-                    TextField("Horarios (07:00, 20:00)", text: $m.correoHorarios).frame(width: 160)
-                    Picker("Periodo", selection: $m.correoPeriodo) {
-                        Text("el día de hoy").tag("hoy")
-                        Text("el día anterior").tag("ayer")
-                        Text("la semana").tag("semana")
-                    }.frame(width: 220)
-                }.disabled(!m.correoAuto)
+                if m.correoAuto {
+                    Text("Cada línea es un envío independiente: su hora, su periodo y los días en que toca. Puedes tener los que quieras.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    ForEach($m.correoReglas) { $r in
+                        HStack(spacing: 6) {
+                            Toggle("", isOn: $r.activa).labelsHidden()
+                            TextField("07:00", text: $r.hora).frame(width: 58)
+                            Picker("", selection: $r.periodo) {
+                                Text("de hoy").tag("hoy")
+                                Text("de ayer").tag("ayer")
+                                Text("de la semana").tag("semana")
+                            }.labelsHidden().frame(width: 130)
+                            Picker("", selection: $r.dias) {
+                                Text("cada día").tag("diario")
+                                Text("lunes").tag("lun")
+                                Text("martes").tag("mar")
+                                Text("miércoles").tag("mie")
+                                Text("jueves").tag("jue")
+                                Text("viernes").tag("vie")
+                                Text("sábados").tag("sab")
+                                Text("domingos").tag("dom")
+                                Text("entre semana").tag("lun,mar,mie,jue,vie")
+                            }.labelsHidden().frame(width: 130)
+                            Button {
+                                m.correoReglas.removeAll { $0.id == r.id }
+                            } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.borderless)
+                                .help("Quitar este envío")
+                        }
+                    }
+                    Button {
+                        m.correoReglas.append(ResumenCorreo.Regla(hora: "07:00", periodo: "ayer", dias: "diario"))
+                    } label: { Label("Añadir envío", systemImage: "plus.circle") }
+                        .buttonStyle(.borderless)
+                    if m.correoReglas.isEmpty {
+                        Text("Sin envíos configurados: no se mandará nada solo.")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
                 Text("También puedes mandarlo cuando quieras desde el menú de la barra: «Enviar resumen por correo».")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Mostrar el panel al dictar", isOn: $m.panelVisible)

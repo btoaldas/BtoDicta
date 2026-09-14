@@ -1,6 +1,6 @@
 # Spec 003 — Resumen de la bitácora por correo
 
-- Estado: Implementada (0.61.0)
+- Estado: Implementada (0.61.0 y 0.62.0)
 - Tipo: funcionalidad
 - Nivel: X
 - Fecha: 2026-09-14
@@ -196,7 +196,7 @@ pegados uno tras otro— donde las ideas repetidas aparezcan una vez.
 | RF-02 — la prueba dice por qué falló | **Hecho** | `BTODICTA_CORREOTEST=1`: clave mala → «535 Incorrect authentication data»; puerto mal → error de conexión; destinatario inválido → lo nombra. Cada uno con su consejo |
 | RF-03 — destinatarios | **Hecho** | Campo separado por comas |
 | RF-04 — consolidar con IA sin repetir | **Hecho** | Envío real de 23 204 caracteres de bitácora consolidados |
-| RF-05 — horarios con su periodo | **Hecho** | Reloj propio de un minuto; dispara en la hora o después, una vez por horario y día |
+| RF-05 — horarios con su periodo | **Hecho del todo en 0.62.0** | Primera versión tenía UN periodo común para todos los horarios, que no expresaba el requisito. Ahora son reglas independientes: cada una con su hora, su periodo y sus días (incluido «los sábados» y «entre semana»), se añaden y se quitan desde la interfaz |
 | RF-06 — enviar a mano | **Hecho** | Menú de la barra → «Enviar resumen por correo» |
 | RF-07 — queda registrado | **Hecho** | Una línea por intento con causa; traza del diálogo con `BTODICTA_SMTPDEBUG=1` |
 
