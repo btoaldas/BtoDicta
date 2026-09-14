@@ -2,15 +2,24 @@ import Foundation
 
 // MARK: - Versión de la app (UN solo lugar; actualizar aquí en cada release)
 //
-// La UI (sidebar, Créditos, menú) lee de aquí. El Makefile inyecta
-// Version.numero al Info.plist del bundle (CFBundleShortVersionString).
+// La UI (sidebar, Créditos, menú) lee de aquí. El paquete lee su versión del
+// Info.plist, que NO se inyecta desde aquí: hay que subir las dos a la vez
+// (`CFBundleShortVersionString` y `CFBundleVersion`). `scripts/release.sh`
+// compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.56.1"
+    static let numero = "0.56.2"
     static let fecha = "2026-09-13"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.56.2", "2026-09-13", [
+            "ARREGLADO: un dictado podía quedarse sin entregar para siempre. Cuando la recuperación de texto perdido arrancaba el motor por lotes y este se atascaba, nadie cortaba la espera: el texto no llegaba nunca y el panel se quedaba en «Recuperando lo que falta». Ahora la recuperación entrega SIEMPRE lo que tenga al cumplirse su tope, y el proceso atascado se detiene solo",
+            "ARREGLADO: cada congelación del motor en vivo costaba minuto y medio de audio transcritos para nada. Se pedía la ventana de audio y después se descartaba el resultado por no saber en qué punto del texto coserlo. Ahora ese punto se anota en el momento en que el motor enmudece, así que la ventana se aprovecha y el tramo congelado a mitad del dictado sí se recupera",
+            "ARREGLADO: las elisiones marcadas con el carácter «…» no se detectaban; solo las escritas con tres puntos. Según qué motor transcribiera, la mitad de los huecos quedaba invisible",
+            "ARREGLADO: al pasar de BetoDicta a BtoDicta, el registro de la semana en curso se quedaba con el nombre anterior y no volvía a archivarse nunca — una semana entera desaparecía del diagnóstico. Ahora se une al nuevo, en orden y sin borrar nada: el original se conserva aparte",
+            "Prueba propia reproducible de los cuatro arreglos: BTODICTA_REDTEST2=1",
+        ]),
         ("0.56.1", "2026-09-13", [
             "ARREGLADO el asistente de mudanza, que no llegaba a instalar nada. Dos fallos encadenados: viajaba sin la clave con la que se comprueba la firma de las descargas (toda instalación moría con «firma del release no válida»), y preguntaba si había una versión «más nueva» cuando él viaja dentro del mismo paquete que la aplicación, así que la respuesta era siempre «ya estás al día». Ahora lleva la clave y pide directamente el último paquete publicado",
             "Probado de punta a punta: el asistente descarga, verifica la firma, instala la aplicación, la abre y se cierra solo",

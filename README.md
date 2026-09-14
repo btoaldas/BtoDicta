@@ -34,6 +34,20 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.56.2
+
+- **El dictado se entrega siempre.** Si la recuperación de texto perdido
+  arrancaba el motor por lotes y este se atascaba, nadie cortaba la espera: el
+  texto no llegaba nunca. Ahora hay un tope que entrega lo recuperado pase lo
+  que pase, y al proceso atascado se le manda parar.
+- **Cada congelación costaba minuto y medio de audio para nada.** Se pedía la
+  ventana y se descartaba el resultado por no saber dónde coserlo. Ese punto se
+  anota ahora en el instante en que el motor enmudece, así que el tramo
+  congelado a mitad del dictado sí se recupera.
+- **Las elisiones marcadas con «…» ya se ven** (antes solo las de tres puntos).
+- **Al venir de BetoDicta, el registro de la semana ya no se pierde**: se une al
+  nuevo en orden y el original se conserva aparte.
+
 ### Novedades 0.56.1
 
 - **El asistente de mudanza ya instala de verdad.** Viajaba sin la clave con la

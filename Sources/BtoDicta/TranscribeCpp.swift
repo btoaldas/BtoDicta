@@ -68,8 +68,10 @@ enum TranscribeCpp {
             task.standardError = Pipe()
             do {
                 try task.run()
+                let guardia = WhisperCLI.vigilar(task, wav: wav.count)
                 let data = out.fileHandleForReading.readDataToEndOfFile()
                 task.waitUntilExit()
+                guardia.cancel()
                 let salida = String(data: data, encoding: .utf8) ?? ""
                 // La transcripción viene en la línea "text: …"
                 let texto = salida.split(separator: "\n")

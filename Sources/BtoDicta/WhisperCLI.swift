@@ -44,7 +44,9 @@ enum WhisperCLI {
             task.standardError = FileHandle.nullDevice
             do {
                 try task.run()
+                let guardia = vigilar(task, wav: wav.count)
                 task.waitUntilExit()
+                guardia.cancel()
                 let texto = ((try? String(contentsOf: salidaTxt, encoding: .utf8)) ?? "")
                     .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
                     .filter { !$0.isEmpty }
@@ -58,5 +60,32 @@ enum WhisperCLI {
                 DispatchQueue.main.async { completion(.failure(error)) }
             }
         }
+    }
+
+    /// Perro guardián del proceso, compartido con `TranscribeCpp`.
+    ///
+    /// `waitUntilExit()` espera PARA SIEMPRE. Si el binario se atasca —modelo a
+    /// medio descargar, disco lleno, memoria agotada— el hilo queda colgado y
+    /// la llamada no devuelve nunca: quien esperaba el texto no recibe ni
+    /// siquiera un error, y el dictado se queda en el aire. Se le da un margen
+    /// generoso y proporcional al audio, porque esto tiene que funcionar
+    /// también en un equipo lento, y pasado ese margen se le manda parar:
+    /// entonces `waitUntilExit` devuelve y el fallo se puede tratar.
+    ///
+    /// Quien lo llama debe cancelar la guardia al terminar bien.
+    static func vigilar(_ task: Process, wav bytes: Int) -> DispatchWorkItem {
+        let segundos = Double(max(0, bytes - 44)) / Double(RedSeguridadDictado.bytesPorSegundo)
+        let margen = max(120.0, segundos * 6)
+        let guardia = DispatchWorkItem {
+            guard task.isRunning else { return }
+            Log.log(.ia, "transcripción por lotes atascada más de \(Int(margen)) s — detengo el proceso")
+            task.terminate()
+            // Si a los 5 s sigue vivo es que no atiende señales suaves.
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5) {
+                if task.isRunning { kill(task.processIdentifier, SIGKILL) }
+            }
+        }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + margen, execute: guardia)
+        return guardia
     }
 }

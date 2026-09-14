@@ -921,8 +921,10 @@ Los motores de dictado **en vivo** trabajan al ritmo del habla y, en grabaciones
 - **Mientras dictas**: si hay voz y el texto deja de crecer durante unos segundos, el motor se da por colgado y se **relanza desde el punto exacto** en que se quedó. Lo ya transcrito se conserva; en el notch verás un instante *"⏱️ Reanudando el motor…"*. Hasta 8 rescates por dictado (`motor_vivo_relanzos_max`), con freno si el motor no revive.
 - **Al soltar la tecla**: solo si hay una señal real de rotura —el motor mudo con voz, el texto cortado a mitad de frase, o puntos suspensivos que el motor dejó dentro del texto— se revisan **esos tramos y nada más**, con una ventana corta de audio cada uno, y se cosen en su sitio. Un dictado sano **no paga nada**: ni una transcripción de más, ni un segundo de espera.
 - **Cuánto cuesta**: reparar los dos cortes y el final de un dictado de 15 minutos tardó **6,6 s**; rehacer ese dictado entero habría costado 44 s. Corre con tu motor local, sin nube y sin IA.
-- En el registro: *"dictado: el motor se saltó texto hacia el segundo N — reviso ese tramo"* y *"dictado: N tramos recuperados, +N palabras"*.
-- Ajustes: `motor_vivo_sin_texto_s` (segundos sin texto para dar por colgado el motor, 12 por defecto; 0 lo desactiva) y `dictado_red_seguridad` (desactiva la reparación).
+- **El dictado se entrega siempre** (desde 0.56.2). La reparación tiene un tope propio (`dictado_red_seguridad_tope_s`, 180 s por defecto): cumplido ese plazo entrega lo que lleve recuperado, aunque el motor por lotes siga trabajando, y al proceso atascado se le manda parar. Antes, un motor que no respondía dejaba el dictado sin entregar y el notch clavado en *"Recuperando lo que falta"*.
+- En el registro: *"dictado: el motor se saltó texto hacia el segundo N — reviso ese tramo"* y *"dictado: N tramos recuperados, +N palabras"*. Si salta el tope: *"la recuperación pasó de N s — entrego lo que hay"*.
+- Ajustes: `motor_vivo_sin_texto_s` (segundos sin texto para dar por colgado el motor, 12 por defecto; 0 lo desactiva), `dictado_red_seguridad` (desactiva la reparación) y `dictado_red_seguridad_tope_s` (tope de toda la reparación).
+- Para comprobarlo en tu Mac: `BTODICTA_REDTEST2=1 /Applications/BtoDicta.app/Contents/MacOS/BtoDicta` — 12 comprobaciones, unos 30 s, sin tocar tu configuración.
 
 ### El disco crece: audio crudo de la bitácora sin comprimir
 

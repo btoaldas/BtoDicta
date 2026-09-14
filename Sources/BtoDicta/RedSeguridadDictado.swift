@@ -87,14 +87,19 @@ enum RedSeguridadDictado {
         let total = texto.count
         guard total > 200, pcmBytes > 0 else { return [] }
         var out: [Hueco] = []
-        var desde = texto.startIndex
-        while let r = texto.range(of: "...", range: desde..<texto.endIndex) {
-            desde = r.upperBound
-            let off = texto.distance(from: texto.startIndex, to: r.lowerBound)
-            // El del final no cuenta como elisión interna.
-            guard total - off > 40 else { continue }
-            let byte = Int(Double(off) / Double(total) * Double(pcmBytes))
-            out.append(Hueco(byte: byte, corteTexto: off, origen: .elision))
+        // Un motor marca lo que se saltó con tres puntos y otro con el carácter
+        // único «…». Se buscan los dos: mirar solo uno deja la mitad de los
+        // huecos sin ver, según qué motor esté transcribiendo.
+        for marca in ["...", "…"] {
+            var desde = texto.startIndex
+            while let r = texto.range(of: marca, range: desde..<texto.endIndex) {
+                desde = r.upperBound
+                let off = texto.distance(from: texto.startIndex, to: r.lowerBound)
+                // El del final no cuenta como elisión interna.
+                guard total - off > 40 else { continue }
+                let byte = Int(Double(off) / Double(total) * Double(pcmBytes))
+                out.append(Hueco(byte: byte, corteTexto: off, origen: .elision))
+            }
         }
         return out
     }
@@ -164,7 +169,10 @@ enum RedSeguridadDictado {
     /// Cada hueco cuesta una ventana corta de audio (no el dictado entero) y
     /// nunca puede empeorar el texto: si la ventana no encaja, se deja como
     /// estaba. El pulido llega después, una sola vez, sobre el texto ya unido.
+    /// `tope` solo lo usa la prueba propia, para no tener que tocar la
+    /// configuración real del equipo; en uso normal manda el valor de Config.
     static func repararTodo(vivo: String, pcm: Data, huecos: [Hueco], colaDesdeByte: Int?,
+                            tope: Double? = nil,
                             completion: @escaping (String, String?) -> Void) {
         guard Config.redSeguridadDictado(), let motor = motorLotes() else {
             completion(vivo, nil); return
@@ -175,21 +183,44 @@ enum RedSeguridadDictado {
         let palabrasAntes = palabras(vivo)
         var texto = vivo
         var reparados = 0
-        let grupo = DispatchGroup()
         let inicioTodo = Date()
+
+        // El dictado SE ENTREGA SIEMPRE, pase lo que pase con la reparación.
+        // Quien nos llamó ya dio por respondido al motor en vivo y desarmó su
+        // propio tope: si esta cadena no llamara a `completion`, el texto no
+        // llegaría nunca y el panel se quedaría en «Recuperando lo que falta».
+        var entregado = false
+        func entregar(_ t: String, _ via: String?) {
+            guard !entregado else { return }
+            entregado = true
+            completion(t, via)
+        }
 
         func terminar() {
             let ganadas = palabras(texto) - palabrasAntes
             if reparados == 0 || ganadas <= 0 {
                 Log.log(.ia, "dictado: nada que recuperar — el texto ya estaba completo")
-                completion(vivo, nil); return
+                entregar(vivo, nil); return
             }
             let ms = Int(Date().timeIntervalSince(inicioTodo) * 1000)
             Log.log(.ia, "dictado: \(reparados) \(reparados == 1 ? "tramo recuperado" : "tramos recuperados") con \(motor.nombre), +\(ganadas) palabras en \(ms)ms")
-            completion(texto, "+\(motor.nombre)")
+            entregar(texto, "+\(motor.nombre)")
+        }
+
+        // Tope de toda la reparación, no de cada tramo. Aunque el motor por
+        // lotes se cuelgue y su propio perro guardián tarde en morderle, aquí
+        // se entrega lo que haya: más vale el dictado con un hueco que ningún
+        // dictado. Lo recuperado hasta ese instante SÍ va incluido.
+        let topeTotal = tope ?? Double(Config.redSeguridadTopeSegundos())
+        DispatchQueue.main.asyncAfter(deadline: .now() + topeTotal) {
+            guard !entregado else { return }
+            Log.log(.ia, "dictado: la recuperación pasó de \(Int(topeTotal)) s — entrego lo que hay")
+            let ganadas = palabras(texto) - palabrasAntes
+            entregar(ganadas > 0 ? texto : vivo, ganadas > 0 ? "+\(motor.nombre)" : nil)
         }
 
         func siguienteHueco(_ i: Int) {
+            guard !entregado else { return }          // el tope ya entregó
             guard i < lista.count else {
                 // Al final, la cola: el tramo desde el último texto conocido
                 // hasta el final del audio.
@@ -201,6 +232,15 @@ enum RedSeguridadDictado {
                 return
             }
             let h = lista[i]
+            // Sin punto de corte en el TEXTO no hay dónde coser lo que se
+            // recupere, así que transcribir la ventana sería pagar 90 s de
+            // motor para tirar el resultado. Se comprueba ANTES de gastar nada,
+            // no después: ese era el orden y costaba una transcripción entera
+            // por cada congelación detectada, sin recuperar una sola palabra.
+            guard let corte = h.corteTexto else {
+                Log.debug("dictado: el tramo del segundo \(h.byte / bytesPorSegundo) no trae punto de corte — no gasto motor en él")
+                siguienteHueco(i + 1); return
+            }
             let media = 45 * bytesPorSegundo                                   // ±45 s alrededor
             // SIEMPRE en frontera de muestra: el PCM es de 16 bits, así que
             // empezar en un byte impar parte cada muestra por la mitad y el
@@ -211,11 +251,11 @@ enum RedSeguridadDictado {
             let wavV = HistoryWriter.wavData(pcm: pcm.subdata(in: a..<b))
             TranscribeCpp.run(wav: wavV, modelo: motor.modelo) { r in
                 DispatchQueue.main.async {
+                    guard !entregado else { return }
                     switch r {
                     case .failure(let e):
                         Log.log(.ia, "dictado: no pude leer ese tramo (\(e.localizedDescription))")
                     case .success(let ventana):
-                        guard let corte = h.corteTexto else { break }
                         Log.debug("dictado: tramo del segundo \(h.byte / bytesPorSegundo) → \(palabras(ventana)) palabras de referencia")
                         if let cosido = coser(texto: texto, ventana: ventana, cerca: corte) {
                             if palabras(cosido) > palabras(texto) {
@@ -233,7 +273,6 @@ enum RedSeguridadDictado {
                 }
             }
         }
-        _ = grupo
         siguienteHueco(0)
     }
 

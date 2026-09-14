@@ -1369,6 +1369,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
+        // Los cuatro arreglos de la red de seguridad, sin necesitar el audio
+        // del dictado original y sin tocar la configuración real del equipo:
+        //   BTODICTA_REDTEST2=1
+        if ProcessInfo.processInfo.environment["BTODICTA_REDTEST2"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("RED2 \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+
+            // 1) Las elisiones se marcan con tres puntos O con el carácter «…».
+            let base = String(repeating: "palabra ", count: 40)
+            let cola = String(repeating: "otra ", count: 40)
+            let conTres = base + "... " + cola
+            let conUno  = base + "… " + cola
+            chk(RedSeguridadDictado.elisionesInternas(conTres, pcmBytes: 32_000 * 100).count == 1,
+                "detecta la elisión escrita «...»")
+            chk(RedSeguridadDictado.elisionesInternas(conUno, pcmBytes: 32_000 * 100).count == 1,
+                "detecta también la elisión escrita «…» (antes era invisible)")
+
+            guard let motor = RedSeguridadDictado.motorLotes() else {
+                print("RED2 ✗ no hay motor local por lotes — la prueba necesita uno"); exit(1)
+            }
+            print("RED2 motor por lotes: \(motor.nombre) (\(motor.modelo))")
+
+            // 2) Un hueco sin punto de corte NO puede arrancar el motor: antes
+            //    transcribía 90 s de audio y tiraba el resultado.
+            let mudo = Data(count: 32_000 * 180)
+            let sinCorte = RedSeguridadDictado.Hueco(byte: 32_000 * 90, corteTexto: nil, origen: .congelacion)
+            let t0 = Date()
+            RedSeguridadDictado.repararTodo(vivo: "un texto cualquiera", pcm: mudo,
+                                            huecos: [sinCorte], colaDesdeByte: nil) { texto, _ in
+                let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                chk(ms < 1_500, "un hueco sin punto de corte no gasta motor (\(ms)ms, antes ~90 s de audio)")
+                chk(texto == "un texto cualquiera", "y devuelve el texto intacto")
+
+                // 3) El perro guardián entrega SIEMPRE, y una sola vez, aunque
+                //    el motor por lotes siga trabajando.
+                var entregas = 0
+                let t1 = Date()
+                RedSeguridadDictado.repararTodo(vivo: "texto en vivo", pcm: mudo,
+                                                huecos: [], colaDesdeByte: 0, tope: 2) { t, _ in
+                    entregas += 1
+                    let ms1 = Int(Date().timeIntervalSince(t1) * 1000)
+                    if entregas == 1 {
+                        chk(ms1 >= 1_800 && ms1 < 6_000, "el tope entrega a los \(ms1)ms, no espera al motor")
+                        chk(!t.isEmpty, "y entrega texto, nunca nada")
+                    }
+                }
+                // Se espera a que el motor termine de verdad para comprobar que
+                // su respuesta tardía NO entrega por segunda vez.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 25) {
+                    chk(entregas == 1, "entregó exactamente una vez (fueron \(entregas))")
+
+                    // 4) El registro de la semana no se queda atrás al cambiar
+                    //    de nombre: se une, en orden, y no se borra nada.
+                    let tmp = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("red2-\(UUID().uuidString)")
+                    try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+                    let viejo = tmp.appendingPathComponent("betodicta.log")
+                    let nuevo = tmp.appendingPathComponent("btodicta.log")
+                    try? "ANTES\n".write(to: viejo, atomically: true, encoding: .utf8)
+                    try? "DESPUES\n".write(to: nuevo, atomically: true, encoding: .utf8)
+                    Rebautizo.mudarRegistro(en: tmp)
+                    let unido = (try? String(contentsOf: nuevo, encoding: .utf8)) ?? ""
+                    chk(unido == "ANTES\nDESPUES\n", "une el registro anterior delante del nuevo → «\(unido.replacingOccurrences(of: "\n", with: "·"))»")
+                    chk(FileManager.default.fileExists(
+                            atPath: tmp.appendingPathComponent("betodicta.log.original").path),
+                        "conserva el original aparte — no borra nada")
+                    chk(!FileManager.default.fileExists(atPath: viejo.path),
+                        "y ya no queda un registro huérfano con el nombre viejo")
+                    // Segunda pasada: no debe duplicar la historia.
+                    Rebautizo.mudarRegistro(en: tmp)
+                    let otraVez = (try? String(contentsOf: nuevo, encoding: .utf8)) ?? ""
+                    chk(otraVez == unido, "correrlo dos veces no duplica el registro")
+                    try? FileManager.default.removeItem(at: tmp)
+
+                    print("RED2 \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+                }
+            }
+            RunLoop.main.run(); return
+        }
         // Micrófono de ESTE equipo con el código real: BTODICTA_MICTEST=1
         // Comprueba que entra audio sea cual sea la frecuencia del aparato
         // (44 100, 48 000, 96 000 Hz…) y que fijar el dispositivo no lo enmudece.
@@ -4104,7 +4183,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Tramos que quedaron SIN texto y no se pudieron rescatar en caliente.
     /// Un dictado largo puede romperse varias veces; se reparan todos al
     /// cerrar, cada uno con su ventana de audio, nunca el dictado entero.
-    private var vivoHuecos: [Int] = []
+    /// Tramos que el motor en vivo se dejó sin transcribir: dónde están en el
+    /// AUDIO y dónde va lo que falte dentro del TEXTO. Las dos cosas, porque
+    /// con la posición del audio sola no hay manera de coser lo recuperado.
+    private var vivoHuecos: [(byte: Int, corte: Int)] = []
     /// Relanzamientos seguidos que no produjeron ni una palabra: si el motor
     /// no revive, se deja de insistir y ese tramo se repara al final.
     private var vivoRelanzosSecos = 0
@@ -4141,8 +4223,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // tramo y se repara al cerrar, sin seguir gastando arranques.
         if vivoUltimoLargo == 0 && vivoRelanzado > 0 { vivoRelanzosSecos += 1 }
         guard vivoRelanzado < Config.motorVivoRelanzosMax(), vivoRelanzosSecos < 2 else {
-            if !vivoHuecos.contains(where: { abs($0 - vivoBytesAlCrecer) < 32_000 * 10 }) {
-                vivoHuecos.append(vivoBytesAlCrecer)
+            if !vivoHuecos.contains(where: { abs($0.byte - vivoBytesAlCrecer) < 32_000 * 10 }) {
+                // El punto de corte en el TEXTO es la longitud que este tenía
+                // justo cuando el motor enmudeció: ahí, y no en otro sitio, va
+                // lo que dejó de transcribir. Estimarlo por proporción sería
+                // coser a ciegas; esto es el dato exacto y lo tenemos aquí.
+                let corte = RedSeguridadDictado.unir(vivoPrefijo, lastPartial).count
+                vivoHuecos.append((byte: vivoBytesAlCrecer, corte: corte))
                 Log.log(.ia, "dictado: el motor no revive; apunto el tramo del segundo \(vivoBytesAlCrecer / 32_000) para recuperarlo al terminar")
             }
             vivoUltimoCrecimiento = Date()   // no repetir el aviso cada 5 s
@@ -4525,7 +4612,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 // colgarse y los que el motor se saltó dejando "..." dentro
                 // del texto. Cada uno se revisa con su propia ventana corta.
                 var huecos = (self?.vivoHuecos ?? []).map {
-                    RedSeguridadDictado.Hueco(byte: $0, corteTexto: nil, origen: .congelacion)
+                    RedSeguridadDictado.Hueco(byte: $0.byte, corteTexto: $0.corte, origen: .congelacion)
                 }
                 huecos += RedSeguridadDictado.elisionesInternas(mejorVivo, pcmBytes: pcm.count)
                 _ = motivo
@@ -4590,7 +4677,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self?.panel.update("⏳ Recuperando el final…")
                     let pcmN = self?.audioDictado ?? Data()
                     var huecosN = (self?.vivoHuecos ?? []).map {
-                        RedSeguridadDictado.Hueco(byte: $0, corteTexto: nil, origen: .congelacion)
+                        RedSeguridadDictado.Hueco(byte: $0.byte, corteTexto: $0.corte, origen: .congelacion)
                     }
                     huecosN += RedSeguridadDictado.elisionesInternas(mejor, pcmBytes: pcmN.count)
                     _ = motivo

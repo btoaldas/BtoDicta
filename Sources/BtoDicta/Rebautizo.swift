@@ -51,6 +51,40 @@ enum Rebautizo {
         }
     }
 
+    /// El archivo de registro VIVO también llevaba el nombre anterior, y vive
+    /// DENTRO de la carpeta que se acaba de mover, así que la mudanza de
+    /// carpetas no lo toca. Si se queda atrás, la semana en curso queda partida
+    /// en dos: la rotación semanal solo archiva el nombre nuevo, de modo que la
+    /// mitad vieja no se archiva jamás y desaparece de todo diagnóstico.
+    /// Medido en una instalación real: 1,5 MB de registro (una semana entera)
+    /// invisibles desde el momento del cambio de nombre.
+    static func mudarRegistro(en carpeta: URL) {
+        let fm = FileManager.default
+        let viejo = carpeta.appendingPathComponent("betodicta.log")
+        let nuevo = carpeta.appendingPathComponent("btodicta.log")
+        let apartado = carpeta.appendingPathComponent("betodicta.log.original")
+        guard fm.fileExists(atPath: viejo.path) else { return }
+        // Si ya se unió una vez, no se vuelve a unir: duplicaría la historia.
+        guard !fm.fileExists(atPath: apartado.path) else { return }
+        if !fm.fileExists(atPath: nuevo.path) {
+            try? fm.moveItem(at: viejo, to: nuevo)
+            NSLog("BtoDicta: el registro de la semana conserva su historia")
+            return
+        }
+        // Existen los dos: lo anterior va DELANTE (es lo más antiguo) y el
+        // original se conserva aparte. Aquí no se borra nada nunca. Es seguro
+        // reescribir: el registro se abre y se cierra en cada línea, y esto
+        // corre antes de que se escriba la primera.
+        guard let antes = try? Data(contentsOf: viejo),
+              let ahora = try? Data(contentsOf: nuevo) else { return }
+        var junto = antes
+        junto.append(ahora)
+        guard (try? junto.write(to: nuevo)) != nil else { return }
+        try? fm.moveItem(at: viejo, to: apartado)
+        NSLog("BtoDicta: el registro anterior (%d bytes) se unió al de la semana en curso",
+              antes.count)
+    }
+
     static func aplicar() {
         let casa = FileManager.default.homeDirectoryForCurrentUser
         let fm = FileManager.default
@@ -76,5 +110,8 @@ enum Rebautizo {
                 try? fm.createSymbolicLink(at: destino, withDestinationURL: origen)
             }
         }
+        // Siempre, aunque la carpeta ya estuviera movida de una versión
+        // anterior: el archivo de registro se quedó dentro con el nombre viejo.
+        mudarRegistro(en: casa.appendingPathComponent(".btodicta"))
     }
 }
