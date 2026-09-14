@@ -1443,6 +1443,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             chk(u > 0 && u <= 5, "el umbral por defecto son \(u) s — conserva casi todo")
             chk(Double(seg) >= u, "un dictado de \(seg) s queda por encima del umbral")
 
+            // 4) Escape necesita repetirse: una sola pulsación no cancela.
+            chk(Config.escDoble(), "Escape exige dos pulsaciones por omisión")
+            let v = Config.escDobleSegundos()
+            chk(v >= 0.2 && v <= 3, "la ventana para repetir son \(v) s")
+            self.escUltimaQA = .distantPast
+            self.escPulsado()
+            chk(self.recorder.isRecording == false, "la primera pulsación no arranca ni para nada")
+            chk(self.escUltimaQA != .distantPast, "pero deja armada la segunda")
+            chk(Config.cancelarConfirma() == false, "la confirmación del notch viene apagada (la doble Esc ya protege)")
+
             print("CANCEL \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
         }
         // Troceo adaptativo: que ni el audio ni el texto pierdan nada al partirse.
@@ -2731,6 +2741,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.onCancelar = { [weak self] in
             guard let self else { return }
             if self.hayConfirmacion { self.resolverConfirmacion(acepta: false, origen: "clic_notch"); return }
+            // Con la confirmación puesta, el clic en el notch pide repetirse,
+            // igual que Escape. Se prefiere repetir a un cuadro de diálogo: un
+            // modal a mitad de un dictado interrumpe más de lo que protege.
+            if Config.cancelarConfirma(), self.recorder.isRecording {
+                self.escPulsadoConfirmando(); return
+            }
             self.cancelarTodo()
         }
         panel.onMotorClick = { [weak self] in
@@ -3620,7 +3636,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let delegate = Unmanaged<AppDelegate>.fromOpaque(userData!).takeUnretainedValue()
             DispatchQueue.main.async {
                 if hotKeyID.id == 1 { delegate.pulsarAtajoCarbon() }
-                if hotKeyID.id == 2 { delegate.cancelarTodo() }   // Esc = cancela dictado O agente/voz
+                if hotKeyID.id == 2 { delegate.escPulsado() }   // Esc = cancela dictado O agente/voz
                 if hotKeyID.id == 3 { delegate.aprenderDeSeleccion() }
                 if hotKeyID.id == 4 { delegate.resolverConfirmacion(acepta: false, origen: "tecla_x") }
             }
@@ -3630,6 +3646,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var escHotKeyRef: EventHotKeyRef?
     private var confirmXHotKeyRef: EventHotKeyRef?
+    private var escUltima = Date.distantPast
+    /// Espejo de `escUltima` para la prueba propia.
+    var escUltimaQA: Date { get { escUltima } set { escUltima = newValue } }
+
+    /// Escape mientras se dicta. `RegisterEventHotKey` se queda la tecla en TODO
+    /// el sistema, así que una sola pulsación nunca llega a la ventana que
+    /// tengas delante: cerrar una vista previa con Esc cancelaba el dictado.
+    ///
+    /// Ahora hace falta pulsarla DOS veces seguidas. La primera no cancela nada
+    /// —solo arma la segunda—, de modo que un Esc suelto deja de tumbar el
+    /// dictado. Es el mismo criterio que ya usa la app para la doble pulsación
+    /// de la tecla de dictado. Se vuelve al comportamiento de una sola pulsación
+    /// con `esc_doble` en false.
+    /// Pedir confirmación por repetición, venga de donde venga la cancelación.
+    func escPulsadoConfirmando() {
+        let ahora = Date()
+        if ahora.timeIntervalSince(escUltima) <= Config.escDobleSegundos() {
+            escUltima = .distantPast; cancelarTodo(); return
+        }
+        escUltima = ahora
+        panel.flash("¿Cancelar la grabación? Repite para confirmar",
+                    segundos: Config.escDobleSegundos())
+    }
+
+    func escPulsado() {
+        guard Config.escDoble() else { cancelarTodo(); return }
+        let ahora = Date()
+        if ahora.timeIntervalSince(escUltima) <= Config.escDobleSegundos() {
+            escUltima = .distantPast
+            cancelarTodo()
+            return
+        }
+        escUltima = ahora
+        guard recorder.isRecording else { return }
+        panel.flash("Esc otra vez para cancelar", segundos: Config.escDobleSegundos())
+    }
 
     /// Esc se apropia SOLO durante el dictado — sin permisos extra.
     private func armEsc() {

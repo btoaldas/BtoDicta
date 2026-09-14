@@ -929,9 +929,11 @@ recupera desde la pestaña de transcribir. Solo se descarta lo que dura menos de
 dos segundos — una pulsación accidental sin nada dentro. El umbral se ajusta con
 `cancelar_conserva_desde_s` (0 conserva siempre).
 
-**Ojo, sigue pendiente**: Escape continúa siendo global, de modo que puede
-interrumpir un dictado desde otra aplicación. Ya no pierdes nada cuando ocurre,
-pero hay que volver a empezar. Si te molesta, apágalo con `esc_cancela`.
+Y desde 0.59.2 **Escape hay que pulsarlo dos veces** para que cancele: la
+primera solo avisa en el notch (*"Esc otra vez para cancelar"*). Así cierras una
+vista previa con Esc sin cortar el dictado. Ajustes: `esc_doble` (quítalo para
+volver a una sola pulsación), `esc_doble_s` (0,8 s para repetir) y
+`cancelar_confirma` (hace que cancelar desde el notch también pida repetirse).
 
 ### Dicté una hora y el motor no lo admitió
 

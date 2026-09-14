@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.59.2
+
+- **Un Escape suelto ya no cancela el dictado.** Hay que pulsarlo **dos veces
+  seguidas**: la primera solo avisa en el notch. Así puedes cerrar una vista
+  previa con Esc sin cortar lo que estás grabando.
+- Nuevo ajuste `cancelar_confirma` (apagado): hace que cancelar desde el notch
+  también pida repetirse.
+
 ### Novedades 0.59.1
 
 - **Cancelar un dictado ya no lo borra.** Cancelar ejecutaba un borrado real del

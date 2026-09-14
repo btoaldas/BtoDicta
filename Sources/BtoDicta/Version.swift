@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.59.1"
+    static let numero = "0.59.2"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.59.2", "2026-09-14", [
+            "UN ESCAPE SUELTO YA NO CANCELA EL DICTADO. Mientras grabas, esa tecla queda capturada en todo el sistema, de modo que pulsarla para cerrar una vista previa o una ventana cualquiera cortaba la grabación. Ahora hay que pulsarla DOS veces seguidas: la primera solo avisa en el notch («Esc otra vez para cancelar») y la segunda cancela. Se vuelve al comportamiento anterior con «esc_doble» en false, y la ventana para repetir se ajusta con «esc_doble_s»",
+            "Nuevo ajuste «cancelar_confirma» (apagado por omisión): con él, cancelar tocando el notch también pide repetirse. Se confirma repitiendo la acción y no con un cuadro de diálogo, porque un modal a mitad de un dictado interrumpe más de lo que protege",
+        ]),
         ("0.59.1", "2026-09-14", [
             "CANCELAR UN DICTADO YA NO LO BORRA. Hasta ahora, cancelar ejecutaba un borrado real del archivo de audio y del texto: no se abandonaba la grabación, se destruía. Y como la tecla Escape queda registrada como atajo GLOBAL mientras grabas, bastaba con pulsarla para cerrar una ventana de otra aplicación para perder el dictado entero. Ahora un dictado cancelado se cierra como cualquier otro —queda su .wav en el historial y en la bitácora, junto al texto que ya se hubiera transcrito— y se recupera desde donde se recuperan todos. Solo se descarta lo que dura menos de dos segundos, que es una pulsación accidental sin nada dentro; el umbral se ajusta con «cancelar_conserva_desde_s»",
             "Prueba propia: BTODICTA_CANCELTEST=1",

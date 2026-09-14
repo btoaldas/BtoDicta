@@ -1113,6 +1113,18 @@ struct Config {
     static func redSeguridadDictado() -> Bool {
         (json()["dictado_red_seguridad"] as? Bool) ?? true
     }
+    /// Pedir confirmación (repitiendo la acción) también al cancelar desde el
+    /// notch, no solo con Escape. Apagado por omisión: la doble pulsación de
+    /// Escape ya evita el accidente que motivó esto.
+    static func cancelarConfirma() -> Bool { (json()["cancelar_confirma"] as? Bool) ?? false }
+    /// Escape exige DOS pulsaciones seguidas para cancelar. Una sola no puede
+    /// tumbar un dictado: mientras se graba, esa tecla está capturada en todo el
+    /// sistema y el usuario suele pulsarla para cerrar una ventana ajena.
+    static func escDoble() -> Bool { (json()["esc_doble"] as? Bool) ?? true }
+    /// Cuánto tiempo cuenta como «seguidas» las dos pulsaciones de Escape.
+    static func escDobleSegundos() -> Double {
+        min(3, max(0.2, (json()["esc_doble_s"] as? Double) ?? 0.8))
+    }
     /// Desde cuántos segundos un dictado CANCELADO se conserva en el historial
     /// en vez de borrarse. Cancelar nunca debe destruir lo grabado: por debajo
     /// de este umbral solo se descarta lo que no tiene nada dentro. 0 conserva

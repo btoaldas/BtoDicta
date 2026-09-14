@@ -1,6 +1,6 @@
 # Spec 002 — Corrección: Cancelar un dictado no puede borrar el audio
 
-- Estado: Aprobada · RF-01 implementado en 0.59.1
+- Estado: Implementada (0.59.1 y 0.59.2)
 - Tipo: correccion
 - Nivel: X
 - Fecha: 2026-09-14
@@ -133,5 +133,5 @@ Dos defectos encadenados, ambos confirmados leyendo el código:
 | RF | Estado | Evidencia |
 |---|---|---|
 | RF-01 — cancelar conserva el audio | **Hecho** en 0.59.1 | `BTODICTA_CANCELTEST=1`, 8 de 8 |
-| RF-02 — Escape no roba la tecla | **Pendiente** | Sigue siendo atajo global; con RF-01 hecho, ya no destruye nada, pero interrumpe |
-| RF-03 — confirmación opcional | **Pendiente** (P2) | — |
+| RF-02 — Escape no roba la tecla | **Hecho** en 0.59.2 | `BTODICTA_CANCELTEST=1`. Solución adoptada: Escape exige repetirse dentro de 0,8 s. `RegisterEventHotKey` se queda la tecla en todo el sistema y no hay forma de devolvérsela a la otra aplicación sin dejar de vigilarla; con la doble pulsación, un Esc suelto deja de cancelar, que es el daño real |
+| RF-03 — confirmación opcional | **Hecho** en 0.59.2 | `cancelar_confirma`, apagado por omisión. Se confirma repitiendo la acción en vez de con un cuadro de diálogo: un modal a mitad de dictado interrumpe más de lo que protege |
