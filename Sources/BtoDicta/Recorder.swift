@@ -136,7 +136,21 @@ final class Recorder {
         engine.stop()
         isRecording = false
         candado.lock(); defer { candado.unlock() }
-        return wavFile(from: samples)
+        let wav = wavFile(from: samples)
+        // Se suelta el PCM en cuanto está el WAV. Antes se quedaba vivo hasta
+        // el siguiente dictado, así que durante toda la transcripción convivían
+        // dos copias completas del audio: en seis horas, 1,4 GB para nada.
+        samples = Data()
+        return wav
+    }
+
+    /// Los últimos `segundos` de audio, sin copiar el dictado entero. Para las
+    /// vistas previas en vivo, que no necesitan lo que ya se transcribió.
+    func pcmReciente(segundos: Double) -> Data {
+        candado.lock(); defer { candado.unlock() }
+        let tope = Int(segundos * Recorder.frecuenciaInterna) * 2
+        guard samples.count > tope else { return samples }
+        return samples.suffix(tope)
     }
 
     private func wavFile(from pcm: Data) -> Data {

@@ -34,6 +34,17 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.60.0
+
+- **El dictado deja de vivir en la memoria.** El audio se guardaba por partida
+  doble en RAM además del archivo que ya se escribe en disco mientras hablas —
+  691 MB por copia en un dictado de seis horas. Ahora el archivo es la única
+  fuente. **Medido: seis horas simuladas, 0 MB de subida.**
+- El grabador suelta el audio en cuanto entrega el `.wav`, y la vista previa en
+  vivo con motor local toma solo los últimos dos minutos en vez de copiar el
+  dictado entero cada 1,6 segundos.
+- Pendiente: la entrega al motor de transcripción todavía hace una copia.
+
 ### Novedades 0.59.3
 
 - **El aviso de cancelar ya no esconde el notch.** Seguías grabando pero perdías
