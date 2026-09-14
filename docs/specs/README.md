@@ -14,7 +14,7 @@ otra spec con `Modifica: NNN`.
 | NNN | Título | Estado | Nivel | Tipo | Fecha | Aprobada por | Modifica | Fase |
 |---|---|---|---|---|---|---|---|---|
 | 001 | Memoria del dictado largo | Aprobada | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «acepto, como te digo, la recomendación de X, pero bajo esos términos y cuidados que te digo» | ninguna | Lista para plan |
-| 002 | Corrección: Cancelar un dictado no puede borrar el audio | Borrador | X | correccion | 2026-09-14 | PENDIENTE | ninguna | Especificando |
-| 003 | Resumen de la bitácora por correo | Borrador | X | funcionalidad | 2026-09-14 | PENDIENTE | ninguna | Especificando |
+| 002 | Corrección: Cancelar un dictado no puede borrar el audio | Implementada (0.59.1 y 0.59.2) | X | correccion | 2026-09-14 | Alberto — 2026-09-14 — «vamos de los tres [pendientes] el que sea más rápido»; RF-01 era «de ley» | ninguna | Especificando |
+| 003 | Resumen de la bitácora por correo | Implementada (0.61.0) | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «hagámoslas todas bajo goal, una por una… puedes utilizar un correo de eztic.ec para probarlo» | ninguna | Especificando |
 
 <!-- sdd:indice:fin -->

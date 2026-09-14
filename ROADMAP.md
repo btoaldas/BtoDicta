@@ -58,23 +58,28 @@ una rama que sobrevive a la sesión diverge y acaba perdiendo trabajo.
 | NNN | Título | Estado | Nivel | Tipo | Fecha | Aprobada por | Modifica | Fase |
 |---|---|---|---|---|---|---|---|---|
 | 001 | Memoria del dictado largo | Aprobada | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «acepto, como te digo, la recomendación de X, pero bajo esos términos y cuidados que te digo» | ninguna | Lista para plan |
-| 002 | Corrección: Cancelar un dictado no puede borrar el audio | Borrador | X | correccion | 2026-09-14 | PENDIENTE | ninguna | Especificando |
-| 003 | Resumen de la bitácora por correo | Borrador | X | funcionalidad | 2026-09-14 | PENDIENTE | ninguna | Especificando |
+| 002 | Corrección: Cancelar un dictado no puede borrar el audio | Implementada (0.59.1 y 0.59.2) | X | correccion | 2026-09-14 | Alberto — 2026-09-14 — «vamos de los tres [pendientes] el que sea más rápido»; RF-01 era «de ley» | ninguna | Especificando |
+| 003 | Resumen de la bitácora por correo | Implementada (0.61.0) | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «hagámoslas todas bajo goal, una por una… puedes utilizar un correo de eztic.ec para probarlo» | ninguna | Especificando |
 
 <!-- sdd:indice:fin -->
 
 ## Próximo
 
-1. **Spec 001 — Memoria del dictado largo.** Aprobada; toca el grabador, así que
-   va con la gobernanza de rama corta. Objetivo: seis horas de dictado sin que la
-   memoria dependa de la duración.
-2. **Spec 002 — Cancelar un dictado no puede borrar el audio.** Defecto
-   confirmado: Escape es un atajo global y `discard()` elimina el archivo. En
-   especificación.
-3. **Spec 003 — Resumen de la bitácora por correo.** En especificación.
+1. **Spec 001, segunda etapa.** Los motores reciben el audio como datos y no
+   como archivo, así que al transcribir se sigue haciendo una copia completa.
+   Pasarlos a transmitir desde disco toca la interfaz de los doce.
+2. **Correo en HTML con logotipo.** La primera versión va en texto plano, que es
+   lo que no cae en spam; queda para cuando el canal esté rodado.
+3. Pendientes heredados: `docs/PENDIENTES-0.50.1.md`, `-0.51.1.md`, `-0.53.0.md`.
 
 ## Hecho recientemente
 
+- **0.61.0** — El resumen de la bitácora llega por correo, consolidado con IA,
+  desde la cuenta del propio usuario. La prueba de envío dice por qué falla.
+- **0.60.0** — El dictado deja de vivir en la memoria: seis horas simuladas, 0 MB
+  de subida.
+- **0.59.1-0.59.3** — Cancelar un dictado ya no lo borra, un Escape suelto ya no
+  lo corta, y sus ajustes salen en la interfaz.
 - **0.59.0** — Troceo adaptativo: se descubre el techo de cada motor al chocar
   con él, se parte con solape y se cose; se aprende, y se olvida cuando la
   medida se contradice. Corregido un cuelgue de conexión que afectaba a los doce
