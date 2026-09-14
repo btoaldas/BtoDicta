@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.59.2"
+    static let numero = "0.59.3"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.59.3", "2026-09-14", [
+            "ARREGLADO: el aviso de «Esc otra vez para cancelar» cerraba el notch. Seguías grabando pero perdías de vista el texto en vivo, el cronómetro y las barras de voz, que es justo lo que hace falta para decidir si cancelar o no. Ahora el aviso sale sin esconder nada y, al pasar, el notch recupera lo que decía",
+            "Los ajustes de cancelación ya están en Configuración → Ajustes, justo debajo de «Cancelar con Esc»: pedir dos pulsaciones, confirmar también al tocar el notch, y desde cuántos segundos se guarda lo cancelado. Antes solo existían en el archivo de configuración",
+        ]),
         ("0.59.2", "2026-09-14", [
             "UN ESCAPE SUELTO YA NO CANCELA EL DICTADO. Mientras grabas, esa tecla queda capturada en todo el sistema, de modo que pulsarla para cerrar una vista previa o una ventana cualquiera cortaba la grabación. Ahora hay que pulsarla DOS veces seguidas: la primera solo avisa en el notch («Esc otra vez para cancelar») y la segunda cancela. Se vuelve al comportamiento anterior con «esc_doble» en false, y la ventana para repetir se ajusta con «esc_doble_s»",
             "Nuevo ajuste «cancelar_confirma» (apagado por omisión): con él, cancelar tocando el notch también pide repetirse. Se confirma repitiendo la acción y no con un cuadro de diálogo, porque un modal a mitad de un dictado interrumpe más de lo que protege",

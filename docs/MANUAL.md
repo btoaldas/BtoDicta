@@ -931,9 +931,14 @@ dos segundos — una pulsación accidental sin nada dentro. El umbral se ajusta 
 
 Y desde 0.59.2 **Escape hay que pulsarlo dos veces** para que cancele: la
 primera solo avisa en el notch (*"Esc otra vez para cancelar"*). Así cierras una
-vista previa con Esc sin cortar el dictado. Ajustes: `esc_doble` (quítalo para
-volver a una sola pulsación), `esc_doble_s` (0,8 s para repetir) y
-`cancelar_confirma` (hace que cancelar desde el notch también pida repetirse).
+vista previa con Esc sin cortar el dictado. El aviso **no esconde el notch**: sigues viendo el texto en vivo, el cronómetro
+y las barras mientras decides, y al pasar recupera lo que decía.
+
+Todo esto se configura en **Configuración → Ajustes**, justo debajo de «Cancelar
+con Esc»: *Pedir dos pulsaciones para cancelar*, *Confirmar también al cancelar
+tocando el notch* y *Guardar lo cancelado desde N segundos* (ponlo en «siempre»
+para no descartar nada). En el archivo son `esc_doble`, `esc_doble_s`,
+`cancelar_confirma` y `cancelar_conserva_desde_s`.
 
 ### Dicté una hora y el motor no lo admitió
 

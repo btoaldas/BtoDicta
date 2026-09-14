@@ -1453,6 +1453,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             chk(self.escUltimaQA != .distantPast, "pero deja armada la segunda")
             chk(Config.cancelarConfirma() == false, "la confirmación del notch viene apagada (la doble Esc ya protege)")
 
+            // 5) El aviso de la primera pulsación NO puede cerrar el notch:
+            //    sigues grabando y tienes que seguir viendo el texto en vivo,
+            //    el cronómetro y las barras.
+            self.panel.show("texto en vivo")
+            self.panel.avisoSinCerrar("Esc otra vez para cancelar", segundos: 0.3)
+            chk(self.panel.visibleQA, "tras el aviso el notch SIGUE abierto")
+            let espera = XCTEsperaQA(0.6)
+            chk(espera, "se espera a que pase el aviso")
+            chk(self.panel.visibleQA, "y sigue abierto cuando el aviso caduca")
+            chk(self.panel.textoQA == "texto en vivo", "y recupera lo que decía → «\(self.panel.textoQA)»")
+            self.panel.hide(after: 0)
+
             print("CANCEL \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
         }
         // Troceo adaptativo: que ni el audio ni el texto pierdan nada al partirse.
@@ -3666,8 +3678,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             escUltima = .distantPast; cancelarTodo(); return
         }
         escUltima = ahora
-        panel.flash("¿Cancelar la grabación? Repite para confirmar",
-                    segundos: Config.escDobleSegundos())
+        panel.avisoSinCerrar("¿Cancelar la grabación? Repite para confirmar",
+                             segundos: Config.escDobleSegundos())
     }
 
     func escPulsado() {
@@ -3680,7 +3692,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         escUltima = ahora
         guard recorder.isRecording else { return }
-        panel.flash("Esc otra vez para cancelar", segundos: Config.escDobleSegundos())
+        panel.avisoSinCerrar("Esc otra vez para cancelar", segundos: Config.escDobleSegundos())
     }
 
     /// Esc se apropia SOLO durante el dictado — sin permisos extra.

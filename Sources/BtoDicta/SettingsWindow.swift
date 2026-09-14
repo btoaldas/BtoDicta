@@ -63,6 +63,9 @@ final class SettingsModel: ObservableObject {
     @Published var silencioMax: Double { didSet { Config.set("silencio_max_seg", to: silencioMax) } }
     @Published var sonidos: Bool { didSet { Config.set("sonidos", to: sonidos) } }
     @Published var escCancela: Bool { didSet { Config.set("esc_cancela", to: escCancela) } }
+    @Published var escDoble: Bool { didSet { Config.set("esc_doble", to: escDoble) } }
+    @Published var cancelarConfirma: Bool { didSet { Config.set("cancelar_confirma", to: cancelarConfirma) } }
+    @Published var cancelarConserva: Double { didSet { Config.set("cancelar_conserva_desde_s", to: cancelarConserva) } }
     @Published var pausarMultimedia: Bool { didSet { Config.set("atenuar_multimedia", to: pausarMultimedia) } }
     @Published var bajarVolumen: Bool { didSet { Config.set("silenciar_ademas", to: bajarVolumen) } }
     @Published var postProceso: Bool { didSet { Config.set("post_proceso", to: postProceso) } }
@@ -178,6 +181,9 @@ final class SettingsModel: ObservableObject {
         silencioMax = Config.maxSilence()
         sonidos = Config.sounds()
         escCancela = Config.escCancels()
+        escDoble = Config.escDoble()
+        cancelarConfirma = Config.cancelarConfirma()
+        cancelarConserva = Config.cancelarConservaDesdeSegundos()
         pausarMultimedia = Config.duckMedia()
         bajarVolumen = Config.muteToo()
         postProceso = Config.postProcess()
@@ -650,6 +656,21 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Sonidos de inicio y fin", isOn: $m.sonidos)
                 Toggle("Cancelar con Esc", isOn: $m.escCancela)
+                Toggle("Pedir dos pulsaciones para cancelar", isOn: $m.escDoble)
+                    .disabled(!m.escCancela).padding(.leading, 18)
+                Text("Mientras grabas, Esc queda capturado en todo el sistema: si lo pulsas para cerrar una ventana cualquiera, cortabas el dictado. Con esto la primera pulsación solo avisa en el notch y hace falta repetirla.")
+                    .font(.caption).foregroundStyle(.secondary).padding(.leading, 18)
+                Toggle("Confirmar también al cancelar tocando el notch", isOn: $m.cancelarConfirma)
+                    .padding(.leading, 18)
+                HStack {
+                    Text("Guardar lo cancelado desde")
+                    Stepper(value: $m.cancelarConserva, in: 0...60, step: 1) {
+                        Text(m.cancelarConserva == 0 ? "siempre" : "\(Int(m.cancelarConserva)) s")
+                            .monospacedDigit()
+                    }
+                }.padding(.leading, 18)
+                Text("Cancelar NUNCA borra lo grabado: queda en el historial y lo recuperas desde Transcribir. Por debajo de este tiempo se descarta, porque es una pulsación sin nada dentro.")
+                    .font(.caption).foregroundStyle(.secondary).padding(.leading, 18)
                 Toggle("Mostrar el panel al dictar", isOn: $m.panelVisible)
                 Toggle("Mostrar autoayuda rápida al pasar el cursor", isOn: $m.autoAyuda)
                 Text("Explica al instante para qué sirve cada botón o enlace. VoiceOver conserva estas descripciones aunque ocultes la burbuja.")

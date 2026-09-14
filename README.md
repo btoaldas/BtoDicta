@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.59.3
+
+- **El aviso de cancelar ya no esconde el notch.** Seguías grabando pero perdías
+  de vista el texto en vivo y el cronómetro.
+- **Los ajustes de cancelación están en la interfaz**, en *Configuración →
+  Ajustes*, debajo de «Cancelar con Esc».
+
 ### Novedades 0.59.2
 
 - **Un Escape suelto ya no cancela el dictado.** Hay que pulsarlo **dos veces

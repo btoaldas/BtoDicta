@@ -301,6 +301,11 @@ final class DictationPanel {
         if let t = cronoTimer { RunLoop.main.add(t, forMode: .common) }
     }
 
+    /// ¿El notch está a la vista? Lo usa la prueba propia.
+    var visibleQA: Bool { panel.isVisible }
+    /// Lo que dice ahora mismo la línea de texto. Lo usa la prueba propia.
+    var textoQA: String { label.stringValue }
+
     /// Lo que se lee ahora mismo en el cronómetro. Lo usa la prueba propia.
     var cronoTextoQA: String { cronoLabel.stringValue }
 
@@ -520,6 +525,27 @@ final class DictationPanel {
     }
 
     /// Muestra un aviso breve por N segundos, por encima del texto del dictado.
+    /// Aviso breve que NO esconde el notch: al terminar recupera lo que decía.
+    ///
+    /// `flash` programa su propio cierre, y eso estaba mal para avisar a mitad
+    /// de un dictado: el aviso salía y acto seguido desaparecía el panel entero
+    /// —con el texto en vivo, el cronómetro y el medidor— aunque se siguiera
+    /// grabando. Si sigues hablando, el notch se queda.
+    func avisoSinCerrar(_ texto: String, segundos: TimeInterval) {
+        guard Config.panelVisible(), !capturaPrivadaActiva, !enRespuestaIA,
+              !resultadoCapturaPersistenteActivo else { return }
+        let previo = label.stringValue
+        label.stringValue = texto
+        panel.orderFrontRegardless()
+        let id = presentacionID
+        DispatchQueue.main.asyncAfter(deadline: .now() + segundos) { [weak self] in
+            guard let self, self.presentacionID == id else { return }
+            // Solo se restaura si nadie escribió algo más entretanto: el texto
+            // en vivo manda sobre el aviso.
+            if self.label.stringValue == texto { self.label.stringValue = previo }
+        }
+    }
+
     func flash(_ text: String, segundos: TimeInterval = 2.5) {
         guard Config.panelVisible(), !capturaPrivadaActiva, !enRespuestaIA,
               !resultadoCapturaPersistenteActivo else { return }
@@ -864,4 +890,14 @@ final class DictationPanel {
             }
         }
     }
+}
+
+/// Espera bloqueante corta para las pruebas propias: deja correr el bucle
+/// principal, que es quien restaura el aviso, sin dormir el hilo.
+func XCTEsperaQA(_ segundos: TimeInterval) -> Bool {
+    let hasta = Date().addingTimeInterval(segundos)
+    while Date() < hasta {
+        RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+    }
+    return true
 }
