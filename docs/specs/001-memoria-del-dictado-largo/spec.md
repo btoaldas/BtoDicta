@@ -1,12 +1,12 @@
 # Spec 001 — Memoria del dictado largo
 
-- Estado: Borrador
+- Estado: Aprobada
 - Tipo: funcionalidad
 - Nivel: X (heredado del ROADMAP; lo fija sw-ciclo)
 - Fecha: 2026-09-14
 - Modifica: ninguna
-- Aprobada por: PENDIENTE
-- Rama: `spec/001-memoria-dictado-largo` (el nivel X obliga a rama propia)
+- Aprobada por: Alberto — 2026-09-14 — «acepto, como te digo, la recomendación de X, pero bajo esos términos y cuidados que te digo»
+- Rama: `spec/001-memoria-dictado-largo`, con la gobernanza de rama corta del ROADMAP (no sobrevive a la sesión)
 
 ## 1. Problema y propósito
 
@@ -161,4 +161,12 @@ consume un dictado no dependerá de su duración.
   eficiencia, la garantía y la disponibilidad del sistema por memoria». Se
   midió: 1 ms leer un tramo frente a 23 000 ms de la llamada siguiente. Queda
   como RF-03 y RNF-02, con cifra y prueba, en vez de como promesa.
-- P: ¿Nivel X o P? → R: [PENDIENTE DE DECISIÓN: el responsable del producto pidió que se le explicara la diferencia; recomendación argumentada: X]
+- P: ¿Nivel X o P? → R: X (decisión del responsable del producto), con la
+  condición expresa de que las ramas no se acumulen: «se me hace muy difícil a mí
+  estar manteniendo dos ramas… cuando se termine una rama se cierre
+  completamente». Queda como gobernanza de rama corta en el ROADMAP.
+- P: ¿Qué preocupa más de este cambio? → R: «este cambio me parece un poco
+  peligroso, porque cambia la forma en la que la voz guarda y pasa y transcribe…
+  toca hacerlo con mucho cuidado». Y el estado de partida que no se puede
+  empeorar: «ahorita al sistema lo siento súper ágil». De ahí salen RF-03 y
+  RNF-03 (decisión del responsable del producto)

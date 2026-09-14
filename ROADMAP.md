@@ -35,15 +35,43 @@ Pase de lista de `sw-ciclo`, con lo descartado y su razón.
 | Móvil | **No** | Es una aplicación de escritorio |
 | Mantenimiento | Sí | Dependencias de terceros y costos de API |
 
+## Gobernanza de ramas — rama corta y cierre obligatorio
+
+Regla de Alberto, 2026-09-14: *«se me hace muy difícil a mí estar manteniendo dos
+ramas… cuando se termine una rama se cierre completamente»*. El riesgo es real:
+en este repositorio trabajan varias sesiones y a veces más de un agente, así que
+una rama que sobrevive a la sesión diverge y acaba perdiendo trabajo.
+
+- Una rama de spec **nace y muere en la misma sesión de trabajo**. Si no se
+  termina, se decide explícitamente: se fusiona lo que esté probado (detrás de un
+  ajuste apagado por defecto si hace falta) o se descarta con su razón escrita.
+  No se deja abierta «para mañana».
+- **Lo instalado siempre sale de `main`.** Mientras una rama está viva, el uso
+  diario no depende de ella.
+- Antes de fusionar: las seis baterías en verde sobre el paquete construido desde
+  la rama, y la spec con su `verificacion.md` al día.
+- Al fusionar: se borra la rama en local y en remoto, y el hito lo deja escrito.
+
 ## Especificaciones
 
 <!-- sdd:indice:inicio -->
+| NNN | Título | Estado | Nivel | Tipo | Fecha | Aprobada por | Modifica | Fase |
+|---|---|---|---|---|---|---|---|---|
+| 001 | Memoria del dictado largo | Aprobada | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «acepto, como te digo, la recomendación de X, pero bajo esos términos y cuidados que te digo» | ninguna | Lista para plan |
+| 002 | Corrección: Cancelar un dictado no puede borrar el audio | Borrador | X | correccion | 2026-09-14 | PENDIENTE | ninguna | Especificando |
+| 003 | Resumen de la bitácora por correo | Borrador | X | funcionalidad | 2026-09-14 | PENDIENTE | ninguna | Especificando |
+
 <!-- sdd:indice:fin -->
 
 ## Próximo
 
-- **Memoria del dictado largo** — que un dictado de hasta seis horas no dependa
-  de tener el audio completo en memoria. En especificación.
+1. **Spec 001 — Memoria del dictado largo.** Aprobada; toca el grabador, así que
+   va con la gobernanza de rama corta. Objetivo: seis horas de dictado sin que la
+   memoria dependa de la duración.
+2. **Spec 002 — Cancelar un dictado no puede borrar el audio.** Defecto
+   confirmado: Escape es un atajo global y `discard()` elimina el archivo. En
+   especificación.
+3. **Spec 003 — Resumen de la bitácora por correo.** En especificación.
 
 ## Hecho recientemente
 

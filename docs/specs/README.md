@@ -11,5 +11,10 @@ otra spec con `Modifica: NNN`.
 ## Índice
 
 <!-- sdd:indice:inicio -->
-(lo genera scripts/indice-specs.py --escribir)
+| NNN | Título | Estado | Nivel | Tipo | Fecha | Aprobada por | Modifica | Fase |
+|---|---|---|---|---|---|---|---|---|
+| 001 | Memoria del dictado largo | Aprobada | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «acepto, como te digo, la recomendación de X, pero bajo esos términos y cuidados que te digo» | ninguna | Lista para plan |
+| 002 | Corrección: Cancelar un dictado no puede borrar el audio | Borrador | X | correccion | 2026-09-14 | PENDIENTE | ninguna | Especificando |
+| 003 | Resumen de la bitácora por correo | Borrador | X | funcionalidad | 2026-09-14 | PENDIENTE | ninguna | Especificando |
+
 <!-- sdd:indice:fin -->
