@@ -79,7 +79,9 @@ enum Rebautizo {
               let ahora = try? Data(contentsOf: nuevo) else { return }
         var junto = antes
         junto.append(ahora)
-        guard (try? junto.write(to: nuevo)) != nil else { return }
+        // Atómica: sin ella, un corte a media escritura dejaría el registro
+        // truncado y ya no habría de dónde recuperarlo.
+        guard (try? junto.write(to: nuevo, options: .atomic)) != nil else { return }
         try? fm.moveItem(at: viejo, to: apartado)
         NSLog("BtoDicta: el registro anterior (%d bytes) se unió al de la semana en curso",
               antes.count)
