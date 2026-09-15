@@ -917,6 +917,27 @@ Un dictado que no recibe audio ya no se queda pensando: a los 6 segundos se cier
 
 Significa que el micrófono no está dando sonido a BtoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.
 
+### OpenCode Go como IA de pulido
+
+Desde 0.63.1 puedes usar tu suscripción de **OpenCode Go** —la mensual con
+decenas de modelos abiertos incluidos: DeepSeek, GLM, Qwen, Kimi, MiniMax,
+Grok— para **pulir, los modos y el agente**. Pon la clave en *Modelos* como
+cualquier otra.
+
+**No sirve para transcribir.** OpenCode solo expone modelos de texto; no tiene
+voz a texto ni texto a voz, así que no aparece entre los motores de dictado.
+
+Dos avisos que ahorran un rato de confusión:
+
+- **La misma clave vale para dos servicios distintos.** *Zen* es pago por uso y
+  *Go* es tu plan mensual, y cada uno tiene su propia dirección. Si apuntas al de
+  Zen sin haber recargado, te dirá «sin saldo» aunque tu plan de Go esté activo y
+  funcionando. BtoDicta usa el de Go.
+- El modelo que viene puesto es **`deepseek-v4.1-flash`**, elegido midiendo: pule
+  en 2,8 segundos frente a los 17-20 de las alternativas del mismo plan. Puedes
+  cambiarlo, pero varios de esos modelos razonan antes de escribir y devuelven
+  el texto vacío si el presupuesto se queda corto.
+
 ### ¿Está caído? ¿Me queda saldo? — el panel de Salud
 
 **Configuración → Salud** responde de un vistazo lo que antes obligaba a leer el
