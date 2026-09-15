@@ -8,11 +8,18 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.62.1"
+    static let numero = "0.63.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.63.0", "2026-09-15", [
+            "PANEL DE SALUD: una sección nueva en Configuración con el estado real de todo, sin abrir el registro. Saldo de los proveedores que lo publican, prueba de vida de TODOS los que tengas configurados —veintitrés en una instalación normal, entre IA, dictado y voz—, quién está apartado ahora mismo y por qué, los techos de tamaño que la aplicación ha aprendido de cada motor, y la cola de la bitácora",
+            "AVISO DE SALDO BAJO: hasta ahora uno se enteraba de que se acabó cuando un dictado fallaba a mitad. Se avisa al bajar del 15 % o de 5 dólares, una vez al día por proveedor, sin interrumpir nada. Los umbrales se ajustan con «saldo_aviso_fraccion» y «saldo_aviso_minimo_usd»",
+            "SEIS proveedores dan saldo de verdad, cada uno en su unidad: ElevenLabs en caracteres, Fish Audio, DeepSeek, OpenRouter y Novita en dinero, y Speechmatics en horas consumidas. La lista salió de PROBARLOS uno por uno con claves reales, no de la documentación: Deepgram y Anthropic sí tienen consulta de saldo pero exigen clave de administrador, así que con una clave normal es como si no existiera",
+            "De los demás no se inventa una estimación —no cuadraría con la factura—: se prueba si responden y se LEE lo que contestan. Ahí aparecen cosas que de otro modo no se saben, como una cuenta suspendida por impago o por llegar al tope de gasto del mes; el panel lo dice con esas palabras en vez de con un código HTTP",
+            "Prueba propia: BTODICTA_SALUDTEST=1",
+        ]),
         ("0.62.1", "2026-09-14", [
             "ARREGLADO de raíz que el pulido se volviera lento cuando un proveedor de IA deja de contestar. La aplicación ya apartaba al que fallaba, pero a una espera agotada le daba solo QUINCE SEGUNDOS: al dictado siguiente, un minuto después, volvía a llamarlo y se comía su plazo entero otra vez. Ahora el castigo sube con los fallos seguidos —un minuto, cinco, un cuarto de hora— y se perdona entero en cuanto el proveedor vuelve a contestar. Un mal momento se disculpa; una caída de horas no se paga en cada dictado",
             "ARREGLADO que un dictado largo pudiera entregarse recortado. La comprobación de integridad exigía que el resultado bajara de 32 caracteres para sospechar, así que un dictado de cinco mil devuelto con ochocientos pasaba como bueno. Ahora se rechaza cualquier pulido que pierda más de la mitad de las letras y se entrega el original. Vale para cualquier proveedor y modelo, sin tener que saber cuál razona ni cuánto gasta pensando antes de escribir",

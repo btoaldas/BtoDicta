@@ -917,6 +917,31 @@ Un dictado que no recibe audio ya no se queda pensando: a los 6 segundos se cier
 
 Significa que el micrófono no está dando sonido a BtoDicta: lo tiene otra aplicación, cambió el dispositivo de entrada, o quedó en mal estado tras un cierre brusco. La bitácora **no se apaga**: reintenta y, si insiste el problema, baja a un intento por minuto y vuelve sola en cuanto el micrófono responda. Revisa qué app está usando el micrófono (el punto naranja de la barra de menús) y, si acabas de cerrar algo de audio, dale un momento.
 
+### ¿Está caído? ¿Me queda saldo? — el panel de Salud
+
+**Configuración → Salud** responde de un vistazo lo que antes obligaba a leer el
+registro:
+
+- **Saldo** de los seis que lo publican, cada uno en su unidad: **ElevenLabs**
+  en caracteres; **Fish Audio**, **DeepSeek**, **OpenRouter** y **Novita** en
+  dinero; **Speechmatics** en horas consumidas. En verde, naranja o rojo según lo
+  que quede. La lista salió de probarlos uno por uno: Deepgram y Anthropic tienen
+  consulta de saldo, pero exigen una clave de administrador.
+- **Todos los demás proveedores** que tengas configurados —veintitrés en una
+  instalación como la de referencia—, con su **prueba de vida**: si responden, en
+  cuánto, y si su clave sigue valiendo. Se **lee lo que contestan**, así que
+  aparecen cosas que de otro modo no se saben: una cuenta suspendida por impago o
+  por llegar al tope de gasto del mes se dice con esas palabras. De los que no
+  publican saldo no se inventa una estimación — no cuadraría con la factura.
+- **Quién está apartado ahora mismo** y cuánto le queda, tanto de dictado como de
+  pulido.
+- **Techos de tamaño aprendidos** por cada motor, con el equivalente en minutos.
+- **Cola de la bitácora**: si está alta, suele ser por varios días a batería.
+
+Además avisa solo cuando un saldo baja del **15 %** o de **5 dólares**, una vez
+al día por proveedor. Los umbrales se cambian con `saldo_aviso_fraccion` y
+`saldo_aviso_minimo_usd`.
+
 ### El pulido tarda mucho de pronto
 
 Si el pulido pasa de un segundo a veinte, casi siempre es que **un proveedor de

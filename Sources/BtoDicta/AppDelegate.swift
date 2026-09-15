@@ -1410,6 +1410,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
+        // Panel de salud y aviso de saldo (spec 004).
+        //   BTODICTA_SALUDTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_SALUDTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("SALUD \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            ContinuoIndice.shared.abrir()
+            NotificacionSaldo.mostrarReal = false   // no abrir avisos del sistema en la prueba
+
+            // Lo local: se puede listar sin red.
+            chk(!CuarentenaSTT.listado().isEmpty || CuarentenaSTT.listado().isEmpty,
+                "las cuarentenas de dictado se pueden listar (\(CuarentenaSTT.listado().count) activas)")
+            CuarentenaSTT.registrar("prueba", nombre: "Prueba", error: ScribeError.http(402, "sin saldo"))
+            let l = CuarentenaSTT.listado()
+            chk(l.contains { $0.id == "prueba" }, "un proveedor apartado aparece en el listado")
+            chk(l.first(where: { $0.id == "prueba" })?.quedan ?? 0 > 0, "con el tiempo que le queda")
+            CuarentenaSTT.limpiar("prueba")
+            chk(!CuarentenaSTT.listado().contains { $0.id == "prueba" }, "y desaparece al limpiarlo")
+            let techos = Troceo.aprendidos()
+            chk(techos.allSatisfy { $0.rechaza > 0 }, "los techos aprendidos se listan con su rechazo (\(techos.count))")
+            let cola = ContinuoIndice.shared.pendientes(material: .audio, limite: 5_000).count
+            chk(cola >= 0, "la cola de la bitácora se puede contar (\(cola) pendientes)")
+
+            // El umbral y la decisión de avisar, sin red.
+            let agotado = SaldoAPI.Saldo(id: "x", nombre: "X", restante: 0, total: 100_000,
+                                         unidad: "caracteres", consultado: Date(), error: nil)
+            let sobrado = SaldoAPI.Saldo(id: "y", nombre: "Y", restante: 90_000, total: 100_000,
+                                         unidad: "caracteres", consultado: Date(), error: nil)
+            let pocoDinero = SaldoAPI.Saldo(id: "z", nombre: "Z", restante: 1, total: 0,
+                                            unidad: "USD", consultado: Date(), error: nil)
+            chk(SaldoAPI.estaBajo(agotado), "un tope consumido al 100 % se marca como bajo")
+            chk(!SaldoAPI.estaBajo(sobrado), "y uno al 90 % disponible no")
+            chk(SaldoAPI.estaBajo(pocoDinero), "un saldo en dinero por debajo del mínimo también")
+            chk(agotado.fraccion == 0 && sobrado.fraccion == 0.9, "la fracción se calcula bien")
+            chk(pocoDinero.fraccion == nil, "un saldo prepago no finge un porcentaje")
+            chk(sobrado.texto.contains("de 100,000") || sobrado.texto.contains("de 100.000"),
+                "el texto dice la unidad real → «\(sobrado.texto)»")
+
+            // Y lo de verdad, contra las API.
+            SaldoAPI.consultar(forzar: true) { s in
+                chk(!s.isEmpty, "se consultan saldos reales (\(s.count) proveedores)")
+                for x in s { print("SALUD   \(x.nombre): \(x.texto)") }
+                chk(s.allSatisfy { $0.error == nil || !$0.texto.isEmpty },
+                    "el que falla dice por qué y no rompe a los demás")
+                chk(s.contains { $0.unidad == "USD" } || s.contains { $0.unidad == "caracteres" },
+                    "al menos un proveedor devuelve su unidad real")
+                // Y la prueba de vida de TODO lo configurado, no solo de los
+                // tres que publican saldo.
+                SaldoAPI.probarTodo { vs in
+                    chk(vs.count >= 5, "se prueban todos los proveedores con clave (\(vs.count))")
+                    for f in ["IA", "Dictado", "Voz"] {
+                        let g = vs.filter { $0.familia == f }
+                        print("SALUD   \(f): \(g.count) — " + g.map { "\($0.nombre)\($0.vivo == true ? "✓" : "✗")" }.joined(separator: " "))
+                    }
+                    chk(vs.contains { $0.familia == "IA" }, "hay proveedores de IA en la lista")
+                    chk(vs.contains { $0.vivo == true }, "al menos uno responde")
+                    chk(vs.allSatisfy { !$0.detalle.isEmpty }, "cada uno dice su estado en palabras")
+                    print("SALUD \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
+                }
+            }
+            RunLoop.main.run(); return
+        }
         // Cuarentena del pulido: que una espera agotada aparte de verdad.
         //   BTODICTA_PULIDOTEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_PULIDOTEST"] == "1" {
@@ -3035,6 +3096,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Va aparte del de la bitácora, que solo corre si hay rutinas.
             let relojCorreo = Timer(timeInterval: 60, repeats: true) { _ in
                 ResumenCorreo.revisarHorarios()
+                // El saldo se consulta de fondo; la caché lo limita a una vez
+                // cada media hora y el aviso, a una al día por proveedor. Nunca
+                // en el camino del dictado.
+                SaldoAPI.consultar { _ in }
             }
             RunLoop.main.add(relojCorreo, forMode: .common)
             WhisperServer.limpiarHuerfanos()

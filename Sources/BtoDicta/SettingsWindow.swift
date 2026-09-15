@@ -409,6 +409,7 @@ private enum Seccion: String, CaseIterable, Identifiable {
     case bitacora = "Bitácora"
     case acciones = "Acciones"
     case transcribir = "Transcribir"
+    case salud = "Salud"
     case estadisticas = "Estadísticas"
     case creditos = "Créditos"
 
@@ -424,6 +425,7 @@ private enum Seccion: String, CaseIterable, Identifiable {
         case .bitacora: return "record.circle"
         case .acciones: return "bolt.fill"
         case .transcribir: return "waveform.badge.mic"
+        case .salud: return "heart.text.square.fill"
         case .estadisticas: return "chart.bar.fill"
         case .creditos: return "heart.fill"
         }
@@ -478,6 +480,7 @@ struct SettingsView: View {
         case .bitacora: ContinuoView()
         case .acciones: acciones
         case .transcribir: TranscribeView()
+        case .salud: SaludView()
         case .estadisticas: StatsView()
         case .creditos: creditos
         case .ajustes: ajustes

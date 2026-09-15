@@ -34,6 +34,19 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.63.0
+
+- **Panel de salud**: el estado real de todo en una pantalla, sin abrir el
+  registro. **Saldo de seis proveedores** (ElevenLabs en caracteres; Fish,
+  DeepSeek, OpenRouter y Novita en dinero; Speechmatics en horas) y **prueba de
+  vida de los veintitrés** que tengas configurados, quién está apartado y por
+  qué, techos aprendidos y cola de la bitácora.
+- Al probarlos se **lee lo que contestan**, así que salen cosas que de otro modo
+  no se saben: una cuenta suspendida por impago aparece dicha con esas palabras,
+  no como un código HTTP.
+- **Aviso de saldo bajo**: antes te enterabas cuando fallaba un dictado. Ahora
+  avisa al bajar del 15 % o de 5 dólares, una vez al día por proveedor.
+
 ### Novedades 0.62.1
 
 - **El pulido lento, de raíz.** Ya se apartaba al proveedor caído, pero solo

@@ -88,6 +88,17 @@ final class CuarentenaPulido {
         return segundos
     }
 
+    /// Los apartados ahora mismo, para el panel de salud. La identidad lleva
+    /// dentro la huella de la credencial: se recorta al nombre del proveedor.
+    func listado(ahora: Date = Date()) -> [(proveedor: String, quedan: Int)] {
+        lock.lock(); defer { lock.unlock() }
+        return hasta.compactMap { (id, fin) in
+            guard fin > ahora else { return nil }
+            return (String(id.split(separator: "|").first ?? "?"),
+                    Int(fin.timeIntervalSince(ahora)))
+        }.sorted { $0.proveedor < $1.proveedor }
+    }
+
     func limpiar(_ identidad: String) {
         lock.lock(); hasta[identidad] = nil; lock.unlock()
         // Contestó bien: se le perdona el historial de esperas agotadas.

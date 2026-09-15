@@ -192,6 +192,14 @@ enum Troceo {
         return out
     }
 
+    /// Lo aprendido, para el panel de salud.
+    static func aprendidos() -> [(motor: String, cabe: Int, rechaza: Int)] {
+        tabla().compactMap { (id, e) in
+            guard let r = e["rechaza"] else { return nil }
+            return (id, e["cabe"] ?? 0, r)
+        }.sorted { $0.motor < $1.motor }
+    }
+
     // MARK: ¿Este fallo puede ser de tamaño?
 
     /// No se pregunta «¿cuál es el límite?», sino «¿este fallo es compatible con

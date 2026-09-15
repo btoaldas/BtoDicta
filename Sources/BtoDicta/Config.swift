@@ -1113,6 +1113,16 @@ struct Config {
     static func redSeguridadDictado() -> Bool {
         (json()["dictado_red_seguridad"] as? Bool) ?? true
     }
+    /// Desde qué fracción del tope se avisa (0,15 = al bajar del 15 %). Solo
+    /// aplica a proveedores con tope conocido, como ElevenLabs.
+    static func saldoAvisoFraccion() -> Double {
+        min(0.9, max(0, (json()["saldo_aviso_fraccion"] as? Double) ?? 0.15))
+    }
+    /// Y para los de saldo en dinero, desde qué cantidad avisar.
+    static func saldoAvisoMinimoUSD() -> Double {
+        max(0, (json()["saldo_aviso_minimo_usd"] as? Double) ?? 5)
+    }
+
     // MARK: Correo (spec 003)
     /// Servidor de salida. La clave NO vive aquí: va en el almacén de secretos.
     static func smtpHost() -> String { (json()["smtp_host"] as? String) ?? "" }

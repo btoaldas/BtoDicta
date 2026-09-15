@@ -78,6 +78,16 @@ enum CuarentenaSTT {
     }
 
     /// Al cambiar una key o la cascada: lo que estaba mal ya puede estar bien.
+    /// Los que están apartados ahora mismo, para el panel de salud.
+    static func listado() -> [(id: String, codigo: Int, causa: String, quedan: Int)] {
+        lock.lock(); defer { lock.unlock() }
+        let ahora = Date()
+        return tabla.compactMap { (id, e) in
+            guard e.hasta > ahora else { return nil }
+            return (id, e.codigo, e.causa, Int(e.hasta.timeIntervalSince(ahora)))
+        }.sorted { $0.id < $1.id }
+    }
+
     static func limpiarTodo() {
         lock.lock(); tabla.removeAll(); lock.unlock()
     }
