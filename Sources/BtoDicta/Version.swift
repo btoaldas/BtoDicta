@@ -14,9 +14,9 @@ enum Version {
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
         ("0.63.1", "2026-09-15", [
-            "NUEVO PROVEEDOR DE IA: OpenCode Zen, una sola clave para unos setenta modelos de Anthropic, OpenAI, Google y xAI. Sirve para pulir, para los modos y para el agente. NO transcribe ni habla —solo expone modelos de texto—, así que no aparece entre los motores de dictado",
-            "Su saldo de API es una bolsa aparte del plan de la suscripción, igual que en Fish Audio: con la suscripción activa, la API puede seguir respondiendo «sin saldo» hasta que se recargue. El panel de Salud lo detecta y lo dice con esas palabras",
-            "La prueba de vida de OpenCode no usa su listado de modelos, que es PÚBLICO y contestaría «vivo» aunque la cuenta estuviera sin saldo: se le pregunta por el camino que de verdad se usa, pidiendo un solo token de respuesta",
+            "NUEVO PROVEEDOR DE IA: OpenCode Go, la suscripción mensual con decenas de modelos abiertos incluidos —DeepSeek, GLM, Qwen, Kimi, MiniMax, Grok—. Sirve para pulir, para los modos y para el agente. NO transcribe ni habla, solo expone modelos de texto, así que no aparece entre los motores de dictado",
+            "Ojo con la trampa: la misma clave vale para dos extremos distintos. El de pago por uso (Zen) y el del plan (Go) son URL diferentes, así que es fácil llamar al equivocado y concluir que no hay saldo cuando el plan está activo. Y el de Go exige una cabecera de sesión o rechaza la petición",
+            "La prueba de vida de OpenCode no usa su listado de modelos: se le pregunta por el camino que de verdad se usa, pidiendo un solo token de respuesta. Medido al elegir el modelo por defecto: deepseek-v4.1-flash pule en 2,8 s frente a los 17-20 s de las alternativas, y el coste que devuelve la respuesta es cero porque lo cubre el plan",
         ]),
         ("0.63.0", "2026-09-15", [
             "PANEL DE SALUD: una sección nueva en Configuración con el estado real de todo, sin abrir el registro. Saldo de los proveedores que lo publican, prueba de vida de TODOS los que tengas configurados —veintitrés en una instalación normal, entre IA, dictado y voz—, quién está apartado ahora mismo y por qué, los techos de tamaño que la aplicación ha aprendido de cada motor, y la cola de la bitácora",

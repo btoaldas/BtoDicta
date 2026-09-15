@@ -36,9 +36,9 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ### Novedades 0.63.1
 
-- **OpenCode Zen** como proveedor de IA: una clave para ~70 modelos de Anthropic,
-  OpenAI, Google y xAI, para pulido, modos y agente. **No transcribe**: solo
-  expone modelos de texto.
+- **OpenCode Go** como proveedor de IA: la suscripción mensual con decenas de
+  modelos abiertos incluidos, para pulido, modos y agente. **No transcribe**:
+  solo expone modelos de texto.
 
 ### Novedades 0.63.0
 

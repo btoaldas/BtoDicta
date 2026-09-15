@@ -9,6 +9,21 @@ import Foundation
 /// /v1/messages con otra forma de request/response.
 enum FormatoIA { case openai, anthropic }
 
+/// Identificador de sesión para OpenCode Go.
+///
+/// Su pasarela exige la cabecera `x-opencode-session` para poder encaminar la
+/// petición; sin ella devuelve 400 «MissingSessionID». Se usa uno estable por
+/// instalación —ni uno nuevo en cada llamada, que desaprovecharía su caché, ni
+/// uno compartido— y se guarda con el resto de la configuración.
+enum OpenCodeGo {
+    static let sesion: String = {
+        if let s = Config.json0("opencode_sesion") as? String, !s.isEmpty { return s }
+        let nuevo = "btodicta-" + UUID().uuidString.lowercased()
+        Config.set("opencode_sesion", to: nuevo)
+        return nuevo
+    }()
+}
+
 struct ChatIA {
     let id: String, nombre: String, base: String, modelo: String, keyEnv: String, local: Bool
     // Auth flexible (para gateways): encabezado, prefijo y extras.
@@ -184,10 +199,17 @@ struct ChatIA {
                authHeader: "x-api-key", authPrefix: "", headersExtra: ["anthropic-version": "2023-06-01"], formato: .anthropic),
         // Proveedores GRATIS / open (OpenAI-compat). El usuario pone su key y
         // puede "Descubrir" para elegir el modelo actual de cada uno.
-        // OpenCode Zen: pasarela con ~70 modelos de las casas grandes bajo una
-        // sola clave. NO transcribe ni habla —solo texto—, así que entra como
-        // IA de pulido/modos/agente, no como motor de dictado.
-        ChatIA(id: "opencode",    nombre: "OpenCode Zen",        base: "https://opencode.ai/zen/v1",              modelo: "claude-haiku-4-5",                     keyEnv: "OPENCODE_API_KEY",    local: false),
+        // OpenCode Go: suscripción mensual con decenas de modelos abiertos
+        // incluidos. NO transcribe ni habla —solo texto—, así que entra como IA
+        // de pulido/modos/agente, no como motor de dictado.
+        //
+        // Dos cosas que no están en la documentación general y cuestan tiempo:
+        // el extremo de Go es distinto del de Zen (pago por uso), y exige la
+        // cabecera `x-opencode-session` o responde 400 «MissingSessionID».
+        // Medido: con esa cabecera, `deepseek-v4.1-flash` pule en 2,8 s y el
+        // coste que devuelve la propia respuesta es cero — lo cubre el plan.
+        ChatIA(id: "opencode",    nombre: "OpenCode Go",         base: "https://opencode.ai/zen/go/v1",           modelo: "deepseek-v4.1-flash",                  keyEnv: "OPENCODE_API_KEY",    local: false,
+               headersExtra: ["x-opencode-session": OpenCodeGo.sesion]),
         ChatIA(id: "cerebras",    nombre: "Cerebras",            base: "https://api.cerebras.ai/v1",              modelo: "llama-3.3-70b",                        keyEnv: "CEREBRAS_API_KEY",    local: false),
         ChatIA(id: "github",      nombre: "GitHub Models",       base: "https://models.github.ai/inference",      modelo: "openai/gpt-4o-mini",                   keyEnv: "GITHUB_MODELS_KEY",   local: false),
         ChatIA(id: "nvidia",      nombre: "NVIDIA NIM",          base: "https://integrate.api.nvidia.com/v1",     modelo: "meta/llama-3.3-70b-instruct",          keyEnv: "NVIDIA_API_KEY",      local: false),

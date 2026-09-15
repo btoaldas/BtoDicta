@@ -27,7 +27,7 @@ enum AyudaIA {
         "TOGETHER_API_KEY": ("Together AI: modelos abiertos; créditos gratis al registrarte.", "https://api.together.ai/settings/api-keys"),
         "NOVITA_API_KEY": ("Novita AI: modelos abiertos; créditos gratis.", "https://novita.ai/settings/key-management"),
         "ZAI_CHAT_API_KEY": ("Z.ai (GLM): el modelo GLM-4.5-Flash es GRATIS.", "https://z.ai/manage-apikey/apikey-list"),
-        "OPENCODE_API_KEY": ("OpenCode Zen: una sola clave para ~70 modelos de Anthropic, OpenAI, Google y xAI. Solo texto: sirve para pulir, modos y agente, no para transcribir. El saldo de la API es aparte del plan de la suscripción.", "https://opencode.ai/zen"),
+        "OPENCODE_API_KEY": ("OpenCode Go: suscripción mensual con decenas de modelos abiertos incluidos (DeepSeek, GLM, Qwen, Kimi, MiniMax…). Solo texto: sirve para pulir, modos y agente, NO para transcribir. Ojo: la clave es la misma que la de Zen, pero el extremo de Go es otro y lo que gastes por Go no toca el saldo de pago por uso.", "https://opencode.ai/docs/go/"),
         "SILICONFLOW_API_KEY": ("SiliconFlow: catálogo amplio con capa gratis.", "https://cloud.siliconflow.com/account/ak"),
         // ── Transcripción (voz) ──
         "ELEVENLABS_API_KEY": ("ElevenLabs Scribe: la mejor calidad, texto EN VIVO. De pago.", "https://elevenlabs.io/app/settings/api-keys"),
