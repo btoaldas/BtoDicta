@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.63.1
+
+- **OpenCode Zen** como proveedor de IA: una clave para ~70 modelos de Anthropic,
+  OpenAI, Google y xAI, para pulido, modos y agente. **No transcribe**: solo
+  expone modelos de texto.
+
 ### Novedades 0.63.0
 
 - **Panel de salud**: el estado real de todo en una pantalla, sin abrir el

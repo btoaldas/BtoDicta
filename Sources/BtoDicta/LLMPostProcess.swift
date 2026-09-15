@@ -184,6 +184,10 @@ struct ChatIA {
                authHeader: "x-api-key", authPrefix: "", headersExtra: ["anthropic-version": "2023-06-01"], formato: .anthropic),
         // Proveedores GRATIS / open (OpenAI-compat). El usuario pone su key y
         // puede "Descubrir" para elegir el modelo actual de cada uno.
+        // OpenCode Zen: pasarela con ~70 modelos de las casas grandes bajo una
+        // sola clave. NO transcribe ni habla —solo texto—, así que entra como
+        // IA de pulido/modos/agente, no como motor de dictado.
+        ChatIA(id: "opencode",    nombre: "OpenCode Zen",        base: "https://opencode.ai/zen/v1",              modelo: "claude-haiku-4-5",                     keyEnv: "OPENCODE_API_KEY",    local: false),
         ChatIA(id: "cerebras",    nombre: "Cerebras",            base: "https://api.cerebras.ai/v1",              modelo: "llama-3.3-70b",                        keyEnv: "CEREBRAS_API_KEY",    local: false),
         ChatIA(id: "github",      nombre: "GitHub Models",       base: "https://models.github.ai/inference",      modelo: "openai/gpt-4o-mini",                   keyEnv: "GITHUB_MODELS_KEY",   local: false),
         ChatIA(id: "nvidia",      nombre: "NVIDIA NIM",          base: "https://integrate.api.nvidia.com/v1",     modelo: "meta/llama-3.3-70b-instruct",          keyEnv: "NVIDIA_API_KEY",      local: false),

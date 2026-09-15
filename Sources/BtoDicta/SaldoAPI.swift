@@ -88,9 +88,28 @@ enum SaldoAPI {
 
         // IA de chat: la propia configuración ya trae base y autenticación.
         for ia in ChatIA.conectadas where !ia.local && !ia.esCuentaCodex {
-            guard let clave = ia.key, !clave.isEmpty,
-                  let u = URL(string: "\(ia.base)/models") else { continue }
-            var r = URLRequest(url: u); r.timeoutInterval = 10
+            guard let clave = ia.key, !clave.isEmpty else { continue }
+            // Casi todos valen con su listado de modelos: es gratis y prueba de
+            // paso que la clave sirve. Pero algunas pasarelas lo publican SIN
+            // autenticación —OpenCode Zen, por ejemplo—, y entonces contestaría
+            // «vivo» aunque la cuenta esté sin saldo. A esas se les pregunta por
+            // el camino que de verdad se usa, con un solo token de respuesta.
+            let sinAuthEnModelos = ["opencode"]
+            var r: URLRequest
+            if sinAuthEnModelos.contains(ia.id) {
+                guard let u = URL(string: "\(ia.base)/chat/completions") else { continue }
+                r = URLRequest(url: u); r.httpMethod = "POST"
+                r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                r.httpBody = try? JSONSerialization.data(withJSONObject: [
+                    "model": ia.modeloEfectivo,
+                    "messages": [["role": "user", "content": "ok"]],
+                    "max_tokens": 1,
+                ])
+            } else {
+                guard let u = URL(string: "\(ia.base)/models") else { continue }
+                r = URLRequest(url: u)
+            }
+            r.timeoutInterval = 10
             r.setValue(ia.authPrefix + clave, forHTTPHeaderField: ia.authHeader)
             for (k, v) in ia.headersExtra { r.setValue(v, forHTTPHeaderField: k) }
             pruebas.append((ia.id, ia.nombre, "IA", r))
@@ -138,6 +157,7 @@ enum SaldoAPI {
                 func motivoDelServidor() -> String? {
                     let b = cuerpo.lowercased()
                     for (marca, texto) in [("suspend", "cuenta suspendida"),
+                                           ("insufficient balance", "sin saldo en la API"),
                                            ("insufficient", "sin saldo"),
                                            ("quota", "cuota agotada"),
                                            ("expired", "clave caducada"),
