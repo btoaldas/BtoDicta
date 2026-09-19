@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.66.2
+
+- **El silencio deja de viajar a la nube.** La bitácora mandaba a transcribir sus
+  trozos mudos: **312 llamadas gastadas en un día** para no obtener nada. Ahora se
+  mira el audio antes, en local.
+- El margen es generoso: 90 ms de sonido en un trozo de 30 s bastan para que se
+  mande. Ajustable, y con el umbral en 0 se manda todo.
+
 ### Novedades 0.66.1
 
 - **Los modelos se comprueban uno a uno**, no solo por su forma: cada uno del

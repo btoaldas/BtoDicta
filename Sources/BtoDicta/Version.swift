@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.66.1"
+    static let numero = "0.66.2"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.66.2", "2026-09-19", [
+            "EL SILENCIO DEJA DE VIAJAR A LA NUBE. La bitácora graba de continuo, y buena parte de lo que graba es silencio: nadie habla, o estás delante del equipo sin decir nada. Cada uno de esos trozos se mandaba igual a un motor de transcripción, que contestaba —con razón— que no había nada que transcribir, y la aplicación lo tomaba por un fallo y probaba con el siguiente motor. En un solo día: 312 llamadas gastadas para no obtener nada",
+            "Ahora se mira el audio antes, aquí mismo y en milésimas de segundo. Si no suena nada, no sale del equipo",
+            "El margen es deliberadamente generoso: basta con que suenen 90 milésimas de segundo dentro de un trozo de treinta para que se mande. Menos de lo que dura una sílaba. Perder una frase por ahorrar una llamada sería un mal negocio, así que ante la duda se manda",
+            "Se puede ajustar, y poniendo el umbral en 0 se manda todo como antes",
+        ]),
         ("0.66.1", "2026-09-19", [
             "LOS MODELOS SE COMPRUEBAN UNO A UNO, NO SOLO POR SU FORMA. Desde 0.65.3 se miraba que lo descargado fuera un modelo de verdad y no una página de error. Ahora se comprueba además que sea EXACTAMENTE el modelo esperado: cada uno del catálogo lleva su huella fijada, y si lo que llega no coincide no se instala, aunque venga del sitio de siempre y parezca correcto",
             "Las huellas no salen de dar por bueno lo que ya había: se tomaron de lo que publica Hugging Face para cada archivo y se contrastaron con los modelos instalados en esta máquina. Los cuatro coincidían",

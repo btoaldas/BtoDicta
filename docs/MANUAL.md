@@ -1032,6 +1032,20 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### «N en silencio, no enviados» en el resumen de la tanda
+
+Desde 0.66.2, la bitácora mira sus trozos antes de mandarlos a transcribir: si no
+suena nada, no salen del equipo. Antes se enviaban igual y el motor contestaba que
+no había nada, gastando una llamada por cada uno.
+
+El margen es generoso: basta con que suenen **90 milésimas de segundo** dentro de
+un trozo de treinta para que se mande — menos de lo que dura una sílaba.
+
+Si quieres cambiarlo, en `~/.btodicta/config.json`:
+
+- `bitacora_umbral_silencio` — 800 de fábrica; **0 manda todo**, como antes.
+- `bitacora_proporcion_voz` — 0.003 de fábrica (tres por mil del trozo).
+
 ### «su huella no es la que debería»
 
 Desde 0.66.1, los modelos del catálogo llevan su huella fijada. Si ves ese aviso,
