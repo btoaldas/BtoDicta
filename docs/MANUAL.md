@@ -1016,6 +1016,17 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### Comprobar tú mismo el rendimiento
+
+Las pruebas internas dicen cuánto tardan, no solo si pasan:
+
+- `BTODICTA_MEMTEST=6` — simula seis horas por el camino real e imprime la
+  memoria en cada etapa, más el tiempo de leer un tramo de 25 MB (2,9 ms medidos).
+- `BTODICTA_SUBIDATEST=1` — compara el paquete del envío por los dos caminos,
+  byte a byte y con sus tiempos. Para una hora de audio: 7 ms armándolo en
+  memoria contra 54 ms escribiéndolo a disco. Más lento en relativo, milésimas en
+  absoluto, y 115 MB menos de memoria.
+
 ### Dictados muy largos: cuánta memoria usa la aplicación
 
 Desde 0.63.5 un dictado de seis horas ocupa **80 MB** de principio a fin. El
