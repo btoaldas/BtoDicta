@@ -5,7 +5,7 @@
 - Nivel: X
 - Fecha: 2026-09-18
 - Modifica: ninguna
-- Aprobada por: [PENDIENTE DE DECISIÓN: puerta 1 sin abrir]
+- Aprobada por: pendiente — puerta 1 abierta parcialmente el 2026-09-18 (ver §9)
 - Rama: [PENDIENTE DE DECISIÓN: toca el camino del dictado, ver §7]
 
 Origen: `docs/SOLICITUD-API-TRANSCRIPCION-EXTERNA.md` (2026-09-15), reconfirmado
@@ -51,6 +51,8 @@ y las credenciales dejan de viajar fuera de `~/.btodicta`.
 - Un contrato estable para pedir la transcripción de un archivo de audio y
   recibir el texto, con qué motor lo produjo y cuánto tardó.
 - Elegir motor: local, nube o la cascada automática que ya existe.
+- **Pulir texto con IA por el mismo contrato**, con la cascada y las
+  cuarentenas que ya existen (decisión de Alberto, 2026-09-18).
 - Pasar vocabulario de contexto, porque está medido que sin él las siglas
   institucionales salen mal («WEA» por UEA, «LEVA» por EVA).
 - Autorización por token y escucha solo en loopback.
@@ -63,8 +65,7 @@ y las credenciales dejan de viajar fuera de `~/.btodicta`.
   entre equipos»: esto es una tubería entre procesos del mismo Mac, no un
   servicio de red. Si algún día hace falta a distancia, es otra spec.
 - Cuentas de usuario, multiusuario o cuotas por consumidor.
-- Exponer el pulido con IA, el TTS o el modo agente. Solo transcripción.
-  [PENDIENTE DE DECISIÓN: ¿o conviene dejar la puerta abierta desde el diseño?]
+- El TTS y el modo agente. El pulido sí entra (arriba); la voz y el agente no.
 - Transcripción en vivo por streaming para terceros. El archivo ya cubre el caso
   conocido.
 
@@ -148,7 +149,21 @@ y las credenciales dejan de viajar fuera de `~/.btodicta`.
   - Cuando pide una transcripción de nube
   - Entonces la recibe igual
 
-### RF-07 — El comando global deja de conocer las tripas
+### RF-07 — Pulir un texto desde otro proceso
+
+- Actor: otro proyecto de la oficina
+- Acción: entrega un texto y pide su versión pulida
+- Resultado: recibe el texto pulido y qué proveedor lo produjo
+- Medida: el mismo texto pulido por el contrato y por la app coinciden en
+  proveedor y en no perder más de la mitad de las letras (la guarda de 0.62.1)
+- Prioridad: P2
+- Criterio de aceptación:
+  - Dado un texto crudo de 600 caracteres
+  - Cuando un proceso externo pide pulirlo
+  - Entonces recibe el texto pulido y el nombre del proveedor que lo hizo, y si
+    ninguno responde recibe el texto original en vez de un error
+
+### RF-08 — El comando global deja de conocer las tripas
 
 - Actor: quien mantiene BtoDicta
 - Acción: reorganiza modelos, rutas o claves por dentro
@@ -216,6 +231,17 @@ Un RNF sin cifra es un deseo.
 
 ### Sesión 2026-09-18
 
+P: ¿el contrato se abre solo a transcripción o se diseña para crecer? → R:
+**«transcripción y pulido desde el principio»** (decisión de Alberto). *Objeción
+registrada:* se recomendó implementar solo transcripción dejando sitio para
+crecer, porque el pulido duplica la superficie que hay que asegurar y probar en
+nivel X sin un consumidor que lo pida todavía. Alberto decide abrirlo; se acata y
+entra como RF-07 con prioridad P2, para que no bloquee a los P1.
+
+P: ¿qué forma tiene el contrato? → R: **HTTP en loopback con token** (decisión de
+Alberto). La forma es solución, así que su detalle vive en `plan.md`; aquí consta
+solo la decisión y su fecha.
+
 P: ¿de dónde sale este pedido? → R: de necesitar transcribir notas de voz de
 WhatsApp en BtoWasap sin duplicar modelos; Alberto lo reconfirma como pedido
 transversal para «alguien que quiera ocupar BtoDicta… por medio de API en algún
@@ -225,8 +251,8 @@ P: ¿el comando `transcribir` se mueve a este repositorio? → R: no, se queda
 fuera hasta que exista la API; entonces se reescribe para consumirla (decisión de
 Alberto registrada el 2026-09-15 en la solicitud).
 
-Pendientes para la puerta 1: forma del contrato (§3), qué hacer con la app
-cerrada (§6), si se abre solo a transcripción o al pulido también (§3), y rama.
+Siguen abiertos para cerrar la puerta 1: qué hacer cuando la aplicación está
+cerrada (§6) y en qué rama se trabaja.
 
 ## 8. Datos medidos que sirven al plan
 
