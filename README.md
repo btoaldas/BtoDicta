@@ -34,6 +34,17 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.64.0
+
+- **La bitácora ya no fotografía tu gestor de contraseñas.** Podía excluir apps
+  desde siempre, pero la lista venía **vacía**. Ahora trae de fábrica los
+  gestores conocidos y el llavero del sistema.
+- Segunda capa por **título de ventana**, para lo que no se excluye por app —una
+  pestaña del banco en el navegador—. Vacía de fábrica.
+- **Lo que se lee en pantalla ya no puede darle órdenes a la IA**: el material
+  viaja dentro de una valla impredecible con una regla que manda sobre el resto.
+- El texto dictado en el registro pasa a ser un ajuste.
+
 ### Novedades 0.63.7
 
 - **El audio deja de copiarse en todo el recorrido.** El historial adopta el

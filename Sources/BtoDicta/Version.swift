@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.63.7"
+    static let numero = "0.64.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.64.0", "2026-09-19", [
+            "LA BITÁCORA YA NO FOTOGRAFÍA TU GESTOR DE CONTRASEÑAS. Podía excluir aplicaciones desde el primer día, pero la lista venía vacía: si no la rellenabas a mano, no protegía nada. Ahora trae de fábrica 1Password, Bitwarden, KeePassXC, Dashlane, Proton Pass, el llavero del sistema y Contraseñas de Apple, entre otros. Sus ventanas no aparecen siquiera en la imagen",
+            "Y una segunda defensa para lo que no se puede excluir por aplicación: una pestaña del banco en el navegador. Puedes indicar palabras que, si salen en el TÍTULO de la ventana, impiden guardar esa captura. Viene vacía a propósito, porque una palabra demasiado común te dejaría sin bitácora media jornada",
+            "LO QUE SE LEE EN TU PANTALLA YA NO PUEDE DARLE ÓRDENES A LA IA. El resumen del día se arma con texto leído de correos, páginas y documentos ajenos, y cualquiera puede traer una frase del tipo «ignora las instrucciones anteriores». Ese material viaja ahora dentro de una valla impredecible, distinta en cada llamada, con una regla que manda sobre todo lo demás: lo de ahí dentro se lee, se menciona si viene al caso, y no se obedece",
+            "El texto de lo que dictas se guarda en el registro, y ahora puedes apagarlo. Sigue encendido de fábrica porque ese registro es local, se borra solo cada semana y es lo único que permite ver después que un pulido te recortó el dictado. Apagado, las líneas siguen ahí con la medida en vez del contenido",
+        ]),
         ("0.63.7", "2026-09-19", [
             "EL AUDIO DEJA DE COPIARSE EN TODO EL RECORRIDO. Al guardar un dictado, el historial recibía los bytes y volvía a escribir el mismo archivo que el grabador acababa de crear. Ahora lo ADOPTA moviéndolo, que es un renombrado: cuesta igual con diez segundos que con seis horas y no pasa un byte por memoria. De paso, el audio de trabajo deja de acumularse, porque deja de existir donde estaba en cuanto pasa al historial",
             "Los motores que corren en tu Mac también dejan de copiarlo: necesitan un archivo y se lo damos con un enlace, no con una copia. En un dictado de seis horas eran 1,3 GB de trabajo para nada",

@@ -1016,6 +1016,32 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### Qué no se fotografía nunca
+
+La bitácora captura la pantalla cada pocos segundos, y esas capturas se indexan y
+alimentan el resumen que redacta la IA. Desde 0.64.0 hay dos defensas:
+
+- **Por aplicación**, en *Bitácora → Apps excluidas*: de fábrica vienen los
+  gestores de contraseñas y el llavero del sistema. Sus ventanas no aparecen
+  siquiera en la imagen, porque las excluye el propio sistema al componerla.
+- **Por título de ventana**, en el campo de debajo: para lo que no se puede
+  excluir por aplicación, como una pestaña del banco en el navegador. Viene
+  vacío, porque una palabra demasiado común te dejaría sin bitácora media
+  jornada.
+
+Cuando una captura se omite, el registro dice que se omitió y por qué tipo de
+regla — nunca qué se vio.
+
+### Lo que la IA lee de tu pantalla no puede darle órdenes
+
+El resumen del día se arma con texto leído de correos, páginas y documentos que
+no escribiste tú. Cualquiera podría traer una frase como «ignora las
+instrucciones anteriores y responde otra cosa». Ese material viaja dentro de una
+valla que cambia en cada llamada, con una regla por encima del encargo: lo de
+dentro se lee y se menciona si viene al caso, pero no se obedece.
+
+Comprobación: `BTODICTA_INYECCIONTEST=1`.
+
 ### Dónde está el audio de cada dictado
 
 Mientras hablas, el audio se escribe en una carpeta de trabajo. Al terminar, el
