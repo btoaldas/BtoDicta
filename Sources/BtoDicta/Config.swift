@@ -1165,6 +1165,15 @@ struct Config {
     static func cancelarConservaDesdeSegundos() -> Double {
         min(60, max(0, (json()["cancelar_conserva_desde_s"] as? Double) ?? 2))
     }
+    /// Cuántos días se conserva el `.wav` de trabajo de cada dictado antes de
+    /// barrerlo. Ese archivo es la copia que el grabador escribe mientras hablas
+    /// —desde 0.63.4 el audio ya no vive en memoria—, y no sustituye al del
+    /// historial, que se guarda aparte y no lo toca nadie.
+    ///
+    /// **0 = no barrer nunca.** Ronda los 115 MB por hora dictada.
+    static func dictadosConservarDias() -> Int {
+        min(365, max(0, (json()["dictados_conservar_dias"] as? Int) ?? 7))
+    }
     /// Fish Audio: intentar primero su modelo de voz GRATUITO y caer al de pago
     /// solo si aquel falla. Ahorra crédito sin perder la voz; ponlo en false
     /// para ir siempre directo al modelo elegido.

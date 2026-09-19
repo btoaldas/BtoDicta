@@ -427,6 +427,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // inesperado puede dejarlos, y son del tamaño del dictado que se estaba
         // enviando. Solo borra lo que crea esa función, en su propia carpeta.
         CuerpoMultipart.barrerHuerfanos()
+        // Audios de trabajo de dictados viejos, según el ajuste (0 = nunca).
+        Recorder.barrerDictadosViejos()
 
         if ProcessInfo.processInfo.environment["BTODICTA_WAKEDETECTTEST"] == "1" {
             let esperarNinguno = ProcessInfo.processInfo.environment["BTODICTA_WAKEEXPECTNONE"] == "1"

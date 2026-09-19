@@ -303,6 +303,35 @@ final class Recorder {
         return (try? Data(contentsOf: url)) ?? Data()
     }
 
+    /// Barre los `.wav` de trabajo con más días de los que se hayan fijado.
+    ///
+    /// Tres cerraduras, porque esto borra audio: solo su propia carpeta, solo su
+    /// propio prefijo, y solo por encima de la antigüedad configurada. Con el
+    /// ajuste en 0 no borra nada en absoluto. El historial guarda su copia
+    /// aparte y no se toca aquí.
+    @discardableResult
+    static func barrerDictadosViejos() -> (archivos: Int, bytes: Int) {
+        let dias = Config.dictadosConservarDias()
+        guard dias > 0 else { return (0, 0) }
+        let fm = FileManager.default
+        guard let lista = try? fm.contentsOfDirectory(at: carpetaDictados,
+                                                      includingPropertiesForKeys: [.contentModificationDateKey]) else {
+            return (0, 0)
+        }
+        let limite = Date().addingTimeInterval(-Double(dias) * 86_400)
+        var n = 0, bytes = 0
+        for u in lista where u.lastPathComponent.hasPrefix("dictado-") && u.pathExtension == "wav" {
+            guard let fecha = (try? u.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+                  fecha < limite else { continue }
+            let peso = Recorder.bytes(de: u)
+            if (try? fm.removeItem(at: u)) != nil { n += 1; bytes += peso }
+        }
+        if n > 0 {
+            Log.log(.sistema, "dictados: barridos \(n) audios de trabajo de más de \(dias) días (\(bytes / 1_048_576) MB). El historial no se toca")
+        }
+        return (n, bytes)
+    }
+
     /// Borra el `.wav` de un dictado ya transcrito y guardado.
     static func descartar(_ url: URL?) {
         guard let url, url.path.hasPrefix(carpetaDictados.path) else { return }

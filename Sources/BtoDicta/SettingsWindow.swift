@@ -75,6 +75,7 @@ final class SettingsModel: ObservableObject {
     @Published var correoPrueba = ""
     @Published var cancelarConfirma: Bool { didSet { Config.set("cancelar_confirma", to: cancelarConfirma) } }
     @Published var cancelarConserva: Double { didSet { Config.set("cancelar_conserva_desde_s", to: cancelarConserva) } }
+    @Published var dictadosDias: Double { didSet { Config.set("dictados_conservar_dias", to: Int(dictadosDias)) } }
     @Published var pausarMultimedia: Bool { didSet { Config.set("atenuar_multimedia", to: pausarMultimedia) } }
     @Published var bajarVolumen: Bool { didSet { Config.set("silenciar_ademas", to: bajarVolumen) } }
     @Published var postProceso: Bool { didSet { Config.set("post_proceso", to: postProceso) } }
@@ -201,6 +202,7 @@ final class SettingsModel: ObservableObject {
         correoReglas = ResumenCorreo.reglas()
         cancelarConfirma = Config.cancelarConfirma()
         cancelarConserva = Config.cancelarConservaDesdeSegundos()
+        dictadosDias = Double(Config.dictadosConservarDias())
         pausarMultimedia = Config.duckMedia()
         bajarVolumen = Config.muteToo()
         postProceso = Config.postProcess()
@@ -691,6 +693,18 @@ struct SettingsView: View {
                 }.padding(.leading, 18)
                 Text("Cancelar NUNCA borra lo grabado: queda en el historial y lo recuperas desde Transcribir. Por debajo de este tiempo se descarta, porque es una pulsación sin nada dentro.")
                     .font(.caption).foregroundStyle(.secondary).padding(.leading, 18)
+
+                Divider().padding(.vertical, 6)
+                Text("Audio de trabajo").font(.headline)
+                HStack {
+                    Text("Conservar el audio de cada dictado")
+                    Stepper(value: $m.dictadosDias, in: 0...365, step: 1) {
+                        Text(m.dictadosDias == 0 ? "siempre" : "\(Int(m.dictadosDias)) días")
+                            .monospacedDigit()
+                    }
+                }
+                Text("Mientras dictas, el audio se escribe a disco en vez de acumularse en memoria: así una grabación de horas no hace crecer la aplicación. Ese archivo de trabajo se barre pasados estos días. NO es el del historial, que se guarda aparte y no se toca nunca. Ronda los 115 MB por hora dictada; con 0 no se barre nada.")
+                    .font(.caption).foregroundStyle(.secondary)
 
                 Divider().padding(.vertical, 6)
                 Text("Resumen de la bitácora por correo").font(.headline)
