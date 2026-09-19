@@ -1,6 +1,6 @@
 # Tareas 001 — Memoria del dictado largo · segunda etapa
 
-- Estado: En curso — fase A cerrada, fase B detenida por el hallazgo de `plan.md` §9
+- Estado: En curso — fases A y A-bis cerradas; fase B (los doce envíos) pendiente
 - Plan: `plan.md` (Aprobado 2026-09-18)
 - Aprobado por: Alberto — 2026-09-18 — «Aprobado, y sigue hasta implementar» (autorización anticipada de la puerta 3, dada al aprobar el plan)
 - Rama: `main` (razón en `plan.md` §8)
@@ -19,6 +19,20 @@ no es idéntico al viejo.
   - Evidencia (2026-09-18): `BTODICTA_SUBIDATEST=1` → «TODO OK — 3/3 idénticos y sin residuos». Memoria y disco coinciden byte a byte en 1 s, 1 min y 1 h
 - [x] T03 (RF-04) Limpieza garantizada del temporal en éxito, error, cancelación y cierre, más barrido al arrancar de los que quedaran de otra sesión; solo borra lo que crea esta función — `Sources/BtoDicta/CuerpoMultipart.swift`, `Sources/BtoDicta/AppDelegate.swift` — Evidencia esperada: creados = borrados tras una tanda, 0 residuales
   - Evidencia (2026-09-18): Misma corrida: «temporales: creados 3 · borrados 3 → sin residuos». Barrido al arrancar añadido en `applicationDidFinishLaunching`
+
+## Fase A-bis — El grabador, tras el hallazgo de `plan.md` §9
+
+Autorizada por Alberto el 2026-09-18 («Adelante, en main como el resto»). No
+estaba en el plan original porque el plan creía que esto ya estaba resuelto.
+
+- [x] T21 (RF-02) Corregir `MEMTEST` para que recorra el grabador real en vez del escritor — `Sources/BtoDicta/AppDelegate.swift`, `Sources/BtoDicta/Recorder.swift` — Evidencia esperada: la prueba da ROJO contra el código sin arreglar
+  - Evidencia (2026-09-18): con el código anterior, «+661 MB al grabar» y «+662 MB al soltar la tecla», 2 fallos. El falso «0 MB» venía de medir `HistoryWriter`
+- [x] T22 (RF-02) El audio se escribe al `.wav` según entra y en memoria queda solo una ventana de tres minutos — `Sources/BtoDicta/Recorder.swift` — Evidencia esperada: `MEMTEST` en verde
+  - Evidencia (2026-09-18): `MEM TODO OK` — +13 MB al grabar seis horas y +3 MB al terminar; 80 MB frente a 1 388 MB. La clave fue envolver `suffix` en `Data(...)`: devuelve una vista que retiene el buffer completo
+- [x] T23 (RF-01) `stop()` devuelve la ruta del `.wav` y no su contenido; los llamadores sacan la duración del tamaño del archivo — `Sources/BtoDicta/Recorder.swift`, `Sources/BtoDicta/AppDelegate.swift` — Evidencia esperada: el `.wav` producido es válido
+  - Evidencia (2026-09-18): `afinfo` sobre un archivo del camino nuevo → WAVE, 1 ch, 16 000 Hz, Int16. Ocho baterías en verde
+- [x] T24 (RF-04) Barrido por antigüedad del audio de trabajo, con el plazo ajustable en la aplicación — `Sources/BtoDicta/Config.swift`, `Sources/BtoDicta/Recorder.swift`, `Sources/BtoDicta/SettingsWindow.swift` — Evidencia esperada: barre lo viejo, conserva lo nuevo y no toca lo ajeno
+  - Evidencia (2026-09-18): con 7 días, se barre uno de 10 días, se conserva uno de 3 y NO se toca uno de 10 días sin el prefijo. Con 0, ni siquiera uno de 30 días
 
 ## Fase B — Un motor primero, medido, y después los once
 
