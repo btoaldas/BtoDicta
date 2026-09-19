@@ -122,6 +122,8 @@ final class ActivacionVoz: @unchecked Sendable {
     /// main y se conserva para que cierre/arranque no vuelvan a pedir la propiedad.
     private var inputNode: AVAudioInputNode?
     private var inputConverter: AVAudioConverter?
+    /// Con qué formato se armó el conversor; se rearma si el micrófono cambia.
+    private var convertidorDesde: AVAudioFormat?
     private var speechConverter: AVAudioConverter?
     private var formatoSpeech: AVAudioFormat?
     private let formatoPCM = AVAudioFormat(commonFormat: .pcmFormatInt16,
@@ -458,14 +460,24 @@ final class ActivacionVoz: @unchecked Sendable {
         Self.dbg("leyendo formato de entrada")
         let entrada = input.outputFormat(forBus: 0)
         Self.dbg("formato entrada \(entrada)")
-        guard let conv = AVAudioConverter(from: entrada, to: formatoPCM) else {
-            throw NSError(domain: "BtoDicta.ActivacionVoz", code: 2,
-                          userInfo: [NSLocalizedDescriptionKey: "formato del micrófono incompatible"])
-        }
-        inputConverter = conv
+        // Igual que en el grabador y en la bitácora: a `installTap` no se le pasa
+        // formato. `Microfono.aplicar` de arriba puede cambiar el dispositivo y
+        // CoreAudio aún no conmutó cuando se lee `outputFormat`, así que el
+        // formato leído puede ser el del aparato anterior —válido, pero no el que
+        // el motor tiene delante— y la escucha se rechaza por discrepancia.
+        inputConverter = nil
+        convertidorDesde = nil
         Self.dbg("instalando tap")
-        input.installTap(onBus: 0, bufferSize: 4096, format: entrada) { [weak self] buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
             guard let self else { return }
+            let entrada = buffer.format
+            if self.convertidorDesde?.sampleRate != entrada.sampleRate
+                || self.convertidorDesde?.channelCount != entrada.channelCount {
+                self.inputConverter = AVAudioConverter(from: entrada, to: self.formatoPCM)
+                self.convertidorDesde = entrada
+                Self.dbg("conversor armado desde \(Int(entrada.sampleRate)) Hz, \(entrada.channelCount) can")
+            }
+            guard let conv = self.inputConverter else { return }
             let ratio = self.formatoPCM.sampleRate / entrada.sampleRate
             let capacidad = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
             guard let out = AVAudioPCMBuffer(pcmFormat: self.formatoPCM,

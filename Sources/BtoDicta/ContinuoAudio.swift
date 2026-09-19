@@ -27,6 +27,9 @@ final class ContinuoAudio {
 
     private var engine: AVAudioEngine?
     private var conversor: AVAudioConverter?
+    /// Con qué formato se armó el conversor, para rearmarlo si el micrófono
+    /// cambia de frecuencia o de número de canales a mitad de la grabación.
+    private var convertidorDesde: AVAudioFormat?
     private let formatoSalida = AVAudioFormat(commonFormat: .pcmFormatInt16,
                                               sampleRate: 16000, channels: 1, interleaved: true)!
 
@@ -235,21 +238,35 @@ final class ContinuoAudio {
             Log.log(.sistema, "bitácora: el micrófono no entregó formato válido — no arranco")
             return false
         }
-        let conv = AVAudioConverter(from: formatoEntrada, to: formatoSalida)
-        // El nodo de entrada puede exponer VARIOS canales (aquí llega con 9 tras
-        // activar la cancelación de eco). Sin mapa de canales, la conversión a
-        // mono devuelve 0 marcos y el audio se pierde sin decir nada. `[0]` toma
-        // el primer canal, que es el del micrófono.
-        if formatoEntrada.channelCount > 1 {
-            conv?.channelMap = [0]
-            Log.log(.sistema, "bitácora: entrada de \(formatoEntrada.channelCount) canales — tomo el canal 0")
-        }
-        conversor = conv
+        // El formato NO se le pasa a `installTap`. `Microfono.aplicar` de arriba
+        // puede CAMBIAR el dispositivo de entrada, y CoreAudio todavía no ha
+        // terminado de conmutar cuando se lee `outputFormat`: devuelve el del
+        // aparato ANTERIOR. Es un formato válido, así que pasa el guard, pero no
+        // es el que el motor tiene delante y `installTap` lo rechaza con «format
+        // mismatch» — el mismo fallo que el grabador arrastró hasta 0.63.2. Aquí
+        // dolía más: si la escucha no entra, la bitácora deja de grabar en
+        // silencio. El conversor se arma con el formato del primer audio REAL.
+        conversor = nil
+        convertidorDesde = nil
 
-        Log.log(.sistema, "bitácora: formato de entrada \(formatoEntrada.sampleRate) Hz, \(formatoEntrada.channelCount) can, \(formatoEntrada.commonFormat.rawValue)")
-
-        entrada.installTap(onBus: 0, bufferSize: 4096, format: formatoEntrada) { [weak self] buffer, _ in
+        entrada.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
             guard let self else { return }
+            let formatoEntrada = buffer.format
+            if self.convertidorDesde?.sampleRate != formatoEntrada.sampleRate
+                || self.convertidorDesde?.channelCount != formatoEntrada.channelCount {
+                let conv = AVAudioConverter(from: formatoEntrada, to: self.formatoSalida)
+                // El nodo de entrada puede exponer VARIOS canales (aquí llega con 9
+                // tras activar la cancelación de eco). Sin mapa de canales, la
+                // conversión a mono devuelve 0 marcos y el audio se pierde sin decir
+                // nada. `[0]` toma el primer canal, que es el del micrófono.
+                if formatoEntrada.channelCount > 1 {
+                    conv?.channelMap = [0]
+                    Log.log(.sistema, "bitácora: entrada de \(formatoEntrada.channelCount) canales — tomo el canal 0")
+                }
+                self.conversor = conv
+                self.convertidorDesde = formatoEntrada
+                Log.log(.sistema, "bitácora: formato de entrada \(Int(formatoEntrada.sampleRate)) Hz, \(formatoEntrada.channelCount) can")
+            }
             self.buffersVistos += 1
             if self.buffersVistos == 1 {
                 // Audio real: aquí sí se limpian los contadores de reintento.
