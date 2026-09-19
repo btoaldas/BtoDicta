@@ -1341,3 +1341,20 @@ Para español, **Media es la mejor opción**: es la única con base nativa en es
 ---
 
 *BtoDicta — hecho en Ecuador 🇪🇨 por Alberto Aldás en compañía de Claude (Anthropic), programado a pura voz. Licencia GPL-3.0, libre para siempre.*
+
+## Comprobar la purga a mano (y por qué no es automática)
+
+La purga borra archivos de verdad, y el índice que usa es único y se abre contra
+tu bitácora real en cuanto arranca la aplicación. No hay forma de apuntarlo a una
+copia desde dentro, así que **no existe una prueba automática**: se intentó, y la
+primera corrida se llevó dos meses de bitácora sin vuelta atrás.
+
+Si quieres comprobarla, hazlo sobre una **copia**:
+
+1. Duplica la carpeta de la bitácora a otro sitio.
+2. En *Bitácora → Carpeta*, apunta a la copia. Cierra y vuelve a abrir la
+   aplicación, para que el índice se abra contra ella.
+3. Baja la retención al valor que quieras probar y usa «Purgar ahora».
+4. Comprueba lo que esperabas, y devuelve la carpeta a su sitio original.
+
+El paso 2 es el que importa: sin cerrar y reabrir, seguirías purgando la buena.

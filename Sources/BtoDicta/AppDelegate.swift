@@ -412,6 +412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ContinuoBitacora.detener(esperandoElCierre: true)
         AutoAyudaControles.shared.detener()
         iconoTimer?.invalidate(); iconoVigilante?.invalidate()
+        purgaTimer?.invalidate()
         activacionVozTimer?.invalidate()
         if let o = activacionVozObserver { NotificationCenter.default.removeObserver(o) }
         ActivacionVoz.shared.apagar()
@@ -2119,6 +2120,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // NO HAY PRUEBA AUTOMÁTICA DE LA PURGA, Y ES A PROPÓSITO.
+        //
+        // Se intentó, y salió cara: la purga trabaja sobre `ContinuoIndice.shared`,
+        // que es único y se abre contra la bitácora REAL al arrancar la
+        // aplicación. Cambiar la ruta en la configuración desde la prueba no lo
+        // mueve —ya estaba abierto—, así que la purga corrió contra el material
+        // del usuario y se llevó dos meses de bitácora sin vuelta atrás.
+        //
+        // Una prueba que puede destruir datos reales no es una prueba: es una
+        // trampa esperando a que alguien la pise. Aislarla de verdad exigiría
+        // poder abrir un índice aparte, que hoy no se puede, y no se va a
+        // rehacer el índice entero para poder probar la purga.
+        //
+        // Cómo se comprueba a mano, sobre una copia y nunca sobre la bitácora
+        // buena, está en `docs/MANUAL.md`, sección «Comprobar la purga».
+
         // Respuestas 200 sin `content`: BTODICTA_EXTRAERTEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_EXTRAERTEST"] == "1" {
             var mal = 0
@@ -3614,6 +3631,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ContinuoBitacora.arrancar()
             ContinuoBitacora.purgaAutomaticaSiCorresponde()
         }
+        // Y se vuelve a mirar cada seis horas. La purga solo corría al arrancar,
+        // así que una sesión de varios días —esta aplicación se deja abierta—
+        // nunca volvía a aplicar la retención que el usuario fijó: seguía
+        // guardando material que ya debería haberse ido. El propio método
+        // comprueba si toca, así que llamarlo de más no cuesta.
+        purgaTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in
+            ContinuoBitacora.purgaAutomaticaSiCorresponde()
+        }
     }
 
     private func startDemo() {
@@ -3673,6 +3698,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Estado del ícono de la barra (reposo / grabando / procesando)
     enum EstadoIcono: Equatable { case reposo, grabando, procesando }
     private var iconoTimer: Timer?
+    /// Repasa la retención de la bitácora en sesiones largas: la purga solo
+    /// corría al arrancar, y esta aplicación se deja abierta días.
+    private var purgaTimer: Timer?
     private var iconoVigilante: Timer?
     private var estadoIconoActual: EstadoIcono = .reposo
     private var iconoFallosEstructurales = 0

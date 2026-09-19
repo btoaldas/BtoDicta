@@ -505,6 +505,38 @@ final class ContinuoIndice {
     /// Borra archivos y filas anteriores a `limite`. Devuelve cuántas filas se
     /// fueron. No pregunta nada: quien llama ya decidió.
     @discardableResult
+    /// Cuántas filas hay anteriores a una fecha. Solo para las pruebas.
+    func contarAnterioresA(_ limite: Date) -> Int {
+        var total = 0
+        cola.sync {
+            guard let d = db else { return }
+            for tabla in ["audio", "pantalla"] {
+                var st: OpaquePointer?
+                guard sqlite3_prepare_v2(d, "SELECT COUNT(*) FROM \(tabla) WHERE instante < ?;", -1, &st, nil) == SQLITE_OK else { continue }
+                sqlite3_bind_double(st, 1, limite.timeIntervalSince1970)
+                if sqlite3_step(st) == SQLITE_ROW { total += Int(sqlite3_column_int64(st, 0)) }
+                sqlite3_finalize(st)
+            }
+        }
+        return total
+    }
+
+    /// ¿Esta ruta sigue en el índice? Solo para las pruebas.
+    func estaIndexado(ruta: String) -> Bool {
+        var hay = false
+        cola.sync {
+            guard let d = db else { return }
+            for tabla in ["audio", "pantalla"] where !hay {
+                var st: OpaquePointer?
+                guard sqlite3_prepare_v2(d, "SELECT 1 FROM \(tabla) WHERE ruta = ? LIMIT 1;", -1, &st, nil) == SQLITE_OK else { continue }
+                sqlite3_bind_text(st, 1, (ruta as NSString).utf8String, -1, nil)
+                if sqlite3_step(st) == SQLITE_ROW { hay = true }
+                sqlite3_finalize(st)
+            }
+        }
+        return hay
+    }
+
     func purgarAnteriorA(_ limite: Date) -> Int {
         // TRES tramos, y solo los de SQL retienen la cola. El borrado físico de
         // miles de archivos va FUERA: con él dentro, un registrarAudio desde el
@@ -513,7 +545,7 @@ final class ContinuoIndice {
         for tabla in ["audio", "pantalla"] {
             // 1) Leer qué cae (cola retenida milisegundos).
             var rutas: [String] = []
-            var ids: [Int64] = []
+            var ids: [Int64] = []   // -1 marca «no se pudo borrar su archivo»
             cola.sync {
                 guard let d = db else { return }
                 var st: OpaquePointer?
@@ -531,30 +563,52 @@ final class ContinuoIndice {
             //    dictado se des-indexa, pero JAMÁS se borra de disco: es del
             //    historial del usuario, no nuestro.
             let raiz = Config.continuoCarpeta().path
+            let fm = FileManager.default
+            var fallados = 0
             for r in rutas where r.hasPrefix(raiz) {
-                try? FileManager.default.removeItem(atPath: r)
+                // Si el archivo NO se puede borrar —permisos, disco lleno, un
+                // volumen que se desconectó— la fila se queda: des-indexarla
+                // dejaría el archivo en disco sin nadie que sepa que existe, y
+                // la retención que el usuario pidió no se estaría cumpliendo
+                // aunque el índice dijera que sí. Se reintenta en la próxima
+                // purga, que ahora vuelve a correr sola cada pocas horas.
+                if fm.fileExists(atPath: r) {
+                    do { try fm.removeItem(atPath: r) }
+                    catch {
+                        fallados += 1
+                        if let idx = rutas.firstIndex(of: r), idx < ids.count { ids[idx] = -1 }
+                        continue
+                    }
+                }
                 // El .txt hermano acompaña al audio: purgar el sonido y dejar
                 // la transcripción en claro burlaría la retención.
                 let txt = (r as NSString).deletingPathExtension + ".txt"
-                try? FileManager.default.removeItem(atPath: txt)
+                try? fm.removeItem(atPath: txt)
             }
+            if fallados > 0 {
+                Log.log(.sistema, "bitácora: \(fallados) archivos no se pudieron borrar en la purga — siguen indexados y se reintentan en la próxima")
+            }
+            let idsBorrables = Set(ids.filter { $0 >= 0 })
 
             // 3) Borrar filas y texto indexado (cola retenida milisegundos).
             cola.sync {
                 guard let d = db else { return }
-                for id in ids {
+                for id in idsBorrables {
                     var bt: OpaquePointer?
                     if sqlite3_prepare_v2(d, "DELETE FROM \(tabla)_texto WHERE fila = ?;", -1, &bt, nil) == SQLITE_OK {
                         sqlite3_bind_int64(bt, 1, id)
                         sqlite3_step(bt)
                         sqlite3_finalize(bt)
                     }
-                }
-                var dt: OpaquePointer?
-                if sqlite3_prepare_v2(d, "DELETE FROM \(tabla) WHERE instante < ?;", -1, &dt, nil) == SQLITE_OK {
-                    sqlite3_bind_double(dt, 1, limite.timeIntervalSince1970)
-                    if sqlite3_step(dt) == SQLITE_DONE { borradas += Int(sqlite3_changes(d)) }
-                    sqlite3_finalize(dt)
+                    // Fila a fila, y solo las de los archivos que SÍ se borraron:
+                    // un `DELETE ... WHERE instante <` se llevaría por delante
+                    // también las de los que fallaron.
+                    var ft: OpaquePointer?
+                    if sqlite3_prepare_v2(d, "DELETE FROM \(tabla) WHERE id = ?;", -1, &ft, nil) == SQLITE_OK {
+                        sqlite3_bind_int64(ft, 1, id)
+                        if sqlite3_step(ft) == SQLITE_DONE { borradas += Int(sqlite3_changes(d)) }
+                        sqlite3_finalize(ft)
+                    }
                 }
             }
         }
