@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.63.6"
+    static let numero = "0.63.7"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.63.7", "2026-09-19", [
+            "EL AUDIO DEJA DE COPIARSE EN TODO EL RECORRIDO. Al guardar un dictado, el historial recibía los bytes y volvía a escribir el mismo archivo que el grabador acababa de crear. Ahora lo ADOPTA moviéndolo, que es un renombrado: cuesta igual con diez segundos que con seis horas y no pasa un byte por memoria. De paso, el audio de trabajo deja de acumularse, porque deja de existir donde estaba en cuanto pasa al historial",
+            "Los motores que corren en tu Mac también dejan de copiarlo: necesitan un archivo y se lo damos con un enlace, no con una copia. En un dictado de seis horas eran 1,3 GB de trabajo para nada",
+            "ARREGLADO UN FALLO QUE PODÍA PERDER UN DICTADO. El nombre de cada dictado es la hora al segundo, así que dos dictados en el mismo segundo compartían archivo y el segundo pisaba al primero. Ahora cada uno va al suyo",
+            "Pedir el cierre de la conexión sobre la sesión que comparte la aplicación deja un socket muerto que la petición siguiente hereda, y se queda esperando hasta agotar su plazo. Se corrigió en los motores de transcripción en 0.59.0 y había vuelto en TRECE sitios: la voz, el resumen del día, el ruteo de modos, transcribir un archivo del historial. Retirado en todos, y ahora hay una comprobación automática que lo vigila en cada versión, para que no vuelva una tercera vez",
+        ]),
         ("0.63.6", "2026-09-19", [
             "Cierre de la mejora de memoria: las pruebas internas dicen ahora también CUÁNTO TARDAN, no solo si pasan. Leer un tramo de 25 MB del medio de un dictado de seis horas: 2,9 milésimas de segundo. Armar el paquete del envío, comparado por los dos caminos: para una hora de audio, 7 ms en memoria contra 54 ms en disco",
             "Ese dato se publica tal cual porque también dice lo que empeora: escribir a disco es más lento en términos relativos. En absoluto son milésimas frente a los segundos que tarda cualquier transcripción, y a cambio se ahorran 115 MB de memoria por hora de audio. En un dictado corto la diferencia es de una milésima",

@@ -34,6 +34,17 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.63.7
+
+- **El audio deja de copiarse en todo el recorrido.** El historial adopta el
+  archivo del grabador moviéndolo en vez de reescribirlo, y los motores locales
+  lo reciben por enlace, no por copia. En seis horas, 1,3 GB de trabajo que
+  desaparecen.
+- **Arreglado un fallo que podía perder un dictado**: dos dictados en el mismo
+  segundo compartían archivo y el segundo pisaba al primero.
+- El cierre de conexión sobre la sesión compartida había vuelto en **trece
+  sitios**. Retirado, y ahora una comprobación automática lo vigila.
+
 ### Novedades 0.63.6
 
 - Las pruebas internas miden también el tiempo: leer un tramo de 25 MB de un

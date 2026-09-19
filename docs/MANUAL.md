@@ -1016,6 +1016,19 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### Dónde está el audio de cada dictado
+
+Mientras hablas, el audio se escribe en una carpeta de trabajo. Al terminar, el
+historial lo **adopta**: el archivo se mueve, no se copia, así que deja de estar
+en la carpeta de trabajo y pasa a la del historial, donde lo recuperas desde la
+pestaña Transcribir.
+
+En la carpeta de trabajo solo queda lo que no llegó a moverse —un dictado
+cancelado, un cierre inesperado—, y eso se barre pasados los días que fijes en
+*Ajustes → Audio de trabajo*.
+
+Comprobación: `BTODICTA_ADOPTATEST=1`.
+
 ### Comprobar tú mismo el rendimiento
 
 Las pruebas internas dicen cuánto tardan, no solo si pasan:
