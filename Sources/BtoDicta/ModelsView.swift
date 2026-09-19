@@ -1,3 +1,4 @@
+import CryptoKit
 import AppKit
 import SwiftUI
 
@@ -20,15 +21,30 @@ final class Descargas: ObservableObject {
                                                  withIntermediateDirectories: true)
         progreso[clave] = 0.0001
         Log.log(.ia, "descargando \(nombre)")
-        let task = URLSession.shared.downloadTask(with: url) { [weak self] tmp, _, err in
+        let task = URLSession.shared.downloadTask(with: url) { [weak self] tmp, resp, err in
             DispatchQueue.main.async {
                 self?.obs[clave] = nil
                 self?.tareas[clave] = nil
                 self?.progreso[clave] = nil
                 if let tmp, err == nil {
+                    // Lo que baja se COMPRUEBA antes de instalarlo.
+                    //
+                    // Antes se movía a su sitio sin mirar nada: ni el código de
+                    // respuesta, ni el tamaño, ni el contenido. Una página de
+                    // error de 2 kB —un 404, un aviso de mantenimiento, una
+                    // pantalla de inicio de sesión— quedaba guardada con el
+                    // nombre del modelo, y el fallo aparecía después, al usarlo,
+                    // con un mensaje que no llevaba a ninguna parte.
+                    if let motivo = ModeloDescargado.motivoParaRechazar(tmp, respuesta: resp) {
+                        try? FileManager.default.removeItem(at: tmp)
+                        Log.log(.ia, "descarga \(nombre) RECHAZADA — \(motivo). No se instala nada")
+                        return
+                    }
                     try? FileManager.default.removeItem(at: destino)
                     try? FileManager.default.moveItem(at: tmp, to: destino)
-                    Log.log(.ia, "\(nombre) descargado")
+                    let huella = ModeloDescargado.huella(de: destino)
+                    Log.log(.ia, "\(nombre) descargado y comprobado · \(ModeloDescargado.tamañoLegible(destino)) · sha256 \(huella.prefix(16))…")
+                    ModeloDescargado.anotarHuella(huella, de: destino, nombre: nombre)
                 } else if (err as NSError?)?.code == NSURLErrorCancelled {
                     Log.log(.ia, "descarga \(nombre) cancelada por el usuario")
                 } else {
@@ -642,5 +658,104 @@ struct CloudRow: View {
         tarifa = String(format: "%.2f", UsageLog.tarifaModelo(modelo))
         withAnimation { tarifaGuardada = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { withAnimation { tarifaGuardada = false } }
+    }
+}
+
+
+// MARK: - Comprobar lo que se descarga antes de instalarlo
+//
+// Un modelo es un archivo de varios gigas que va a ejecutar la máquina. Bajarlo
+// y moverlo a su sitio sin mirar qué es deja pasar lo que el servidor haya
+// devuelto: una página de error, un aviso de mantenimiento, un HTML de inicio de
+// sesión. El fallo no aparece al descargar, sino después, al usarlo, con un
+// mensaje que no lleva a ninguna parte.
+
+enum ModeloDescargado {
+
+    /// Firmas de los formatos que la aplicación sabe cargar.
+    private static let firmas: [(String, [UInt8])] = [
+        ("GGUF", Array("GGUF".utf8)),      // llama.cpp y derivados
+        ("ggml", Array("ggml".utf8)),      // whisper.cpp clásico
+        ("ONNX", [0x08]),                  // protobuf de ONNX (Piper)
+        ("PyTorch/zip", [0x50, 0x4B]),     // .ckpt y .pt son zip
+    ]
+
+    /// Por qué NO instalar esto, o `nil` si se puede.
+    static func motivoParaRechazar(_ archivo: URL, respuesta: URLResponse?) -> String? {
+        if let http = respuesta as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            return "el servidor respondió HTTP \(http.statusCode)"
+        }
+        let bytes = ((try? FileManager.default.attributesOfItem(atPath: archivo.path))?[.size] as? Int) ?? 0
+        // Ningún modelo de verdad pesa menos de un mega. Una página de error, sí.
+        guard bytes > 1_048_576 else {
+            return "solo pesa \(bytes / 1024) kB: eso no es un modelo, parece una página de error"
+        }
+        guard let h = try? FileHandle(forReadingFrom: archivo) else {
+            return "no pude leer lo descargado"
+        }
+        defer { try? h.close() }
+        let cabecera = Array((try? h.read(upToCount: 8)) ?? Data())
+        // Si empieza por `<` es HTML: el servidor devolvió una página, no un modelo.
+        if cabecera.first == UInt8(ascii: "<") {
+            return "lo descargado es una página web, no un modelo"
+        }
+        let reconocido = firmas.contains { _, firma in Array(cabecera.prefix(firma.count)) == firma }
+        guard reconocido else {
+            let vistos = cabecera.prefix(4).map { String(format: "%02x", $0) }.joined(separator: " ")
+            return "no reconozco el formato (empieza por \(vistos))"
+        }
+        return nil
+    }
+
+    static func huella(de archivo: URL) -> String {
+        guard let h = try? FileHandle(forReadingFrom: archivo) else { return "" }
+        defer { try? h.close() }
+        var sha = SHA256()
+        // Por trozos: un modelo puede pesar varios gigas y no cabe de golpe.
+        while let trozo = try? h.read(upToCount: 1_048_576), !trozo.isEmpty {
+            sha.update(data: trozo)
+        }
+        return sha.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func tamañoLegible(_ archivo: URL) -> String {
+        let b = ((try? FileManager.default.attributesOfItem(atPath: archivo.path))?[.size] as? Int) ?? 0
+        return b > 1_073_741_824 ? String(format: "%.1f GB", Double(b) / 1_073_741_824)
+                                 : String(format: "%.0f MB", Double(b) / 1_048_576)
+    }
+
+    /// Guarda la huella de lo instalado.
+    ///
+    /// No convierte la descarga en segura —la primera vez se confía en el
+    /// servidor—, pero deja constancia: si un modelo cambia de contenido sin que
+    /// nadie lo haya vuelto a descargar, se puede ver. Y permite comparar dos
+    /// máquinas que deberían tener lo mismo.
+    static func anotarHuella(_ huella: String, de archivo: URL, nombre: String) {
+        guard !huella.isEmpty else { return }
+        let registro = Config.dir.appendingPathComponent("modelos-huellas.json")
+        var tabla = ((try? Data(contentsOf: registro))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+        let f = ISO8601DateFormatter()
+        tabla[archivo.lastPathComponent] = ["sha256": huella, "nombre": nombre,
+                                            "fecha": f.string(from: Date())]
+        guard let d = try? JSONSerialization.data(withJSONObject: tabla, options: [.prettyPrinted]) else { return }
+        Config.asegurarDirSeguro()
+        try? d.write(to: registro, options: .atomic)
+    }
+
+    /// ¿Algún modelo instalado cambió de contenido desde que se descargó?
+    static func verificarInstalados() -> [String] {
+        let registro = Config.dir.appendingPathComponent("modelos-huellas.json")
+        guard let d = try? Data(contentsOf: registro),
+              let tabla = (try? JSONSerialization.jsonObject(with: d)) as? [String: [String: String]]
+        else { return [] }
+        var cambiados: [String] = []
+        for (archivo, datos) in tabla {
+            let ruta = TranscribeCpp.modelsDir.appendingPathComponent(archivo)
+            guard FileManager.default.fileExists(atPath: ruta.path) else { continue }
+            let ahora = huella(de: ruta)
+            if !ahora.isEmpty, ahora != datos["sha256"] { cambiados.append(archivo) }
+        }
+        return cambiados
     }
 }

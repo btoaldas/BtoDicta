@@ -131,6 +131,14 @@ BTODICTA_QA_BIN="$PWD/$BUILD_DIR/BtoDicta.app/Contents/MacOS/BtoDicta" \
   || fail "La suite del paquete release falló"
 ok "Suite automática del paquete final aprobada"
 
+# Los motores locales se copian al paquete con `if [ -x … ]` y sin `else`: si las
+# carpetas de compilación no están, el paquete sale SIN ellos y nadie se entera
+# hasta que alguien intenta dictar sin internet. Aquí se convierte en un fallo
+# ruidoso, antes de firmar nada.
+/usr/bin/python3 scripts/qa-binarios.py "$PWD/$BUILD_DIR/BtoDicta.app" \
+  || fail "El paquete no lleva todos los motores locales — revisa las carpetas de compilación"
+ok "Los motores locales viajan dentro del paquete y son arm64"
+
 # La firma distribuible NO depende de que cada Mac confíe en un certificado
 # autofirmado: Ed25519 autentica el DMG completo con una clave privada local.
 DIGEST=$(mktemp)

@@ -2124,6 +2124,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // Que no se instale como modelo lo que no lo es: BTODICTA_MODELOTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_MODELOTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("MODELO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            let fm = FileManager.default
+            let carpeta = fm.temporaryDirectory.appendingPathComponent("modelotest-\(UUID().uuidString)")
+            try? fm.createDirectory(at: carpeta, withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: carpeta) }
+
+            func archivo(_ nombre: String, _ datos: Data) -> URL {
+                let u = carpeta.appendingPathComponent(nombre)
+                try? datos.write(to: u); return u
+            }
+            let relleno = Data(repeating: 0x42, count: 2_000_000)
+
+            // Lo que un servidor devuelve cuando algo va mal.
+            let html = archivo("404.gguf", Data("<!DOCTYPE html><html><body>404 Not Found".utf8) + relleno)
+            chk(ModeloDescargado.motivoParaRechazar(html, respuesta: nil) != nil,
+                "una página web NO se instala como modelo")
+
+            let corto = archivo("corto.gguf", Data(repeating: 1, count: 4_000))
+            chk(ModeloDescargado.motivoParaRechazar(corto, respuesta: nil) != nil,
+                "un archivo de 4 kB NO es un modelo")
+
+            let basura = archivo("basura.gguf", Data([0xDE, 0xAD, 0xBE, 0xEF]) + relleno)
+            chk(ModeloDescargado.motivoParaRechazar(basura, respuesta: nil) != nil,
+                "un formato desconocido se rechaza")
+
+            // Un 404 con cuerpo grande y firma válida: manda el código HTTP.
+            let bueno = archivo("bueno.gguf", Data("GGUF".utf8) + relleno)
+            let resp404 = HTTPURLResponse(url: URL(string: "https://x/y")!, statusCode: 404,
+                                          httpVersion: nil, headerFields: nil)
+            chk(ModeloDescargado.motivoParaRechazar(bueno, respuesta: resp404) != nil,
+                "con HTTP 404 se rechaza aunque el contenido parezca bueno")
+
+            // Y los formatos de verdad SÍ pasan (pruebas negativas).
+            let resp200 = HTTPURLResponse(url: URL(string: "https://x/y")!, statusCode: 200,
+                                          httpVersion: nil, headerFields: nil)
+            chk(ModeloDescargado.motivoParaRechazar(bueno, respuesta: resp200) == nil,
+                "un GGUF de verdad se instala")
+            let ggml = archivo("v.bin", Data("ggml".utf8) + relleno)
+            chk(ModeloDescargado.motivoParaRechazar(ggml, respuesta: resp200) == nil,
+                "y un ggml clásico también")
+            let ckpt = archivo("v.ckpt", Data([0x50, 0x4B, 0x03, 0x04]) + relleno)
+            chk(ModeloDescargado.motivoParaRechazar(ckpt, respuesta: resp200) == nil,
+                "y un punto de control de PyTorch")
+
+            // La huella: misma entrada, misma salida; cambio de un byte, otra.
+            let h1 = ModeloDescargado.huella(de: bueno)
+            chk(h1.count == 64, "la huella tiene los 64 caracteres de un sha256")
+            chk(h1 == ModeloDescargado.huella(de: bueno), "calcularla dos veces da lo mismo")
+            let otro = archivo("otro.gguf", Data("GGUF".utf8) + Data(repeating: 0x43, count: 2_000_000))
+            chk(h1 != ModeloDescargado.huella(de: otro), "un contenido distinto da otra huella")
+
+            print("MODELO \(mal == 0 ? "TODO OK — no se instala como modelo lo que no lo es" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Que un fallo al escribir NO pase desapercibido: BTODICTA_ESCRITURATEST=1
         //
         // El peor fallo de esta aplicación no es que avise de un problema: es que

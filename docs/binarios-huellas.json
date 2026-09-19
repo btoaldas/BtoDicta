@@ -1,0 +1,42 @@
+{
+  "libggml-cpu.0.dylib": {
+    "arq": "arm64",
+    "bytes": 846080,
+    "sha256": "601b2991c250f141848d3af5537da64d946f146257b5331338924cd1ea5b4ed1"
+  },
+  "libggml-metal.0.dylib": {
+    "arq": "arm64",
+    "bytes": 832776,
+    "sha256": "9f9bf5c35cdc89abcfa5ed4a0f8796de46b274d1e606d87d51d9d2538e16c39b"
+  },
+  "libggml.0.dylib": {
+    "arq": "arm64",
+    "bytes": 59808,
+    "sha256": "ab8fc55bafb6ad57f12c9dc0d1b52b1af51c9dd0fc8fe802bc8a107e05955f6e"
+  },
+  "libwhisper.1.dylib": {
+    "arq": "arm64",
+    "bytes": 424304,
+    "sha256": "94b5b6905fcfb5f6f61627e1a8d95b258b2caca33d28482d26c51899854e14ca"
+  },
+  "llama-server": {
+    "arq": "arm64",
+    "bytes": 15493232,
+    "sha256": "83470e5c90f0d4bd6ca67fadc965c001d44065193e49d2327c0b338e20e12d1e"
+  },
+  "transcribe-cli": {
+    "arq": "arm64",
+    "bytes": 3837168,
+    "sha256": "b763f0795bf777accb9cd6b0849cb38f7c1812d60b23f20f190581bd239cb621"
+  },
+  "whisper-cli": {
+    "arq": "arm64",
+    "bytes": 845064,
+    "sha256": "1ace862ca9aaeaa22cdeecf87d31a866ab953a4ce4200f412b3d4858a427421f"
+  },
+  "whisper-server": {
+    "arq": "arm64",
+    "bytes": 1230464,
+    "sha256": "c849d74da1a821fe63ead8ed0b86a7c36fd6ee617802d62678e4d1658c12488f"
+  }
+}
