@@ -1016,6 +1016,17 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### El resumen del día salió corto
+
+Desde 0.64.2 no debería volver a pasar por esta causa. Si una rutina se disparaba
+mientras la bitácora estaba transcribiendo su cola de audio, generaba el documento
+igual — con el día a medio procesar. Ahora espera cinco minutos y lo genera con el
+material completo; el registro lo dice: «rutina aplazada 5 min — hay una tanda
+transcribiendo».
+
+Si aun así sale corto, mira en la pestaña Bitácora cuánto material hay sin
+procesar: puede que sencillamente el día tenga poco.
+
 ### Qué no se fotografía nunca
 
 La bitácora captura la pantalla cada pocos segundos, y esas capturas se indexan y
