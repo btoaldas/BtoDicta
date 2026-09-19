@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.66.1
+
+- **Los modelos se comprueban uno a uno**, no solo por su forma: cada uno del
+  catálogo lleva su **huella fijada**, tomada de lo que publica Hugging Face y
+  contrastada con lo instalado.
+- Un modelo ajeno al catálogo se sigue instalando igual.
+- Los que ya tenías se revisan al arrancar, sin estorbar y sin borrar nada.
+
 ### Novedades 0.66.0
 
 - **Motores locales al día**: whisper.cpp 1.9.4 y el de embeddings con ~1000

@@ -1032,6 +1032,19 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### «su huella no es la que debería»
+
+Desde 0.66.1, los modelos del catálogo llevan su huella fijada. Si ves ese aviso,
+lo que llegó no es exactamente el modelo esperado — normalmente porque su
+repositorio lo actualizó. **No se instala nada.**
+
+Si el modelo cambió a propósito en su origen, hay que anotar la huella nueva en
+`Resources/modelos-conocidos.json` del repositorio. Es a propósito que no se
+acepte solo: un modelo que cambia sin avisar es exactamente lo que hay que notar.
+
+Un modelo que **no** esté en el catálogo se instala igual: puedes bajar el GGUF
+que quieras.
+
 ### «descarga RECHAZADA» al bajar un modelo
 
 Desde 0.65.3, lo que se descarga se comprueba antes de instalarse. Si ves ese

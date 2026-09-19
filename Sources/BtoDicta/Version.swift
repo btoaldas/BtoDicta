@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.66.0"
+    static let numero = "0.66.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.66.1", "2026-09-19", [
+            "LOS MODELOS SE COMPRUEBAN UNO A UNO, NO SOLO POR SU FORMA. Desde 0.65.3 se miraba que lo descargado fuera un modelo de verdad y no una página de error. Ahora se comprueba además que sea EXACTAMENTE el modelo esperado: cada uno del catálogo lleva su huella fijada, y si lo que llega no coincide no se instala, aunque venga del sitio de siempre y parezca correcto",
+            "Las huellas no salen de dar por bueno lo que ya había: se tomaron de lo que publica Hugging Face para cada archivo y se contrastaron con los modelos instalados en esta máquina. Los cuatro coincidían",
+            "Un modelo que NO está en el catálogo se sigue instalando igual: puedes bajar el que quieras y no es asunto de la aplicación impedirlo. Lo que no puede pasar es que uno del catálogo llegue cambiado",
+            "Los que ya tenías se revisan también, una vez al arrancar y sin estorbar. Solo avisa: que un modelo cambie puede ser normal si su repositorio lo actualizó, y esa decisión es de quien lo publica",
+        ]),
         ("0.66.0", "2026-09-19", [
             "MOTORES LOCALES AL DÍA. whisper.cpp pasa de la 1.9.1 a la 1.9.4 —449 cambios, 81 de ellos arreglos— y el motor de embeddings se pone al día con casi mil cambios acumulados desde julio. Actualizar esto tiene su riesgo, porque una versión nueva puede cambiar lo que transcribe, así que se comprobó ANTES de instalar nada: el mismo audio da el texto IDÉNTICO letra por letra, incluido uno con siglas y nombres propios, que es donde más se notaría",
             "OTROS PROGRAMAS DE TU MAC YA PUEDEN TRANSCRIBIR DE VERDAD. La puerta local está encendida y el comando `transcribir` de la Mac la usa: antes alcanzaba las carpetas internas de BtoDicta, y se habría roto el día que algo cambiara de sitio. Ahora habla por un contrato, y si BtoDicta está cerrada sigue funcionando como siempre en vez de fallar",
