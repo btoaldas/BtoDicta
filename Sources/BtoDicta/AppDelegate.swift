@@ -2011,6 +2011,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             RunLoop.main.run(); return
         }
+        // Relevo rápido del micrófono: el patrón que rompía el dictado —la
+        // bitácora lo suelta y el dictado lo toma en el mismo instante—.
+        //   BTODICTA_MICRELEVO=<ciclos>   (8 por omisión)
+        if let n = ProcessInfo.processInfo.environment["BTODICTA_MICRELEVO"] {
+            let ciclos = max(2, Int(n) ?? 8)
+            var fallos = 0, conAudio = 0
+            var formatos = Set<String>()
+            print("RELEVO \(ciclos) tomas y sueltas seguidas del micrófono, sin pausa entre ellas")
+            // Encadenado por el bucle principal REAL: el motor de audio entrega
+            // sus buffers en su propio hilo, pero necesita que el bucle corra.
+            func ciclo(_ i: Int) {
+                guard i <= ciclos else {
+                    print("RELEVO formatos vistos: \(formatos.sorted().joined(separator: " · "))")
+                    print("RELEVO \(ciclos - fallos)/\(ciclos) arrancaron · \(conAudio)/\(ciclos) con audio")
+                    let ok = fallos == 0 && conAudio >= ciclos - 1
+                    print("RELEVO \(ok ? "TODO OK" : "FALLOS=\(fallos)")"); exit(ok ? 0 : 1)
+                }
+                let r = Recorder()
+                do { try r.start() } catch {
+                    fallos += 1
+                    print("RELEVO ✗ ciclo \(i): NO arrancó — \(error.localizedDescription)")
+                    DispatchQueue.main.async { ciclo(i + 1) }
+                    return
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let b = r.buffersRecibidos
+                    if let f = r.formatoEntradaQA {
+                        formatos.insert("\(Int(f.sampleRate))Hz/\(f.channelCount)ch")
+                    }
+                    _ = r.stop()
+                    if b > 0 { conAudio += 1 }
+                    else { print("RELEVO ✗ ciclo \(i): arrancó pero no entró audio") }
+                    // Sin pausa: soltar y volver a tomar de inmediato es
+                    // exactamente el caso que fallaba.
+                    DispatchQueue.main.async { ciclo(i + 1) }
+                }
+            }
+            ciclo(1)
+            RunLoop.main.run(); return
+        }
         // Micrófono de ESTE equipo con el código real: BTODICTA_MICTEST=1
         // Comprueba que entra audio sea cual sea la frecuencia del aparato
         // (44 100, 48 000, 96 000 Hz…) y que fijar el dispositivo no lo enmudece.

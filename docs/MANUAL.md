@@ -1016,6 +1016,22 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### «El micrófono no aceptó la escucha» y hay que reiniciar
+
+Arreglado en 0.63.2. Pasaba al pulsar la tecla **justo cuando la bitácora acababa
+de soltar el micrófono**: la app leía el formato del aparato inmediatamente
+después de fijarlo y macOS aún no había terminado de conmutar, así que devolvía
+el del aparato anterior. Ese formato es válido —44 100 Hz en vez de 48 000—, de
+modo que pasaba la comprobación de 0.54.1 y la escucha se rechazaba con «format
+mismatch». El dictado no arrancaba y no quedaba más remedio que reiniciar.
+
+Ahora no se le pasa ningún formato: lo resuelve el motor de audio al instalar la
+escucha, y el conversor se arma con el del primer audio real, rearmándose si el
+micrófono cambia de frecuencia a mitad de la grabación. Si aun así falla, se
+reintenta tres veces con un respiro.
+
+Comprobación del caso exacto: `BTODICTA_MICRELEVO=10`.
+
 ### Dicté horas y la aplicación se puso pesada
 
 Hasta 0.59.3 el audio del dictado se guardaba **dos veces en memoria** —en el

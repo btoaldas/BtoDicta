@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.63.2
+
+- **Arreglado el «el micrófono no aceptó la escucha»** que obligaba a cerrar y
+  volver a abrir la app. Pasaba al dictar justo cuando la bitácora soltaba el
+  micrófono: se leía el formato del aparato anterior —44 100 Hz cuando ya estaba
+  en 48 000— y la escucha se rechazaba. Ahora el formato lo resuelve el motor de
+  audio en el momento, y si algo falla se reintenta tres veces.
+
 ### Novedades 0.63.1
 
 - **OpenCode Go** como proveedor de IA: la suscripción mensual con decenas de

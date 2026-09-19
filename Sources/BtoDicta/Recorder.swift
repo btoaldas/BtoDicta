@@ -11,6 +11,12 @@ final class Recorder {
     // (backlog en vivo): sin este candado es una carrera de datos real.
     private let candado = NSLock()
     private var converter: AVAudioConverter?
+    /// Con qué formato se armó el convertidor. Si el micrófono cambia de
+    /// frecuencia a mitad de la grabación —pasa al conmutar de dispositivo—, se
+    /// rearma solo en vez de convertir con la tasa equivocada.
+    private var convertidorDesde: AVAudioFormat?
+    /// El formato con el que se está escuchando. Lo usa la prueba propia.
+    var formatoEntradaQA: AVAudioFormat? { convertidorDesde }
     /// Frecuencia INTERNA de la app. El micrófono de cada equipo entrega la
     /// suya —44 100, 48 000, 96 000 Hz…— y el conversor la lleva siempre aquí,
     /// así que nada del resto del código depende del hardware de turno.
@@ -63,14 +69,31 @@ final class Recorder {
             Log.log(.sistema, "micrófono no disponible (formato \(inFormat.sampleRate) Hz, \(inFormat.channelCount) can) — no arranco el dictado")
             throw ScribeError.ws("el micrófono no está disponible ahora mismo")
         }
-        converter = AVAudioConverter(from: inFormat, to: outFormat)
-
         buffersRecibidos = 0
         let instalar = { [weak self] in
-        input.installTap(onBus: 0, bufferSize: 4096, format: inFormat) { [weak self] buffer, _ in
-            guard let self, let converter = self.converter else { return }
+        // `format: nil` a propósito. Pasarle el formato que acabamos de leer
+        // era la causa del fallo: `Microfono.aplicar` puede CAMBIAR el
+        // dispositivo y CoreAudio tarda en conmutar, así que la lectura devuelve
+        // el formato del aparato ANTERIOR —44 100 Hz cuando ya está en 48 000, o
+        // al revés—. Es un formato válido, así que pasaba la comprobación de
+        // 0.54.1, y `installTap` lo rechazaba con «Failed to create tap due to
+        // format mismatch»; el dictado no arrancaba y había que reiniciar la
+        // aplicación. Con nil, AVAudioEngine resuelve el formato real en el
+        // momento de instalar y la discrepancia no puede existir.
+        input.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
+            guard let self else { return }
+            // El convertidor se arma con el formato del PRIMER buffer —el de
+            // verdad— y se rearma si cambia a mitad de camino.
+            let formatoEntrada = buffer.format
+            if self.convertidorDesde?.sampleRate != formatoEntrada.sampleRate
+                || self.convertidorDesde?.channelCount != formatoEntrada.channelCount {
+                self.converter = AVAudioConverter(from: formatoEntrada, to: self.outFormat)
+                self.convertidorDesde = formatoEntrada
+                Log.log(.sistema, "micrófono: escuchando a \(Int(formatoEntrada.sampleRate)) Hz, \(formatoEntrada.channelCount) can")
+            }
+            guard let converter = self.converter else { return }
             self.buffersRecibidos &+= 1
-            let ratio = self.outFormat.sampleRate / inFormat.sampleRate
+            let ratio = self.outFormat.sampleRate / formatoEntrada.sampleRate
             let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
             guard let out = AVAudioPCMBuffer(pcmFormat: self.outFormat, frameCapacity: capacity) else { return }
             var served = false
@@ -104,10 +127,26 @@ final class Recorder {
         }
         // AVFoundation lanza excepciones de Objective-C que `try` no ve: van por
         // el atrapador nativo o se llevan la app por delante.
-        if let fallo = AudioSeguro.atrapar(instalar) {
+        // Hasta TRES intentos con un respiro entre ellos. Un micrófono que
+        // acaba de cambiar de dueño —la bitácora lo suelta y el dictado lo
+        // toma— puede tardar unas décimas en asentarse. Antes se fallaba al
+        // primer intento y el dictado no arrancaba: había que cerrar y volver a
+        // abrir la aplicación. Medido en el registro: el mismo micrófono que
+        // rechazaba la escucha entregaba audio sin problema segundos después.
+        var falloInstalar: String?
+        for intento in 1...3 {
+            falloInstalar = AudioSeguro.atrapar(instalar)
+            if falloInstalar == nil { break }
             input.removeTap(onBus: 0)
-            Log.log(.sistema, "micrófono: no pude instalar la escucha (\(fallo)) — dictado no iniciado")
-            throw ScribeError.ws("el micrófono no aceptó la escucha")
+            guard intento < 3 else { break }
+            Log.log(.sistema, "micrófono: la escucha no entró al intento \(intento) (\(falloInstalar ?? "")) — reintento")
+            engine.stop(); engine.reset()
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        if let fallo = falloInstalar {
+            input.removeTap(onBus: 0)
+            Log.log(.sistema, "micrófono: no pude instalar la escucha tras 3 intentos (\(fallo)) — dictado no iniciado")
+            throw ScribeError.ws("el micrófono no está libre; suelta la tecla y vuelve a intentarlo")
         }
         engine.prepare()
         var errorArranque: Error?

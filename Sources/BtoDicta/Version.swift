@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.63.1"
+    static let numero = "0.63.2"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.63.2", "2026-09-18", [
+            "ARREGLADO el fallo que obligaba a cerrar y volver a abrir la aplicación: «el micrófono no aceptó la escucha». Ocurría al pulsar la tecla justo cuando la bitácora acababa de soltar el micrófono. La aplicación leía el formato del aparato inmediatamente después de fijarlo, y macOS todavía no había terminado de conmutar, así que devolvía el del aparato ANTERIOR —44 100 Hz cuando ya estaba en 48 000, o al revés—. Ese formato es válido, de modo que pasaba la comprobación añadida en 0.54.1, y la escucha se rechazaba con «format mismatch»: el dictado no arrancaba y no había forma de seguir sin reiniciar",
+            "Ahora no se le pasa ningún formato: lo resuelve el propio motor de audio en el instante de instalar la escucha, así que la discrepancia no puede existir. El conversor se arma con el formato del primer trozo de audio REAL y se rearma solo si el micrófono cambia de frecuencia a mitad de la grabación",
+            "Y si aun así algo falla, se reintenta hasta tres veces con un respiro entre ellas en vez de rendirse al primer intento. En el registro se veía que el mismo micrófono que rechazaba la escucha entregaba audio sin problema segundos después",
+            "Prueba propia del caso exacto —soltar y volver a tomar el micrófono sin pausa, con la bitácora disputándolo—: BTODICTA_MICRELEVO=10",
+        ]),
         ("0.63.1", "2026-09-15", [
             "NUEVO PROVEEDOR DE IA: OpenCode Go, la suscripción mensual con decenas de modelos abiertos incluidos —DeepSeek, GLM, Qwen, Kimi, MiniMax, Grok—. Sirve para pulir, para los modos y para el agente. NO transcribe ni habla, solo expone modelos de texto, así que no aparece entre los motores de dictado",
             "Ojo con la trampa: la misma clave vale para dos extremos distintos. El de pago por uso (Zen) y el del plan (Go) son URL diferentes, así que es fácil llamar al equivocado y concluir que no hay saldo cuando el plan está activo. Y el de Go exige una cabecera de sesión o rechaza la petición",
