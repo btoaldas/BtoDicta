@@ -1,5 +1,20 @@
 import SwiftUI
 
+/// Amortiguador para los deslizadores de la bitácora.
+///
+/// Arrastrar uno dispara `didSet` en cada paso, y cada paso reconfiguraba el
+/// planificador: decenas de reinicios del motor en un solo arrastre. Se espera a
+/// que la mano se quede quieta un momento antes de aplicar.
+enum ReconfiguracionAmortiguada {
+    private static var pendiente: DispatchWorkItem?
+    static func pedir(tras espera: TimeInterval = 0.4, _ accion: @escaping () -> Void) {
+        pendiente?.cancel()
+        let trabajo = DispatchWorkItem(block: accion)
+        pendiente = trabajo
+        DispatchQueue.main.asyncAfter(deadline: .now() + espera, execute: trabajo)
+    }
+}
+
 /// Mismo púrpura del logo que usa la ventana de ajustes. Se repite aquí porque
 /// allí es `private` y no merece la pena tocar ese archivo solo por un color.
 private let acentoBitacora = Color(red: 0.36, green: 0.28, blue: 0.62)
@@ -49,8 +64,8 @@ final class ContinuoModel: ObservableObject {
     @Published var dispHora: Bool { didSet { guardarDisparadores() } }
     @Published var dispArranque: Bool { didSet { guardarDisparadores() } }
     @Published var dispApagado: Bool { didSet { guardarDisparadores() } }
-    @Published var loteIntervalo: Double { didSet { Config.set("continuo_lote_intervalo_minutos", to: Int(loteIntervalo)); ContinuoPlanificador.reconfigurar() } }
-    @Published var loteMinutoDia: Double { didSet { Config.set("continuo_lote_minuto_del_dia", to: Int(loteMinutoDia)); ContinuoPlanificador.reconfigurar() } }
+    @Published var loteIntervalo: Double { didSet { Config.set("continuo_lote_intervalo_minutos", to: Int(loteIntervalo)); ReconfiguracionAmortiguada.pedir { ContinuoPlanificador.reconfigurar() } } }
+    @Published var loteMinutoDia: Double { didSet { Config.set("continuo_lote_minuto_del_dia", to: Int(loteMinutoDia)); ReconfiguracionAmortiguada.pedir { ContinuoPlanificador.reconfigurar() } } }
     @Published var loteMotor: String { didSet { Config.set("continuo_lote_motor", to: loteMotor) } }
     @Published var resumenIA: String { didSet { Config.set("continuo_resumen_ia", to: resumenIA) } }
     @Published var promptActivo: String { didSet { Config.set("continuo_prompt_activo", to: promptActivo); cargarPrompt() } }

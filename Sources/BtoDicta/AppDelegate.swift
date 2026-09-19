@@ -413,6 +413,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         AutoAyudaControles.shared.detener()
         iconoTimer?.invalidate(); iconoVigilante?.invalidate()
         purgaTimer?.invalidate()
+        ocupacionTimer?.invalidate()
         activacionVozTimer?.invalidate()
         if let o = activacionVozObserver { NotificationCenter.default.removeObserver(o) }
         ActivacionVoz.shared.apagar()
@@ -3626,7 +3627,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // dictado en curso, se detiene y sigue en la próxima. Se usa el estado
         // completo de ocupación del micrófono, no solo `recorder.isRecording`,
         // porque la escucha de manos libres también cuenta.
-        ContinuoLote.dictadoOcupado = { [weak self] in self?.activacionVozOcupada ?? true }
+        // El estado de ocupación se PUBLICA desde el hilo principal en una
+        // bandera atómica, en vez de que la cola de la tanda venga a leer aquí.
+        // Leía propiedades de `main` desde otra cola, que es una carrera de
+        // datos real sobre el dato con el que se decide si transcribir de fondo
+        // mientras alguien está hablando.
+        ContinuoLote.dictadoOcupado = { ContinuoLote.ocupadoPublicado }
+        ocupacionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            ContinuoLote.publicarOcupado(self?.activacionVozOcupada ?? true)
+        }
+        ContinuoLote.publicarOcupado(activacionVozOcupada)
         DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
             ContinuoBitacora.arrancar()
             ContinuoBitacora.purgaAutomaticaSiCorresponde()
@@ -3701,6 +3711,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Repasa la retención de la bitácora en sesiones largas: la purga solo
     /// corría al arrancar, y esta aplicación se deja abierta días.
     private var purgaTimer: Timer?
+    /// Publica el estado de ocupación para la cola de la tanda (ver arranque).
+    private var ocupacionTimer: Timer?
     private var iconoVigilante: Timer?
     private var estadoIconoActual: EstadoIcono = .reposo
     private var iconoFallosEstructurales = 0

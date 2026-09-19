@@ -124,7 +124,16 @@ enum ContinuoRutinas {
             return
         }
         Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» disparada")
-        ContinuoLote.ejecutar { _ in
+        ContinuoLote.ejecutar(alTerminar: { _ in }, huboTanda: { corrio in
+            guard corrio else {
+                // Otra tanda está transcribiendo justo ahora. Generar el
+                // documento con lo que hay sería resumir un día a medio
+                // transcribir: se reintenta en unos minutos, cuando el material
+                // esté completo.
+                Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» aplazada 5 min — hay una tanda transcribiendo")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 300) { ejecutar(r) }
+                return
+            }
             let desde: Date? = r.rango == "horas"
                 ? Date().addingTimeInterval(-Double(r.rangoHoras) * 3600)
                 : nil
@@ -147,6 +156,6 @@ enum ContinuoRutinas {
                     }
                 }
             }
-        }
+        })
     }
 }

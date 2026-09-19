@@ -20,6 +20,19 @@ enum ContinuoResumen {
         guard Config.continuoActivo() else {
             completion(.failure(ErrorResumen.apagado)); return
         }
+        // Todo el trabajo pesado —consultar el índice y armar un cuerpo que
+        // puede pasar de doscientos mil caracteres— va FUERA del hilo principal.
+        // Corría en el del llamador, que es `main` cuando lo dispara una rutina
+        // o el botón de la pestaña: la aplicación se quedaba tiesa mientras
+        // tanto, justo el rato en que alguien podría querer dictar.
+        guard !Thread.isMainThread else {
+            DispatchQueue.global(qos: .userInitiated).async {
+                generar(dia: dia, promptId: promptId, desde: desde, hasta: hasta) { r in
+                    DispatchQueue.main.async { completion(r) }
+                }
+            }
+            return
+        }
         ContinuoIndice.shared.abrir()
         // Con `desde`/`hasta`, el material es un rango arbitrario (últimas N
         // horas, o «de 15:00 a 17:00 de tal fecha»); sin ellos, el día natural

@@ -413,6 +413,8 @@ final class ContinuoIndice {
         guard let e = FileManager.default.enumerator(at: raiz, includingPropertiesForKeys: nil,
                                                      options: [.skipsHiddenFiles]) else { return 0 }
         var rescatados = 0
+        var migajas = 0
+        var enCurso = 0
         let fm = FileManager.default
         for caso in e {
             guard let url = caso as? URL else { continue }
@@ -433,7 +435,27 @@ final class ContinuoIndice {
             // carpeta aaaa/MM/dd; si no cuadra, se usa la fecha del archivo.
             let instante = fechaDe(url) ?? ((try? fm.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? nil) ?? Date()
             let bytes = ((try? fm.attributesOfItem(atPath: url.path))?[.size] as? Int64) ?? 0
-            guard bytes > 16_000 else { continue }
+
+            // Migajas: menos de medio segundo de audio. No tienen contenido que
+            // transcribir, así que no entran al índice — y por eso ANTES se
+            // quedaban en disco para siempre, porque la purga solo borra lo que
+            // está indexado. Se retiran aquí, que es donde se descubren.
+            if bytes <= 16_000 {
+                if bytes == 0 || material == .audio {
+                    try? fm.removeItem(at: url)
+                    migajas += 1
+                }
+                continue
+            }
+
+            // El trozo que se está grabando AHORA MISMO no se toca. Indexarlo a
+            // medio escribir lo deja con una duración y un tamaño que no son los
+            // definitivos, y esos metadatos provisionales se quedan: el archivo
+            // ya consta, así que nadie vuelve a mirarlo. La bitácora cierra sus
+            // trozos cada pocos minutos; con un minuto de margen basta para no
+            // pillar ninguno a medias.
+            let modificado = ((try? fm.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date) ?? .distantPast
+            guard Date().timeIntervalSince(modificado) > 60 else { enCurso += 1; continue }
 
             if material == .audio {
                 let duracion = ext == "pcm" ? Double(bytes) / 32_000.0 : 0
@@ -443,6 +465,12 @@ final class ContinuoIndice {
                 registrarPantalla(ruta: url, instante: instante, app: nil, ventana: nil, monitor: 0)
             }
             rescatados += 1
+        }
+        if migajas > 0 {
+            Log.log(.sistema, "bitácora: retiradas \(migajas) migajas de audio de menos de medio segundo — no se pueden transcribir y no las alcanzaba la limpieza")
+        }
+        if enCurso > 0 {
+            Log.debug("bitácora: \(enCurso) archivos aún en escritura — se indexarán cuando se cierren")
         }
         if rescatados > 0 {
             Log.log(.sistema, "bitácora: \(rescatados) archivos huérfanos incorporados al índice")

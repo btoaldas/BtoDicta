@@ -24,22 +24,47 @@ enum ContinuoLote {
     /// Última vez que se vio actividad de dictado, para no arrancar encima.
     static var dictadoOcupado: (() -> Bool)?
 
+    /// ¿Hay alguien dictando ahora mismo?
+    ///
+    /// Lo publica el hilo principal, que es quien lo sabe, y lo lee la cola de
+    /// la tanda. Antes la cola llamaba a un cierre que iba a leer propiedades
+    /// de `main`: una carrera sobre el dato con el que se decide si transcribir
+    /// de fondo mientras la persona está hablando. En la duda vale más creer
+    /// que sí está ocupado —la tanda espera— que ponerse a competir por la CPU
+    /// justo cuando más se nota.
+    private static let candadoOcupado = NSLock()
+    private static var _ocupado = true
+    static var ocupadoPublicado: Bool {
+        candadoOcupado.lock(); defer { candadoOcupado.unlock() }
+        return _ocupado
+    }
+    static func publicarOcupado(_ v: Bool) {
+        candadoOcupado.lock(); _ocupado = v; candadoOcupado.unlock()
+    }
+
     // MARK: Entrada
 
     /// Lanza una tanda si procede. `manual` salta las condiciones de energía
     /// porque lo pidió una persona mirando la pantalla.
     /// `canal`: qué procesar — "todo", "voz", "sistema" o "pantalla". A
     /// petición se puede drenar un solo canal sin esperar a los demás.
+    /// `huboTanda` dice si esta llamada llegó a procesar algo. Importa: una
+    /// rutina que se dispara mientras otra tanda está en marcha recibía el aviso
+    /// y GENERABA SU DOCUMENTO IGUAL, con material que todavía no se había
+    /// transcrito. El documento salía pobre y nadie sabía por qué.
     static func ejecutar(manual: Bool = false, canal: String = "todo",
-                         alTerminar: ((String) -> Void)? = nil) {
+                         alTerminar: ((String) -> Void)? = nil,
+                         huboTanda: ((Bool) -> Void)? = nil) {
         candado.lock()
         if enMarcha {
             candado.unlock()
             alTerminar?("Ya hay una tanda en curso.")
+            huboTanda?(false)
             return
         }
         enMarcha = true
         candado.unlock()
+        defer { huboTanda?(true) }
 
         cola.async {
             let resumen = trabajar(manual: manual, canal: canal)
