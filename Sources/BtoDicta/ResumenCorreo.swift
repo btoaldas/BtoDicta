@@ -196,11 +196,56 @@ enum ResumenCorreo {
 
     // MARK: Horarios
 
-    private static var ultimoEnvio: [String: String] = [:]   // id de regla → "yyyy-MM-dd"
+    /// Qué día se envió cada regla por última vez: id de regla → "yyyy-MM-dd".
+    ///
+    /// **En disco, no en memoria.** Estaba en memoria, y como se pierde al
+    /// cerrar la aplicación, cada arranque volvía a creer que no había enviado
+    /// nada: reabrirla después de la hora fijada mandaba otro correo. Una tarde
+    /// de reinicios llegó a mandar diecisiete. El destinatario es una persona,
+    /// así que esto no es un contador: es correo de verdad saliendo.
+    private static var archivoUltimos: URL {
+        Config.dir.appendingPathComponent("correo-ultimos.json")
+    }
+
+    private static var _ultimos: [String: String]?
+
+    private static var ultimoEnvio: [String: String] {
+        get {
+            if let c = _ultimos { return c }
+            let d = (try? Data(contentsOf: archivoUltimos)) ?? Data()
+            let c = (try? JSONSerialization.jsonObject(with: d)) as? [String: String] ?? [:]
+            _ultimos = c
+            return c
+        }
+        set {
+            _ultimos = newValue
+            Config.asegurarDirSeguro()
+            guard let d = try? JSONSerialization.data(withJSONObject: newValue) else { return }
+            try? d.write(to: archivoUltimos, options: .atomic)
+        }
+    }
+
+    /// Comprueba que el registro de envíos sobrevive a un reinicio, sin mandar
+    /// ni un correo. Lo usa `BTODICTA_CORREOHORARIO`.
+    static func pruebaPersistenciaQA() -> (guardado: Bool, trasReinicio: Bool, limpiaBien: Bool) {
+        let previo = ultimoEnvio
+        defer { ultimoEnvio = previo }
+        let id = "QA-PRUEBA-NO-ES-UNA-REGLA-REAL"
+        var m = previo; m[id] = "2026-01-01"; ultimoEnvio = m
+        let guardado = ultimoEnvio[id] == "2026-01-01"
+        // Un reinicio es exactamente esto: se pierde lo que hay en memoria y hay
+        // que volver a leerlo del disco.
+        _ultimos = nil
+        let trasReinicio = ultimoEnvio[id] == "2026-01-01"
+        var n = ultimoEnvio; n[id] = nil; ultimoEnvio = n
+        _ultimos = nil
+        let limpiaBien = ultimoEnvio[id] == nil
+        return (guardado, trasReinicio, limpiaBien)
+    }
 
     /// Se llama desde el reloj que ya recorre la aplicación. Recorre TODAS las
     /// reglas y envía las que toquen, una sola vez cada una por día, aunque el
-    /// equipo despierte más tarde de la hora fijada.
+    /// equipo despierte —o la aplicación se reabra— más tarde de la hora fijada.
     static func revisarHorarios(ahora: Date = Date()) {
         guard Config.correoAutomatico(), !Config.correoDestinatarios().isEmpty else { return }
         let f = DateFormatter(); f.dateFormat = "HH:mm"
@@ -213,10 +258,18 @@ enum ResumenCorreo {
             // dormido a las 07:00, el resumen sale al despertar en vez de
             // perderse ese día.
             guard hhmm >= regla.hora else { continue }
+            // Se marca ANTES de mandar, para que dos vueltas del reloj no
+            // manden dos correos. Si el envío falla, se desmarca y lo reintenta
+            // en la vuelta siguiente.
             ultimoEnvio[regla.id] = hoy
             let periodo = Periodo(rawValue: regla.periodo) ?? .ayer
             Log.log(.sistema, "correo: toca «\(regla.descripcion)»")
-            enviar(periodo, ahora: ahora) { _ in }
+            enviar(periodo, ahora: ahora) { r in
+                if case .failure = r {
+                    var m = ultimoEnvio; m[regla.id] = nil; ultimoEnvio = m
+                    Log.log(.sistema, "correo: «\(regla.descripcion)» no salió — se reintenta en la próxima vuelta")
+                }
+            }
         }
     }
 }

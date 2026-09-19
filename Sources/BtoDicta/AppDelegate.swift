@@ -2076,6 +2076,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // Que un reinicio no vuelva a mandar el correo: BTODICTA_CORREOHORARIO=1
+        if ProcessInfo.processInfo.environment["BTODICTA_CORREOHORARIO"] == "1" {
+            let r = ResumenCorreo.pruebaPersistenciaQA()
+            print("CORREOHORARIO guardado=\(r.guardado) sobrevive-al-reinicio=\(r.trasReinicio) se-limpia=\(r.limpiaBien)")
+            let ok = r.guardado && r.trasReinicio && r.limpiaBien
+            print("CORREOHORARIO \(ok ? "TODO OK — un reinicio ya no reenvía" : "FALLA")")
+            exit(ok ? 0 : 1)
+        }
         // El cuerpo de la subida, byte a byte: BTODICTA_SUBIDATEST=1
         //
         // La red de seguridad de la spec 001. Antes de migrar ningún motor a

@@ -248,6 +248,11 @@ final class ContinuoAudio {
         // silencio. El conversor se arma con el formato del primer audio REAL.
         conversor = nil
         convertidorDesde = nil
+        // A cero en CADA montaje: si no, «el micrófono entrega audio» solo sale
+        // la primera vez de la sesión y las recuperaciones tras ceder el
+        // micrófono al dictado quedan mudas en el registro. Es justo la línea
+        // que se mira para saber si la bitácora está escuchando.
+        buffersVistos = 0
 
         entrada.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
             guard let self else { return }
