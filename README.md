@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.65.2
+
+- **Un dictado que no se puede guardar ya no parece guardado.** Si el archivo no
+  se podía abrir, el contador de bytes subía igual y todo parecía normal.
+- Segunda auditoría, esta de corrección de errores: 5 áreas, 1 hallazgo.
+
 ### Novedades 0.65.1
 
 - **Arreglado un agujero de seguridad real**: el texto que pronuncia la voz local

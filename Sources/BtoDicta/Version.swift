@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.65.1"
+    static let numero = "0.65.2"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.65.2", "2026-09-19", [
+            "UN DICTADO QUE NO SE PUEDE GUARDAR YA NO PARECE GUARDADO. Si el archivo donde se escribe el audio no se podía abrir —disco lleno, permisos, un disco externo que se desconecta—, la aplicación seguía como si nada: el contador de bytes subía igual y todo parecía normal. Podías dictar media hora contra el vacío y enterarte al ir a buscarlo",
+            "Ahora se dice en el registro con todas las letras, el contador solo sube cuando la escritura ocurrió de verdad, y si el disco se llena A MITAD del dictado también avisa —una vez, no cuarenta veces por minuto—",
+            "Segunda revisión completa de la aplicación, esta preguntando «cuando algo falla, ¿se entera alguien?». Cinco áreas, un fallo. Las otras cuatro estaban bien",
+        ]),
         ("0.65.1", "2026-09-19", [
             "ARREGLADO UN AGUJERO DE SEGURIDAD REAL. La voz local construye un comando del sistema con el texto dentro para hablar. Ese texto se protegía a medias, y bastaba que contuviera cierta forma de escritura para que el sistema EJECUTARA lo que hubiera ahí. Suena rebuscado hasta que se ve la cadena entera: la bitácora lee lo que hay en tu pantalla —correos, páginas ajenas—, la IA redacta con ello, y la voz lo pronuncia. Alguien solo tenía que escribir la frase adecuada en una web que estuvieras mirando",
             "Ahora el texto se neutraliza antes de llegar al sistema. La comprobación no se conforma con revisar el código: EJECUTA de verdad un texto preparado para crear un archivo y comprueba que no aparece",

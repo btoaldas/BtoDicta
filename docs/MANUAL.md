@@ -1016,6 +1016,13 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### «este dictado no se está guardando»
+
+Si ves esa frase en el registro, el audio no está llegando al disco: lo habitual
+es que no quede espacio, o que la carpeta del historial esté en un disco externo
+que se desconectó. Desde 0.65.2 se avisa en cuanto pasa; antes la aplicación
+seguía como si nada y el dictado se perdía sin decir palabra.
+
 ### Si usas una voz local con comando propio
 
 Desde 0.65.1 el texto que se le pasa a tu comando va **neutralizado**: si contiene
