@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.63.6
+
+- Las pruebas internas miden también el tiempo: leer un tramo de 25 MB de un
+  dictado de seis horas tarda **2,9 ms**. Armar el paquete del envío de una hora
+  de audio: 7 ms en memoria contra 54 ms en disco — más lento en relativo,
+  milésimas en absoluto, y 115 MB menos de memoria.
+
 ### Novedades 0.63.5
 
 - **Los doce motores suben el audio desde el disco.** Enviar un dictado armaba en

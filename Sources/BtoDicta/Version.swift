@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.63.5"
+    static let numero = "0.63.6"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.63.6", "2026-09-19", [
+            "Cierre de la mejora de memoria: las pruebas internas dicen ahora también CUÁNTO TARDAN, no solo si pasan. Leer un tramo de 25 MB del medio de un dictado de seis horas: 2,9 milésimas de segundo. Armar el paquete del envío, comparado por los dos caminos: para una hora de audio, 7 ms en memoria contra 54 ms en disco",
+            "Ese dato se publica tal cual porque también dice lo que empeora: escribir a disco es más lento en términos relativos. En absoluto son milésimas frente a los segundos que tarda cualquier transcripción, y a cambio se ahorran 115 MB de memoria por hora de audio. En un dictado corto la diferencia es de una milésima",
+        ]),
         ("0.63.5", "2026-09-19", [
             "LOS DOCE MOTORES SUBEN EL AUDIO DESDE EL DISCO. Antes, enviar un dictado armaba en memoria un paquete que contenía el audio entero: sumado a la copia que ya existía, un dictado de seis horas necesitaba cerca de dos gigas en el momento del envío. Ahora ese paquete se escribe a disco copiando el audio por trozos pequeños y se transmite desde ahí. Medido con seis horas: preparar el envío cuesta 0 MB",
             "Con esto, un dictado de seis horas ocupa 80 MB de principio a fin —grabar 13, terminar 3, enviar 0— frente a los cerca de 2 000 MB de antes. El audio viaja como una ruta de archivo desde que sueltas la tecla hasta el motor; solo se lee entero para guardarlo en el historial, y ya con la transcripción hecha",
