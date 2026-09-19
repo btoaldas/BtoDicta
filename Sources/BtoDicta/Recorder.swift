@@ -6,7 +6,20 @@ import Carbon.HIToolbox
 
 final class Recorder {
     private let engine = AVAudioEngine()
+    /// Ventana reciente de PCM, NO el dictado entero.
+    ///
+    /// Hasta 0.63.3 esto acumulaba todo lo hablado: seis horas eran 659 MB en
+    /// memoria, y `stop()` armaba encima un `.wav` completo desde este mismo
+    /// buffer — 1 388 MB medidos en total. Ahora el audio va a disco según
+    /// entra y aquí solo se guarda lo que la vista previa en vivo puede pedir.
     private var samples = Data()
+    /// Cuánto se conserva en memoria. La vista previa en vivo mira como mucho
+    /// los últimos dos minutos; tres da margen sin que cueste: 5,7 MB.
+    static let ventanaMemoria = Int(frecuenciaInterna) * 2 * 180
+    /// El `.wav` del dictado en curso, escrito según entra el audio.
+    private var salida: FileHandle?
+    private var urlSalida: URL?
+    private var bytesPCM = 0
     // El tap escribe desde el hilo de audio y main lee a mitad de grabación
     // (backlog en vivo): sin este candado es una carrera de datos real.
     private let candado = NSLock()
@@ -38,6 +51,69 @@ final class Recorder {
     /// usuario hablando contra un micrófono mudo.
     private(set) var buffersRecibidos = 0
 
+    /// Abre el `.wav` del dictado en curso. Si falla no se aborta nada: se
+    /// sigue en memoria, porque un dictado con memoria alta es infinitamente
+    /// mejor que un dictado que no arranca.
+    ///
+    /// Está fuera de `start()` para que la prueba de memoria pueda usar el
+    /// mismo camino sin abrir el micrófono. Si se volviera a meter dentro, la
+    /// prueba mediría otra cosa — que es exactamente cómo se coló el falso
+    /// «0 MB en seis horas».
+    private func abrirSalida(preload: Data = Data()) {
+        Config.asegurarDirSeguro()
+        try? FileManager.default.createDirectory(at: Recorder.carpetaDictados,
+                                                 withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
+        let destino = Recorder.carpetaDictados
+            .appendingPathComponent("dictado-\(UUID().uuidString).wav")
+        guard FileManager.default.createFile(atPath: destino.path,
+                                             contents: Recorder.cabecera(bytesPCM: 0),
+                                             attributes: [.posixPermissions: 0o600]),
+              let h = try? FileHandle(forWritingTo: destino) else {
+            salida = nil; urlSalida = nil; bytesPCM = 0
+            Log.log(.sistema, "dictado: no pude abrir el archivo de audio — grabo en memoria")
+            return
+        }
+        try? h.seekToEnd()
+        salida = h
+        urlSalida = destino
+        bytesPCM = 0
+        if !preload.isEmpty {
+            try? h.write(contentsOf: preload)
+            bytesPCM = preload.count
+        }
+    }
+
+    /// Abre el archivo sin tocar el micrófono. Solo para `BTODICTA_MEMTEST`.
+    func abrirSalidaQA() { abrirSalida() }
+
+    /// Dónde viven los `.wav` del dictado en curso.
+    static var carpetaDictados: URL {
+        Config.dir.appendingPathComponent("dictados", isDirectory: true)
+    }
+
+    /// Cabecera WAV de 44 bytes. Los tamaños se escriben al cerrar, cuando ya se
+    /// sabe cuánto audio hubo.
+    private static func cabecera(bytesPCM: Int) -> Data {
+        var wav = Data()
+        let sampleRate = UInt32(frecuenciaInterna)
+        func mete<T>(_ v: T) { withUnsafeBytes(of: v) { wav.append(contentsOf: $0) } }
+        wav.append("RIFF".data(using: .ascii)!)
+        mete(UInt32(36 + bytesPCM).littleEndian)
+        wav.append("WAVE".data(using: .ascii)!)
+        wav.append("fmt ".data(using: .ascii)!)
+        mete(UInt32(16).littleEndian)
+        mete(UInt16(1).littleEndian)
+        mete(UInt16(1).littleEndian)
+        mete(sampleRate.littleEndian)
+        mete(UInt32(sampleRate * 2).littleEndian)
+        mete(UInt16(2).littleEndian)
+        mete(UInt16(16).littleEndian)
+        wav.append("data".data(using: .ascii)!)
+        mete(UInt32(bytesPCM).littleEndian)
+        return wav
+    }
+
     func start(preloadPCM: Data = Data()) throws {
         // Blindaje contra doble arranque: un segundo installTap en el mismo
         // bus lanza NSException y tumba la app (crash real del 2026-07-10).
@@ -45,6 +121,9 @@ final class Recorder {
         candado.lock()
         samples = preloadPCM
         candado.unlock()
+
+        abrirSalida(preload: preloadPCM)
+
         let input = engine.inputNode
         input.removeTap(onBus: 0)   // por si quedó un tap de un intento fallido
         // Fijar el micrófono ANTES de leer el formato: sin esto macOS puede
@@ -109,7 +188,23 @@ final class Recorder {
             guard out.frameLength > 0, let ch = out.int16ChannelData else { return }
             let chunk = Data(bytes: ch[0], count: Int(out.frameLength) * 2)
             self.candado.lock()
-            self.samples.append(chunk)
+            if let h = self.salida {
+                try? h.write(contentsOf: chunk)
+                self.bytesPCM += chunk.count
+                // En memoria solo la ventana reciente: lo demás ya está en disco.
+                self.samples.append(chunk)
+                if self.samples.count > Recorder.ventanaMemoria {
+                    // `Data(...)` no sobra: `suffix` devuelve una VISTA que
+                    // retiene el buffer entero, así que sin copiar aquí la
+                    // memoria no baja ni un byte. Es lo que hacía que la ventana
+                    // pareciera aplicada y el dictado siguiera vivo en RAM.
+                    self.samples = Data(self.samples.suffix(Recorder.ventanaMemoria))
+                }
+            } else {
+                // Sin archivo, el buffer vuelve a ser la única copia.
+                self.samples.append(chunk)
+                self.bytesPCM += chunk.count
+            }
             self.candado.unlock()
             self.onChunk?(chunk)
 
@@ -170,17 +265,72 @@ final class Recorder {
         if !preloadPCM.isEmpty { onChunk?(preloadPCM) }
     }
 
-    func stop() -> Data {
+    /// Cierra el dictado y devuelve **la ruta** del `.wav`, no su contenido.
+    ///
+    /// Devolver los bytes era la segunda mitad del problema de memoria: se
+    /// armaba un `.wav` completo desde el buffer, de modo que al soltar la tecla
+    /// había dos copias del dictado en RAM. Medido en seis horas: 1 388 MB.
+    /// Ahora el archivo ya está escrito y solo hay que cerrarle la cabecera.
+    @discardableResult
+    func stop() -> URL? {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         isRecording = false
         candado.lock(); defer { candado.unlock() }
-        let wav = wavFile(from: samples)
-        // Se suelta el PCM en cuanto está el WAV. Antes se quedaba vivo hasta
-        // el siguiente dictado, así que durante toda la transcripción convivían
-        // dos copias completas del audio: en seis horas, 1,4 GB para nada.
         samples = Data()
-        return wav
+        guard let h = salida, let url = urlSalida else { return urlSalida }
+        // La cabecera se escribió con ceros porque aún no se sabía cuánto audio
+        // iba a haber. Ahora sí: se reescriben los 44 bytes del principio.
+        try? h.synchronize()
+        try? h.seek(toOffset: 0)
+        try? h.write(contentsOf: Recorder.cabecera(bytesPCM: bytesPCM))
+        try? h.close()
+        salida = nil
+        return url
+    }
+
+    /// Cuánto pesa el `.wav` sin abrirlo. Para calcular la duración no hace
+    /// falta cargar el audio, y cargarlo era justamente el problema.
+    static func bytes(de url: URL?) -> Int {
+        guard let url else { return 0 }
+        return ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int) ?? 0
+    }
+
+    /// El `.wav` del dictado que acaba de terminar, en bytes. Solo para quien de
+    /// verdad lo necesita en memoria; para enviarlo a un motor, usar la ruta.
+    static func datos(de url: URL?) -> Data {
+        guard let url else { return Data() }
+        return (try? Data(contentsOf: url)) ?? Data()
+    }
+
+    /// Borra el `.wav` de un dictado ya transcrito y guardado.
+    static func descartar(_ url: URL?) {
+        guard let url, url.path.hasPrefix(carpetaDictados.path) else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Mete un trozo por el mismo camino que el tap del micrófono, sin abrir el
+    /// micrófono. Solo la usa `BTODICTA_MEMTEST`: grabar seis horas de verdad
+    /// para medir la memoria no es una prueba, es una tarde.
+    ///
+    /// Tiene que hacer EXACTAMENTE lo que hace el tap. Si se separan, la prueba
+    /// vuelve a medir algo que no es el grabador — que es justo el fallo que la
+    /// hizo dar 0 MB cuando el grabador sí acumulaba.
+    func inyectarQA(_ chunk: Data) {
+        candado.lock()
+        if let h = salida {
+            try? h.write(contentsOf: chunk)
+            bytesPCM += chunk.count
+            samples.append(chunk)
+            if samples.count > Recorder.ventanaMemoria {
+                samples = Data(samples.suffix(Recorder.ventanaMemoria))
+            }
+        } else {
+            samples.append(chunk)
+            bytesPCM += chunk.count
+        }
+        candado.unlock()
+        onChunk?(chunk)
     }
 
     /// Los últimos `segundos` de audio, sin copiar el dictado entero. Para las
@@ -189,7 +339,7 @@ final class Recorder {
         candado.lock(); defer { candado.unlock() }
         let tope = Int(segundos * Recorder.frecuenciaInterna) * 2
         guard samples.count > tope else { return samples }
-        return samples.suffix(tope)
+        return Data(samples.suffix(tope))
     }
 
     private func wavFile(from pcm: Data) -> Data {

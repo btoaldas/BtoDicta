@@ -254,7 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         silenceTimer = nil
         liveTimer?.invalidate()
         liveTimer = nil
-        let wavCancelado = recorder.stop()
+        let urlCancelado = recorder.stop()
         panel.detenerCronometro()
         entregaVivo = nil
         audioBytes = 0
@@ -272,9 +272,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Ahora se cierra como un dictado normal —.wav en el historial y en la
         // bitácora— y se recupera desde donde se recuperan todos. Solo se
         // descarta lo que no tiene nada dentro.
-        let segundosCancelado = Double(max(0, wavCancelado.count - 44)) / 32_000.0
+        // La duración sale del tamaño del archivo: no hace falta cargarlo.
+        let segundosCancelado = Double(max(0, Recorder.bytes(de: urlCancelado) - 44)) / 32_000.0
         if segundosCancelado >= Config.cancelarConservaDesdeSegundos() {
-            history?.finish(wav: wavCancelado, finalText: lastPartial)
+            history?.finish(wav: Recorder.datos(de: urlCancelado), finalText: lastPartial)
             Log.log(.sistema, "dictado cancelado: conservo \(DictationPanel.reloj(segundosCancelado)) en el historial")
         } else {
             history?.discard()
@@ -1649,12 +1650,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let bytes = Int(horas * 3600) * RedSeguridadDictado.bytesPorSegundo
             let base = rssMB()
             print("MEM memoria al empezar: \(Int(base)) MB · simulando \(horas) h = \(bytes / 1_048_576) MB de audio")
+
+            // El camino REAL del dictado: el grabador recibe los trozos y se los
+            // pasa al escritor, igual que hace `onChunk` al dictar. Medir solo el
+            // escritor daba 0 MB y escondía que el grabador retiene el dictado
+            // entero: ese falso positivo es lo que esta prueba existe para evitar.
             let w = HistoryWriter()
+            let rec = Recorder()
+            rec.abrirSalidaQA()   // el mismo archivo que abre `start()`, sin micrófono
+            rec.onChunk = { w.append(chunk: $0) }
             let trozo = Data(repeating: 9, count: 32_000)          // 1 s
-            for _ in 0..<(bytes / trozo.count) { w.append(chunk: trozo) }
+            for _ in 0..<(bytes / trozo.count) { rec.inyectarQA(trozo) }
             let tras = rssMB()
-            print("MEM memoria tras grabar \(horas) h: \(Int(tras)) MB (subió \(Int(tras - base)) MB)")
+            print("MEM memoria tras grabar \(horas) h por el camino real: \(Int(tras)) MB (subió \(Int(tras - base)) MB)")
             chk(tras - base <= 200, "grabar \(horas) h no añade más de 200 MB de memoria")
+
+            // Y el otro momento crítico: soltar la tecla. Aquí es donde antes se
+            // armaba un segundo .wav completo en memoria desde el mismo buffer.
+            let antesParar = rssMB()
+            _ = rec.stop()
+            let trasParar = rssMB()
+            print("MEM al terminar el dictado: \(Int(trasParar)) MB (soltar la tecla sumó \(Int(trasParar - antesParar)) MB)")
+            chk(trasParar - base <= 200, "terminar el dictado no deja más de 200 MB por encima del inicio")
+
             chk(w.bytesEscritos == bytes, "el archivo tiene los \(bytes / 1_048_576) MB completos")
             // Leer tramos sueltos no carga el dictado entero.
             let antesLeer = rssMB()
@@ -5259,9 +5277,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         silenceTimer = nil
         liveTimer?.invalidate()
         liveTimer = nil
-        let wav = recorder.stop()
+        let wavURL = recorder.stop()
         panel.detenerCronometro()
-        let seconds = Double(wav.count - 44) / 32000.0
+        // Del tamaño del archivo, sin abrirlo.
+        let seconds = Double(Recorder.bytes(de: wavURL) - 44) / 32000.0
+        // Paso intermedio de la spec 001: el grabador ya no retiene el dictado
+        // —esa copia ha desaparecido—, pero los motores todavía reciben datos y
+        // no la ruta, así que aquí se lee una vez. Las tareas T06 a T10 quitan
+        // también esta lectura pasándoles `wavURL`.
+        let wav = Recorder.datos(de: wavURL)
         // La duración del audio grabado, para decirla mientras se transcribe:
         // se mide del propio PCM, no del reloj, así que no la falsea una pausa.
         let duracionDictado = DictationPanel.reloj(seconds)
