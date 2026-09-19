@@ -1,6 +1,6 @@
 # Spec 001 — Memoria del dictado largo
 
-- Estado: Aprobada
+- Estado: Implementada (0.63.4 y 0.63.5)
 - Tipo: funcionalidad
 - Nivel: X (heredado del ROADMAP; lo fija sw-ciclo)
 - Fecha: 2026-09-14

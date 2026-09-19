@@ -1703,8 +1703,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             chk(w.bytesEscritos == bytes, "el archivo tiene los \(bytes / 1_048_576) MB completos")
             // Leer tramos sueltos no carga el dictado entero.
             let antesLeer = rssMB()
+            let t0Leer = Date()
             let medio = w.leerPCM(desde: bytes / 2, hasta: bytes / 2 + 25 * 1_048_576)
+            let msLeer = Date().timeIntervalSince(t0Leer) * 1000
             chk(medio.count == 25 * 1_048_576, "se lee un tramo de 25 MB del medio del archivo")
+            // RNF-02 de la spec 001: el umbral es 50 ms.
+            chk(msLeer < 50, "y se lee en menos de 50 ms (\(String(format: "%.1f", msLeer)) ms)")
             chk(rssMB() - antesLeer <= 60, "y leerlo no dispara la memoria (+\(Int(rssMB() - antesLeer)) MB)")
             chk(medio.first == 9 && medio.last == 9, "el contenido leído es el audio, no basura")
             chk(w.leerPCM(desde: bytes - 100).count == 100, "el último tramo se lee entero")
@@ -2133,9 +2137,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let origen = FileManager.default.temporaryDirectory
                     .appendingPathComponent("subidatest-\(n).wav")
                 try? d.write(to: origen)
+                let tV0 = Date()
                 let viejo = CuerpoMultipart.construirEnMemoria(
                     boundary: bound, campos: campos,
                     nombreArchivo: "audio.wav", tipo: "audio/wav", audio: d)
+                let msViejo = Date().timeIntervalSince(tV0) * 1000
+                let tN0 = Date()
                 guard let nuevo = try? CuerpoMultipart.construir(
                     boundary: bound, campos: campos,
                     nombreArchivo: "audio.wav", tipo: "audio/wav",
@@ -2145,9 +2152,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     try? FileManager.default.removeItem(at: origen)
                     continue
                 }
+                let msNuevo = Date().timeIntervalSince(tN0) * 1000
                 let leido = (try? Data(contentsOf: nuevo.url)) ?? Data()
                 let igual = leido == viejo
-                print("SUBIDATEST \(nombre): memoria \(viejo.count) B · disco \(nuevo.bytes) B · \(igual ? "idénticos" : "DIFIEREN")")
+                print("SUBIDATEST \(nombre): memoria \(viejo.count) B en \(String(format: "%.0f", msViejo)) ms · disco \(nuevo.bytes) B en \(String(format: "%.0f", msNuevo)) ms · \(igual ? "idénticos" : "DIFIEREN")")
                 if !igual { fallos += 1 }
                 nuevo.limpiar()
                 try? FileManager.default.removeItem(at: origen)
