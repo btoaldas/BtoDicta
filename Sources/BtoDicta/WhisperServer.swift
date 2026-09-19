@@ -123,44 +123,69 @@ enum WhisperServer {
     /// Transcribe vía server residente. Si el puerto aún no abre (el modelo
     /// sigue cargando del precalentamiento), reintenta hasta ~40 s antes de
     /// rendirse; un server colgado no bloquea la cascada más de ese margen.
+    /// Transcribe un audio que ya está en disco. Este es el camino que ahorra
+    /// memoria: el cuerpo de la subida se escribe a un temporal copiando el
+    /// audio por ventanas, y se transmite desde ahí.
+    static func transcribe(wavURL: URL, completion: @escaping (Result<String, Error>) -> Void) {
+        enviar(origen: .archivo(wavURL),
+               bytesAudio: CuerpoMultipart.Origen.archivo(wavURL).bytes,
+               completion: completion)
+    }
+
+    /// Misma transcripción con el audio ya en memoria. Queda para quien lo tiene
+    /// así por otra razón —un tramo que el troceo acaba de partir—; para un
+    /// archivo, usar `transcribe(wavURL:)`.
     static func transcribe(wav: Data, completion: @escaping (Result<String, Error>) -> Void) {
+        enviar(origen: .datos(wav), bytesAudio: wav.count, completion: completion)
+    }
+
+    private static func enviar(origen: CuerpoMultipart.Origen, bytesAudio: Int,
+                               completion: @escaping (Result<String, Error>) -> Void) {
         guard corriendo else { completion(.failure(ScribeError.ws("server local no corre"))); return }
         let boundary = "BtoDicta-\(UUID().uuidString)"
-        var body = Data()
-        func field(_ n: String, _ v: String) {
-            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(n)\"\r\n\r\n\(v)\r\n".data(using: .utf8)!)
-        }
-        field("response_format", "json")
-        field("language", "es")
+        var campos: [(String, String)] = [("response_format", "json"), ("language", "es")]
         // Glosario por request: siempre el keyterms.txt vigente.
         let glosario = Config.glosarioPrompt()
-        if !glosario.isEmpty { field("prompt", glosario) }
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(wav)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        if !glosario.isEmpty { campos.append(("prompt", glosario)) }
+
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: campos,
+                                                   nombreArchivo: "audio.wav",
+                                                   tipo: "audio/wav", audio: origen)
+        } catch {
+            completion(.failure(error)); return
+        }
 
         var req = URLRequest(url: URL(string: "http://\(host):\(port)/inference")!)
         req.httpMethod = "POST"
         // Acotado: suficiente para el audio dictado, sin secuestrar el failover.
-        let segundosAudio = Double(max(wav.count - 44, 0)) / 32000.0
+        let segundosAudio = Double(max(bytesAudio - 44, 0)) / 32000.0
         req.timeoutInterval = min(90, max(30, segundosAudio))
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
-        postear(req, body: body, deadline: Date().addingTimeInterval(40), completion: completion)
+        // El temporal se borra cuando termina DE VERDAD, no en cada reintento:
+        // `postear` se vuelve a llamar con el mismo archivo mientras el servidor
+        // precalienta, y necesita que siga estando ahí.
+        postear(req, cuerpo: cuerpo, deadline: Date().addingTimeInterval(40)) { r in
+            cuerpo.limpiar()
+            completion(r)
+        }
     }
 
     /// POST con reintentos mientras el server precalienta (puerto todavía
     /// cerrado → conexión rechazada al instante; reintentar no cuesta nada).
-    private static func postear(_ req: URLRequest, body: Data, deadline: Date,
+    private static func postear(_ req: URLRequest, cuerpo: CuerpoMultipart.Preparado,
+                                deadline: Date,
                                 completion: @escaping (Result<String, Error>) -> Void) {
-        URLSession.shared.uploadTask(with: req, from: body) { data, resp, err in
+        URLSession.shared.uploadTask(with: req, fromFile: cuerpo.url) { data, resp, err in
             DispatchQueue.main.async {
                 if let err {
                     let e = err as NSError
                     let rechazada = e.code == NSURLErrorCannotConnectToHost || e.code == NSURLErrorNetworkConnectionLost
                     if rechazada && corriendo && Date() < deadline {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            postear(req, body: body, deadline: deadline, completion: completion)
+                            postear(req, cuerpo: cuerpo, deadline: deadline, completion: completion)
                         }
                         return
                     }

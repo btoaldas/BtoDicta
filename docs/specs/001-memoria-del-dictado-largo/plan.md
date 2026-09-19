@@ -1,8 +1,11 @@
 # Plan 001 — Memoria del dictado largo · segunda etapa
 
-- Estado: Propuesto
+- Estado: Aprobado
 - Fecha: 2026-09-18
-- Aprobado por: [PENDIENTE DE DECISIÓN: puerta 2 sin abrir]
+- Aprobado por: Alberto — 2026-09-18 — «Aprobado, y sigue hasta implementar»
+- Puerta 3 (tareas): **autorizada por anticipado** en la misma respuesta. Se
+  escribe `tasks.md` y se implementa tarea por tarea con evidencia, sin
+  detenerse en cada una; cualquier desviación respecto al plan sí vuelve a él
 - Spec: `spec.md` (Aprobada 2026-09-14, nivel X)
 - Cubre: RF-01 (parcial) y RF-02 (parcial); no toca RF-03, RF-04 ni RF-05, ya cumplidos
 
@@ -72,14 +75,22 @@ recomienda Apple para cuerpos grandes. Sale a `docs/adr/`.
 
 ## 4. Comprobación contra la constitución
 
-| Regla del MANIFIESTO | Cómo lo respeta |
-|---|---|
-| Nunca se entrega menos texto del que se dictó | El troceo, la cascada y la costura no se tocan. Solo cambia por dónde viajan los bytes |
-| La fluidez del usuario no se sacrifica | La escritura del temporal ocurre fuera del hilo principal; RF-03 se vuelve a medir |
-| Sin internet tiene que seguir funcionando | Los motores locales usan el mismo camino; `WhisperServer` entra en el cambio |
-| El audio y el texto son del usuario | El temporal vive en `~/.btodicta/tmp`, con los permisos que ya usa la app, y se borra al terminar |
-| Ninguna credencial en el repositorio | No toca credenciales |
-| Nada se borra sin visto bueno | Lo único que se borra son temporales creados por esta función, nunca audio del usuario ni del historial |
+- [x] **Nunca se entrega menos texto del que se dictó.** El troceo, la cascada y
+      la costura no se tocan. Solo cambia por dónde viajan los bytes.
+- [x] **La fluidez del usuario no se sacrifica.** La escritura del temporal
+      ocurre fuera del hilo principal; RF-03 se vuelve a medir.
+- [x] **Sin internet tiene que seguir funcionando.** Los motores locales usan el
+      mismo camino; el motor local entra en el cambio y es el primero que se migra.
+- [x] **El audio y el texto son del usuario.** El temporal vive en
+      `~/.btodicta/tmp`, con los permisos que ya usa la aplicación, y se borra al
+      terminar.
+- [x] **Ninguna credencial en el repositorio.** No toca credenciales.
+- [x] **Nada se borra sin visto bueno.** Lo único que se borra son temporales
+      creados por esta función; nunca audio del usuario ni del historial.
+- [x] **Tres capas y reglas de API.** No cambia ningún contrato externo: la
+      interfaz de los motores es interna.
+- [x] **Datos personales.** No se introduce ningún dato personal nuevo; el audio
+      ya estaba en la máquina.
 
 Nivel X: cada RF con prueba negativa, rama propia y hito con riesgos residuales.
 
@@ -122,6 +133,54 @@ limpieza falla aunque la memoria salga bien.
 
 ## 8. Decisiones pendientes para la puerta 2
 
-- [PENDIENTE DE DECISIÓN: ¿rama propia `spec/001-memoria-dictado-largo` como dice
-  la spec, o `main` como las últimas cuatro? La spec pide rama corta; en la
-  práctica las specs 002–004 fueron por `main`.]
+Resueltas el 2026-09-18. Queda una de detalle, que se decide aquí por criterio
+técnico y se anota para que conste:
+
+**Rama: `main`.** La spec pedía rama corta propia. Las specs 002, 003 y 004
+fueron por `main` y el ROADMAP reserva la rama corta para lo que pueda dejar la
+aplicación inservible entre commits. Aquí no ocurre: cada motor migrado es un
+cambio independiente que se prueba solo y que, si falla, se revierte solo. Además
+el propio Alberto pidió en su día no mantener dos ramas a la vez. Si al migrar
+aparece un cambio que rompa el dictado entre commits, se abre rama entonces.
+
+
+## 9. Hallazgo del 2026-09-18 — la primera etapa no midió lo que dice
+
+Al migrar el primer motor aparece que **el supuesto de partida de este plan es
+falso**. La spec da por cumplido RF-02 «al grabar», con la medición de 0 MB en
+seis horas. Esa medición es real, pero **mide otro componente**:
+
+- `BTODICTA_MEMTEST` construye un `HistoryWriter` y le mete los trozos
+  directamente. `HistoryWriter` sí escribe a disco sin acumular, y por eso da 0 MB.
+- El grabador del dictado, `Recorder`, **nunca entra en esa prueba**. Y su tap
+  hace `samples.append(chunk)` en cada trozo: retiene el dictado entero en
+  memoria. `stop()` construye después el `.wav` completo **desde ese buffer**,
+  así que en el instante de terminar hay **dos copias** en RAM.
+
+Es el mismo tipo de falso positivo que ya apareció dos veces esta semana: la
+prueba pasa porque mide el componente que funciona.
+
+### Lo que sí está bien, y hace la solución más limpia
+
+El archivo en disco **ya existe**: `recorder.onChunk` se lo pasa a
+`history.append(chunk:)` mientras se dicta. Lo que falta no es escribirlo, es
+**usarlo**: hoy se transcribe desde el `.wav` que `stop()` arma en memoria, no
+desde el archivo que ya está escrito.
+
+### Qué cambia en el plan
+
+El trabajo no es solo migrar los doce envíos. Antes hay que:
+
+1. Que `Recorder` deje de retener el dictado entero. El buffer solo hace falta
+   acotado, para la vista previa en vivo, que ya solo mira los últimos dos minutos.
+2. Que `stop()` devuelva **la ruta del archivo** que `HistoryWriter` ya escribió,
+   en vez de un `.wav` armado en memoria.
+3. Solo entonces, los doce envíos con `uploadTask(with:fromFile:)`.
+
+Sin los dos primeros, migrar los envíos quita una copia de dos y deja la otra:
+la mejora sería la mitad de la anunciada, y RF-02 seguiría sin cumplirse.
+
+**Pendiente de decisión de Alberto**, porque toca el grabador —el camino por el
+que pasa cada dictado— y eso excede lo que aprobó: aprobó los envíos, no el
+grabador. Las tareas T04 a T10 quedan detenidas hasta esa decisión. La fase A
+(red de seguridad) está cerrada y no depende de esto.

@@ -422,6 +422,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Cuerpos de subida que quedaran de una sesión anterior: un cierre
+        // inesperado puede dejarlos, y son del tamaño del dictado que se estaba
+        // enviando. Solo borra lo que crea esa función, en su propia carpeta.
+        CuerpoMultipart.barrerHuerfanos()
+
         if ProcessInfo.processInfo.environment["BTODICTA_WAKEDETECTTEST"] == "1" {
             let esperarNinguno = ProcessInfo.processInfo.environment["BTODICTA_WAKEEXPECTNONE"] == "1"
             let frase = ProcessInfo.processInfo.environment["BTODICTA_WAKEPHRASE"]
@@ -2050,6 +2055,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             ciclo(1)
             RunLoop.main.run(); return
+        }
+        // El cuerpo de la subida, byte a byte: BTODICTA_SUBIDATEST=1
+        //
+        // La red de seguridad de la spec 001. Antes de migrar ningún motor a
+        // `uploadTask(fromFile:)` hay que demostrar que el cuerpo escrito a
+        // disco es EXACTAMENTE el que se armaba en memoria. Si difiere un solo
+        // byte, el servidor recibe basura y el dictado se pierde — que es
+        // justamente lo que el MANIFIESTO pone por encima de la memoria.
+        if ProcessInfo.processInfo.environment["BTODICTA_SUBIDATEST"] == "1" {
+            // PCM 16 kHz mono de 16 bits = 32 000 B/s.
+            let casos: [(String, Int)] = [("1 s", 32_000), ("1 min", 1_920_000), ("1 h", 115_200_000)]
+            let campos = [("model", "whisper-1"), ("language", "es"), ("response_format", "json")]
+            let bound = "BtoDicta-PRUEBA-FIJA"
+            var fallos = 0
+            for (nombre, n) in casos {
+                // Contenido determinista: la misma secuencia en cada corrida,
+                // así un fallo se reproduce igual.
+                var d = Data(count: n)
+                d.withUnsafeMutableBytes { crudo in
+                    let b = crudo.bindMemory(to: UInt8.self)
+                    for i in 0..<n { b[i] = UInt8((i &* 31 &+ 7) & 0xFF) }
+                }
+                let origen = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("subidatest-\(n).wav")
+                try? d.write(to: origen)
+                let viejo = CuerpoMultipart.construirEnMemoria(
+                    boundary: bound, campos: campos,
+                    nombreArchivo: "audio.wav", tipo: "audio/wav", audio: d)
+                guard let nuevo = try? CuerpoMultipart.construir(
+                    boundary: bound, campos: campos,
+                    nombreArchivo: "audio.wav", tipo: "audio/wav",
+                    audio: .archivo(origen)) else {
+                    print("SUBIDATEST \(nombre) FALLA — no pude escribir el cuerpo en disco")
+                    fallos += 1
+                    try? FileManager.default.removeItem(at: origen)
+                    continue
+                }
+                let leido = (try? Data(contentsOf: nuevo.url)) ?? Data()
+                let igual = leido == viejo
+                print("SUBIDATEST \(nombre): memoria \(viejo.count) B · disco \(nuevo.bytes) B · \(igual ? "idénticos" : "DIFIEREN")")
+                if !igual { fallos += 1 }
+                nuevo.limpiar()
+                try? FileManager.default.removeItem(at: origen)
+            }
+            // Segundo ángulo: la memoria puede salir bien y la limpieza mal.
+            let bal = CuerpoMultipart.balance()
+            let limpio = bal.creados == bal.borrados && bal.creados > 0
+            print("SUBIDATEST temporales: creados \(bal.creados) · borrados \(bal.borrados) → \(limpio ? "sin residuos" : "QUEDAN RESIDUOS")")
+            let ok = fallos == 0 && limpio
+            print("SUBIDATEST \(ok ? "TODO OK — 3/3 idénticos y sin residuos" : "FALLA — \(fallos) de 3 difieren")")
+            exit(ok ? 0 : 1)
         }
         // Micrófono de ESTE equipo con el código real: BTODICTA_MICTEST=1
         // Comprueba que entra audio sea cual sea la frecuencia del aparato
