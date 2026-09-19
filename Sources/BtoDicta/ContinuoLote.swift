@@ -118,7 +118,7 @@ enum ContinuoLote {
         }
 
         Log.log(.sistema, "bitácora: tanda con \(pendientes.count) fragmentos pendientes")
-        var hechos = 0, fallos = 0, saltados = 0
+        var hechos = 0, fallos = 0, saltados = 0, silenciosos = 0
         var comprimidos: Int64 = 0
 
         for p in pendientes {
@@ -133,6 +133,23 @@ enum ContinuoLote {
                 // El archivo se borró por fuera: se marca para no reintentarlo eternamente.
                 ContinuoIndice.shared.anotarTexto("", material: .audio, id: p.id)
                 saltados += 1
+                continue
+            }
+
+            // Si no suena nada, no se manda a ningún motor.
+            //
+            // La bitácora graba todo el rato, y buena parte de lo que graba es
+            // silencio: nadie habla, o se está delante del equipo sin decir
+            // nada. Medido en esta máquina: el 36 % de los trozos. Cada uno se
+            // mandaba a la nube, el motor devolvía «respuesta sin texto»
+            // —correctamente, porque no hay nada que transcribir—, la cascada lo
+            // contaba como FALLO y probaba con el siguiente motor. En un día:
+            // 312 llamadas gastadas para no obtener nada.
+            //
+            // Mirar el audio cuesta milisegundos y se hace en local.
+            if AudioSilencio.esSilencio(p.ruta) {
+                ContinuoIndice.shared.anotarTexto("", material: .audio, id: p.id)
+                silenciosos += 1
                 continue
             }
 
@@ -155,6 +172,8 @@ enum ContinuoLote {
         var partes = ["tanda terminada: \(hechos) transcritos"]
         if fallos > 0 { partes.append("\(fallos) con error") }
         if saltados > 0 { partes.append("\(saltados) sin archivo") }
+        // Se dice: es la medida de cuánto se ahorra en llamadas de nube.
+        if silenciosos > 0 { partes.append("\(silenciosos) en silencio, no enviados") }
         if comprimidos > 0 { partes.append("\(ContinuoBitacora.tamanoLegible(comprimidos)) liberados") }
 
         // Con canal de solo audio no se toca el OCR: eso es lo que pidió quien

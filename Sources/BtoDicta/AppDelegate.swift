@@ -2163,6 +2163,87 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             exit(mal == 0 ? 0 : 1)
         }
 
+        // No mandar silencio a la nube: BTODICTA_SILENCIOTEST=1
+        //
+        // Se prueba contra los trozos REALES de la bitácora de esta máquina, no
+        // contra audio inventado: lo que importa no es que el detector funcione
+        // en teoría, sino que no descarte NI UNA sola frase de las que hay.
+        if ProcessInfo.processInfo.environment["BTODICTA_SILENCIOTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("SILENCIO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            let fm = FileManager.default
+
+            // 1) Audio fabricado: silencio puro y voz clara.
+            let carpeta = fm.temporaryDirectory.appendingPathComponent("silenciotest-\(UUID().uuidString)")
+            try? fm.createDirectory(at: carpeta, withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: carpeta) }
+
+            func escribir(_ nombre: String, muestras: [Int16]) -> URL {
+                let u = carpeta.appendingPathComponent(nombre)
+                var d = Data()
+                for m in muestras { withUnsafeBytes(of: m.littleEndian) { d.append(contentsOf: $0) } }
+                try? d.write(to: u); return u
+            }
+            let mudo = escribir("mudo.pcm", muestras: [Int16](repeating: 0, count: 160_000))
+            chk(AudioSilencio.esSilencio(mudo), "el silencio absoluto se detecta")
+
+            let zumbido = escribir("zumbido.pcm", muestras: (0..<160_000).map { _ in Int16.random(in: -300...300) })
+            chk(AudioSilencio.esSilencio(zumbido), "el ruido de fondo de una habitación también")
+
+            var conVoz = [Int16](repeating: 0, count: 160_000)
+            for i in 70_000..<80_000 { conVoz[i] = Int16(truncatingIfNeeded: 9000 - (i % 400) * 20) }
+            let voz = escribir("voz.pcm", muestras: conVoz)
+            chk(!AudioSilencio.esSilencio(voz), "una frase corta en medio de un trozo largo SÍ se manda")
+
+            // Una palabra suelta y floja: 250 ms a 16 kHz son 4000 muestras.
+            // Menos que eso ya no es voz, es un golpe o un clic — y esos SÍ
+            // pueden descartarse, que es justo lo que se quiere.
+            var apenas = [Int16](repeating: 0, count: 160_000)
+            for i in 1000..<5000 { apenas[i] = 1500 }
+            let bajita = escribir("bajita.pcm", muestras: apenas)
+            chk(!AudioSilencio.esSilencio(bajita), "una palabra suelta y floja se manda (prueba negativa)")
+
+            var clic = [Int16](repeating: 0, count: 160_000)
+            for i in 1000..<1150 { clic[i] = 12_000 }
+            let golpe = escribir("clic.pcm", muestras: clic)
+            chk(AudioSilencio.esSilencio(golpe),
+                "un golpe de 9 ms, por fuerte que sea, NO justifica una llamada a la nube")
+
+            // 2) Contra la bitácora REAL de esta máquina.
+            let raiz = Config.continuoCarpeta()
+            var reales: [URL] = []
+            if let e = fm.enumerator(at: raiz, includingPropertiesForKeys: nil) {
+                for caso in e {
+                    guard let u = caso as? URL, u.pathExtension == "pcm" else { continue }
+                    reales.append(u)
+                    if reales.count >= 120 { break }
+                }
+            }
+            if reales.isEmpty {
+                print("SILENCIO · sin trozos .pcm en la bitácora para contrastar (ya comprimidos)")
+            } else {
+                var mudos = 0, conAlgo = 0
+                for u in reales {
+                    if AudioSilencio.esSilencio(u) { mudos += 1 } else { conAlgo += 1 }
+                }
+                let total = mudos + conAlgo
+                print("SILENCIO · en \(total) trozos reales: \(mudos) mudos (\(mudos * 100 / max(total, 1)) %), \(conAlgo) con algo que decir")
+                chk(conAlgo > 0, "en la bitácora real sigue habiendo audio que SÍ se manda")
+                chk(mudos < total, "y no se descarta todo (eso sería un detector roto)")
+            }
+
+            // 3) Con el umbral en 0 no se descarta nada: el usuario manda.
+            let previo = Config.json0("bitacora_umbral_silencio") as? Int
+            Config.set("bitacora_umbral_silencio", to: 0)
+            chk(!AudioSilencio.esSilencio(mudo), "con el umbral en 0 se manda TODO, hasta el silencio puro")
+            if let p = previo { Config.set("bitacora_umbral_silencio", to: p) }
+            else { Config.set("bitacora_umbral_silencio", to: 800) }
+            chk(AudioSilencio.esSilencio(mudo), "y al restaurarlo vuelve a detectar")
+
+            print("SILENCIO \(mal == 0 ? "TODO OK — no se manda silencio a la nube, y no se pierde voz" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Que no se instale como modelo lo que no lo es: BTODICTA_MODELOTEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_MODELOTEST"] == "1" {
             var mal = 0
