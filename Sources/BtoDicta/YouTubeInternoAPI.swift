@@ -148,7 +148,7 @@ enum YouTubeDataAPI {
         }
         var req = URLRequest(url: url)
         req.timeoutInterval = 15
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         if case .oauth(let token) = autorizacion {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -322,7 +322,7 @@ enum YouTubeDataAPI {
         req.timeoutInterval = 15
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         URLSession.shared.dataTask(with: req) { data, response, error in
             let terminar: (Result<T, Error>) -> Void = { resultado in
                 DispatchQueue.main.async { completion(resultado) }
@@ -432,7 +432,7 @@ enum YouTubeOAuth {
         var req = URLRequest(url: URL(string: "https://oauth2.googleapis.com/revoke")!)
         req.httpMethod = "POST"; req.timeoutInterval = 12
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         req.httpBody = formulario(["token": refresh]).data(using: .utf8)
         URLSession.shared.dataTask(with: req) { _, response, _ in
             let ok = ((response as? HTTPURLResponse)?.statusCode).map { (200..<300).contains($0) } ?? false
@@ -537,7 +537,7 @@ enum YouTubeOAuth {
         var req = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!)
         req.httpMethod = "POST"; req.timeoutInterval = 20
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         req.httpBody = formulario(campos).data(using: .utf8)
         URLSession.shared.dataTask(with: req) { data, response, error in
             let terminar: (Result<String, Error>) -> Void = { r in DispatchQueue.main.async { completion(r) } }

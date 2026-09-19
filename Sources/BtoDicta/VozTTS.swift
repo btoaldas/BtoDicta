@@ -494,7 +494,7 @@ enum ElevenLabsTTS {
         req.httpMethod = "POST"
         req.setValue(key, forHTTPHeaderField: "xi-api-key")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         req.timeoutInterval = 20
         let cuerpo: [String: Any] = [
             "text": texto,

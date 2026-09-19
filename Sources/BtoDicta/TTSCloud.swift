@@ -92,7 +92,7 @@ enum TTSCloud {
             guard let u = URL(string: url) else { return nil }
             var r = URLRequest(url: u); r.httpMethod = "POST"; r.timeoutInterval = 25
             r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            r.setValue("close", forHTTPHeaderField: "Connection")
+            // (sin `Connection: close`: ver nota abajo)
             for (k, v) in headers { r.setValue(v, forHTTPHeaderField: k) }
             r.httpBody = try? JSONSerialization.data(withJSONObject: body); return r
         }

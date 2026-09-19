@@ -391,7 +391,7 @@ enum ContinuoResumen {
         guard var req = ia.requestChat(prompt: prompt, temperatura: 0.3, textLen: textLen) else {
             DispatchQueue.main.async { completion(nil, "no pude armar la petición") }; return
         }
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         req.timeoutInterval = 180
         URLSession.shared.dataTask(with: req) { data, resp, error in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? -1

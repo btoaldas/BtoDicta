@@ -161,12 +161,16 @@ enum EmbeddingSearch {
         guard esSeguro(url) else { completion(.failure(ScribeError.ws("Embeddings en la nube exige https"))); return }
         var req = URLRequest(url: url); req.httpMethod = "POST"; req.timeoutInterval = 20
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("close", forHTTPHeaderField: "Connection")   // conexión fresca (VPN mata sockets idle)
+        // La razón original era buena —la VPN mata los sockets parados— pero
+        // pedir el cierre sobre la sesión compartida contagia el problema al
+        // resto de la aplicación. La conexión fresca se consigue con una sesión
+        // propia, que se cierra sola al terminar.
         let key = m.keyEnv.isEmpty ? "" : ApiKeys.get(m.keyEnv)
         if openai, !key.isEmpty { req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         let cuerpo: [String: Any] = openai ? ["model": m.modelo, "input": texto] : ["model": m.modelo, "prompt": texto]
         req.httpBody = try? JSONSerialization.data(withJSONObject: cuerpo)
-        URLSession.shared.dataTask(with: req) { data, resp, err in
+        let sesionPropia = RedDictado.sesionNueva()
+        sesionPropia.dataTask(with: req) { data, resp, err in
             if let err { completion(.failure(err)); return }
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard let data, (200..<300).contains(code),

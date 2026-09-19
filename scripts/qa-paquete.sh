@@ -123,6 +123,23 @@ ejecutar() {
   print "[$estado] $id"
 }
 
+# Comprobación ESTÁTICA: no necesita arrancar la aplicación, lee el código. Vigila
+# el fallo de 0.59.0 —pedir el cierre de la conexión sobre la sesión compartida—,
+# que ya volvió una vez en trece sitios distintos.
+estatica() {
+  local id="$1"; shift
+  local log="$salida/logs-automaticos/$id.log"
+  local inicio fin codigo estado
+  inicio="$(/bin/date +%s)"
+  "$@" > "$log" 2>&1
+  codigo=$?
+  fin="$(/bin/date +%s)"
+  total=$((total + 1))
+  if (( codigo == 0 )); then estado="PASA"; else estado="FALLA"; fallos=$((fallos + 1)); fi
+  print "$id\t$estado\t$codigo\t$((fin - inicio))\t${log:t}" >> "$salida/resumen.tsv"
+  print "[$estado] $id"
+}
+
 if [[ "$modo" == "audio" ]]; then
   ejecutar "audio_elevenlabs_apple" "BTODICTA_MODOAUDIOQA" "1" 900
 elif [[ "$modo" == "ia" ]]; then
@@ -143,6 +160,7 @@ else
   ejecutar "almacen_tareas_notas" "BTODICTA_NOTATEST" "1" 90
   ejecutar "autoayuda" "BTODICTA_HELPTEST" "1" 90
   ejecutar "permisos" "BTODICTA_PERMISSIONSTEST" "1" 90
+  estatica "conexion_compartida" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-conexion-compartida.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
 fi
 
 copiar_evidencia

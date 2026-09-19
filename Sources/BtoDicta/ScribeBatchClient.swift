@@ -55,7 +55,7 @@ func transcribeBatch(wav: CuerpoMultipart.Origen, model: String, completion: @es
 /// formatos (wav, mp3, m4a, ogg, mp4, mov…) y extrae el audio del video.
 func transcribeFile(url: URL, model: String, completion: @escaping (Result<String, Error>) -> Void) {
     guard let key = Config.apiKey() else { completion(.failure(ScribeError.sinApiKey)); return }
-    guard let fileData = try? Data(contentsOf: url) else {
+    guard FileManager.default.fileExists(atPath: url.path) else {
         completion(.failure(ScribeError.http(0, "No se pudo leer el archivo")))
         return
     }
@@ -72,25 +72,27 @@ func transcribeFile(url: URL, model: String, completion: @escaping (Result<Strin
     }()
 
     let boundary = "BtoDicta-\(UUID().uuidString)"
-    var body = Data()
-    func field(_ name: String, _ value: String) {
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".data(using: .utf8)!)
-    }
-    field("model_id", model)
-    field("language_code", "es")
-    field("tag_audio_events", "false")
-    for term in Config.keyterms().prefix(1000) { field("keyterms", term) }
-    body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(url.lastPathComponent)\"\r\nContent-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
-    body.append(fileData)
-    body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+    var campos: [(String, String)] = [("model_id", model), ("language_code", "es"),
+                                      ("tag_audio_events", "false")]
+    for term in Config.keyterms().prefix(1000) { campos.append(("keyterms", term)) }
+    // Desde archivo: transcribir una grabación de horas del historial no tiene
+    // por qué cargarla entera en memoria.
+    let cuerpo: CuerpoMultipart.Preparado
+    do {
+        cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: campos,
+                                               nombreArchivo: url.lastPathComponent,
+                                               tipo: mime, audio: .archivo(url))
+    } catch { completion(.failure(error)); return }
 
-    var request = URLRequest(url: URL(string: "https://api.elevenlabs.io/v1/speech-to-text")!); request.setValue("close", forHTTPHeaderField: "Connection")
+    // SIN `Connection: close`: sobre la sesión compartida deja un socket muerto
+    // que el envío siguiente hereda y espera en balde. Es el mismo fallo de 0.59.0.
+    var request = URLRequest(url: URL(string: "https://api.elevenlabs.io/v1/speech-to-text")!)
     request.httpMethod = "POST"
     request.timeoutInterval = 300   // archivos largos
     request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
     request.setValue(key, forHTTPHeaderField: "xi-api-key")
 
-    URLSession.shared.uploadTask(with: request, from: body) { data, response, error in
+    CuerpoMultipart.subir(request, cuerpo: cuerpo) { data, response, error in
         DispatchQueue.main.async {
             if let error { completion(.failure(error)); return }
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -105,6 +107,6 @@ func transcribeFile(url: URL, model: String, completion: @escaping (Result<Strin
             }
             completion(.success(text.trimmingCharacters(in: .whitespacesAndNewlines)))
         }
-    }.resume()
+    }
 }
 

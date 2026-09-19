@@ -159,7 +159,7 @@ enum Updater {
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("BtoDicta/\(Version.numero)", forHTTPHeaderField: "User-Agent")
         req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         URLSession.shared.dataTask(with: req) { data, response, error in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard error == nil, status == 200, let data else {
@@ -303,7 +303,7 @@ enum Updater {
         req.cachePolicy = .reloadIgnoringLocalCacheData
         req.setValue("BtoDicta/\(Version.numero)", forHTTPHeaderField: "User-Agent")
         req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         URLSession.shared.dataTask(with: req) { data, response, error in
             DispatchQueue.main.async {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0

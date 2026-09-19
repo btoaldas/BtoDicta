@@ -296,7 +296,7 @@ enum ConexionesIA {
         guard var req = ia.requestChat(prompt: prompt, temperatura: 0, textLen: textLen) else {
             DispatchQueue.main.async { completion(nil) }; return
         }
-        req.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         req.timeoutInterval = limite
         URLSession.shared.dataTask(with: req) { data, resp, error in
             let contenido: String? = {

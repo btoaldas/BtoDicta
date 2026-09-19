@@ -211,7 +211,7 @@ enum ModoIAEnrutador {
         }
         // Evita reutilizar un socket que una VPN haya dejado muerto durante la
         // inactividad. Si aun así falla, el límite estricto devuelve el dictado.
-        request.setValue("close", forHTTPHeaderField: "Connection")
+        // (sin `Connection: close`: ver nota abajo)
         request.timeoutInterval = Config.modoIATimeout()
         let inicio = Date()
         Log.log(.ia, "árbitro de modos → \(ia.etiqueta) (zona \(zona.count) chars)")
