@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.65.4"
+    static let numero = "0.66.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.66.0", "2026-09-19", [
+            "MOTORES LOCALES AL DÍA. whisper.cpp pasa de la 1.9.1 a la 1.9.4 —449 cambios, 81 de ellos arreglos— y el motor de embeddings se pone al día con casi mil cambios acumulados desde julio. Actualizar esto tiene su riesgo, porque una versión nueva puede cambiar lo que transcribe, así que se comprobó ANTES de instalar nada: el mismo audio da el texto IDÉNTICO letra por letra, incluido uno con siglas y nombres propios, que es donde más se notaría",
+            "OTROS PROGRAMAS DE TU MAC YA PUEDEN TRANSCRIBIR DE VERDAD. La puerta local está encendida y el comando `transcribir` de la Mac la usa: antes alcanzaba las carpetas internas de BtoDicta, y se habría roto el día que algo cambiara de sitio. Ahora habla por un contrato, y si BtoDicta está cerrada sigue funcionando como siempre en vez de fallar",
+            "Las carpetas desde las que la puerta local acepta audios se SUMAN a las de siempre, en vez de reemplazarlas. Antes había que acordarse de repetir las tres de fábrica al añadir una, y era fácil acabar abriendo de más. Y ahora se rechazan las carpetas demasiado amplias aunque se pongan a mano: abrir la carpeta personal entera convertiría esto en un lector de todo tu disco",
+        ]),
         ("0.65.4", "2026-09-19", [
             "DEJA DE GASTAR LLAMADAS CONTRA CUENTAS VACÍAS. Cuando un proveedor se quedaba sin saldo, se apartaba media hora — el mismo tiempo que si la clave estuviera mal. Pero el saldo no vuelve solo en media hora, así que cada treinta minutos se gastaba otra llamada para recibir exactamente el mismo error. En un solo día se contaron 57",
             "Ahora el tiempo depende de si el problema se arregla solo: seis horas cuando falta saldo o cuota, media hora cuando es la clave —que puedes cambiar en cualquier momento—, cinco minutos cuando solo hay prisa, y dos cuando el servidor del proveedor está caído",

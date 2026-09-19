@@ -34,6 +34,16 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.66.0
+
+- **Motores locales al día**: whisper.cpp 1.9.4 y el de embeddings con ~1000
+  cambios acumulados. Comprobado antes de instalar: **texto idéntico** letra por
+  letra, y los mismos vectores de embeddings.
+- **El comando `transcribir` de la Mac usa ya la API**: deja de conocer las
+  carpetas internas.
+- Las carpetas permitidas de la API **se suman** a las de fábrica, y se rechazan
+  las demasiado amplias aunque se pongan a mano.
+
 ### Novedades 0.65.4
 
 - **Deja de gastar llamadas contra cuentas vacías.** Un proveedor sin saldo se

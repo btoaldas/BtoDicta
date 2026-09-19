@@ -1062,6 +1062,19 @@ Tu plantilla sigue funcionando igual. Comprobación: `BTODICTA_SHELLTEST=1`.
 
 ## Que otros programas de tu Mac transcriban con BtoDicta
 
+Desde 0.66.0, el comando `transcribir` de tu Mac ya usa esta puerta:
+
+```bash
+transcribir audio.m4a --json     # dice qué motor lo hizo de verdad
+```
+
+Si BtoDicta está cerrada, cae a su camino de siempre en vez de fallar.
+
+Las carpetas que añadas en la configuración **se suman** a las de fábrica —no las
+reemplazan—, y las demasiado amplias (`/`, `/Users`, tu carpeta personal) se
+rechazan aunque se pongan a mano: abrirlas convertiría esto en un lector de todo
+tu disco.
+
 Desde 0.65.0, otros proyectos tuyos pueden pedirle a BtoDicta que transcriba un
 audio o pula un texto, en vez de instalar sus propios modelos de varios gigabytes.
 
