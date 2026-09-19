@@ -319,15 +319,74 @@ enum SaldoAPI {
 
     // MARK: Aviso
 
-    private static var avisado: [String: String] = [:]   // id → "yyyy-MM-dd"
+    /// Qué proveedor se avisó y qué día. **En disco, no en memoria.**
+
+    ///
+
+    /// Estaba en memoria, así que cada arranque lo olvidaba y volvía a avisar de
+
+    /// lo mismo. Una jornada con muchos reinicios produjo 68 avisos de dos
+
+    /// proveedores que ya se sabían agotados. Y el ruido no solo molesta: entierra
+
+    /// el aviso que sí importaba.
+
+    ///
+
+    /// Es el mismo fallo que tenía el resumen por correo, en otro sitio.
+
+    private static var archivoAvisos: URL { Config.dir.appendingPathComponent("saldo-avisos.json") }
+
+    private static var _avisado: [String: String]?
+
+    private static var avisado: [String: String] {
+
+        get {
+
+            if let c = _avisado { return c }
+
+            let d = (try? Data(contentsOf: archivoAvisos)) ?? Data()
+
+            let c = ((try? JSONSerialization.jsonObject(with: d)) as? [String: String]) ?? [:]
+
+            _avisado = c
+
+            return c
+
+        }
+
+        set {
+
+            _avisado = newValue
+
+            Config.asegurarDirSeguro()
+
+            guard let d = try? JSONSerialization.data(withJSONObject: newValue) else { return }
+
+            try? d.write(to: archivoAvisos, options: .atomic)
+
+        }
+
+    }
 
     /// Avisa UNA vez al día por proveedor. Un aviso que se repite en cada
     /// consulta deja de leerse a la tercera.
+    /// Solo para `BTODICTA_AVISOTEST`.
+    static func avisarQA(_ saldos: [Saldo]) { avisarSiHaceFalta(saldos) }
+    static func olvidarAvisosQA() { avisado = [:] }
+    static func yaAvisadoQA(_ id: String) -> Bool { avisado[id] != nil }
+    /// Simula un reinicio: se olvida lo que hay en memoria, no lo del disco.
+    static func simularReinicioQA() { _avisado = nil }
+
     private static func avisarSiHaceFalta(_ saldos: [Saldo]) {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
         let hoy = f.string(from: Date())
+        let callados = Set(Config.saldoAvisoSilenciados())
         for s in saldos where s.error == nil {
             guard estaBajo(s) else { avisado[s.id] = nil; continue }
+            // Un proveedor que ya se sabe agotado y que se decidió no renovar no
+            // tiene por qué avisar cada día: eso no es información, es ruido.
+            guard !callados.contains(s.id) else { continue }
             guard avisado[s.id] != hoy else { continue }
             avisado[s.id] = hoy
             let aviso = s.restante <= 0
@@ -352,7 +411,7 @@ enum SaldoAPI {
 /// Aviso del sistema, separado para poder probar el resto sin abrir ventanas.
 enum NotificacionSaldo {
     static var mostrarReal = true
-    private(set) static var ultimo: (titulo: String, cuerpo: String)?
+    static var ultimo: (titulo: String, cuerpo: String)?
 
     static func mostrar(titulo: String, cuerpo: String) {
         ultimo = (titulo, cuerpo)

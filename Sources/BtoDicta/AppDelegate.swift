@@ -2163,6 +2163,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             exit(mal == 0 ? 0 : 1)
         }
 
+        // Que un aviso no se repita en cada arranque: BTODICTA_AVISOTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_AVISOTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("AVISO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            NotificacionSaldo.mostrarReal = false
+            SaldoAPI.olvidarAvisosQA()
+            let previoSilencio = Config.json0("saldo_aviso_silenciados") as? [String]
+            Config.set("saldo_aviso_silenciados", to: [String]())
+
+            let vacio = SaldoAPI.Saldo(id: "pruebavacia", nombre: "Prueba Vacía",
+                                       restante: 0, total: 100_000, unidad: "caracteres",
+                                       consultado: Date(), error: nil)
+            SaldoAPI.avisarQA([vacio])
+            chk(NotificacionSaldo.ultimo?.cuerpo.contains("Prueba Vacía") == true, "avisa la primera vez")
+
+            NotificacionSaldo.ultimo = nil
+            SaldoAPI.avisarQA([vacio])
+            chk(NotificacionSaldo.ultimo == nil, "y NO repite el mismo día")
+
+            // El fallo que había: al reiniciar se olvidaba y volvía a avisar.
+            SaldoAPI.simularReinicioQA()
+            NotificacionSaldo.ultimo = nil
+            SaldoAPI.avisarQA([vacio])
+            chk(NotificacionSaldo.ultimo == nil,
+                "ni después de REINICIAR: antes cada arranque avisaba otra vez")
+
+            // Silenciar un proveedor que ya se sabe agotado.
+            SaldoAPI.olvidarAvisosQA()
+            Config.set("saldo_aviso_silenciados", to: ["pruebavacia"])
+            NotificacionSaldo.ultimo = nil
+            SaldoAPI.avisarQA([vacio])
+            chk(NotificacionSaldo.ultimo == nil, "un proveedor silenciado no avisa")
+
+            // Y otro distinto sí sigue avisando (prueba negativa).
+            let otro = SaldoAPI.Saldo(id: "otraprueba", nombre: "Otra Prueba",
+                                      restante: 0, total: 100_000, unidad: "caracteres",
+                                      consultado: Date(), error: nil)
+            SaldoAPI.avisarQA([otro])
+            chk(NotificacionSaldo.ultimo?.cuerpo.contains("Otra Prueba") == true,
+                "silenciar uno NO silencia a los demás")
+
+            SaldoAPI.olvidarAvisosQA()
+            if let p = previoSilencio { Config.set("saldo_aviso_silenciados", to: p) }
+            else { Config.set("saldo_aviso_silenciados", to: [String]()) }
+            NotificacionSaldo.mostrarReal = true
+            print("AVISO \(mal == 0 ? "TODO OK — un aviso no se repite en cada arranque" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Cuánto tarda cada motor: BTODICTA_LATENCIATEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_LATENCIATEST"] == "1" {
             var mal = 0

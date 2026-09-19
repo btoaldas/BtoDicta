@@ -1198,6 +1198,15 @@ struct Config {
     static func cancelarConservaDesdeSegundos() -> Double {
         min(60, max(0, (json()["cancelar_conserva_desde_s"] as? Double) ?? 2))
     }
+    /// Proveedores que NO deben avisar de saldo bajo.
+    ///
+    /// Para los que se sabe agotados y se ha decidido no renovar: avisar cada
+    /// día de algo ya decidido no es información, es ruido — y el ruido entierra
+    /// el aviso que sí importa.
+    static func saldoAvisoSilenciados() -> [String] {
+        (json()["saldo_aviso_silenciados"] as? [String]) ?? []
+    }
+
     /// Escribir en el registro el TEXTO de lo dictado, no solo su medida.
     ///
     /// **Encendido de fábrica, y a conciencia.** El registro es local, rota cada
