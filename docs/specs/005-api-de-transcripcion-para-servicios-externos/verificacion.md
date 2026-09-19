@@ -40,7 +40,7 @@ dejarlos en el registro filtraría justo lo que se protege.
 | RF-05 no se leen rutas arbitrarias | **Cumple** | Ver tabla de cerraduras |
 | RF-06 las credenciales no salen | **Cumple** | El consumidor manda una ruta y recibe texto; nunca toca `~/.btodicta/.env` |
 | RF-07 pulir por el contrato | **Cumple** | «esto es una prueba de pulido sin puntuacion» → «Esto es una prueba de pulido, sin puntuación ni mayúsculas, a ver qué hace.», DeepSeek V4.1 Flash |
-| RF-08 el comando global deja de conocer las tripas | **Pendiente** | Ver desviaciones |
+| RF-08 el comando global deja de conocer las tripas | **Cumple** | Reescrito a 2.0.0: el camino que usa la API no contiene ninguna ruta de modelos ni de credenciales. 1,37 s medidos, devolviendo el motor real que transcribió |
 
 ## Requerimientos no funcionales
 
@@ -63,12 +63,16 @@ BtoDicta  67357  bto  5u  IPv4  TCP 127.0.0.1:8787 (LISTEN)
 
 ## Desviaciones respecto al plan
 
-**RF-08 queda fuera de esta entrega.** Reescribir el comando global
-`transcribir` para que consuma la API exige tocar un archivo que vive **fuera de
-este repositorio** (`~/.local/bin`, documentado en el skill `transcribir`). La
-API ya está y el contrato es estable, así que el comando se puede reescribir
-cuando se quiera; hacerlo desde aquí sería modificar herramientas de la máquina
-por cuenta propia. Queda anotado, no olvidado.
+**Ninguna al cierre.** RF-08 quedó fuera de la primera entrega porque el comando
+global vive fuera de este repositorio; se completó el 2026-09-19 con autorización
+expresa.
+
+Una decisión que merece constar: el comando **conserva el camino anterior como
+respaldo**, y ese respaldo sí conoce las rutas internas. Es deliberado. Quitarlo
+habría dejado el comando inútil con BtoDicta cerrada, que es peor que el
+acoplamiento que se quería evitar. Lo que importa es que el camino **principal**
+ya no depende de dónde estén los modelos: si BtoDicta los mueve, el comando sigue
+funcionando por la API y el respaldo solo se usa cuando la API no está.
 
 ## Riesgos residuales
 
