@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.65.3
+
+- **Lo que se descarga se comprueba antes de instalarse**: una página de error ya
+  no queda guardada con el nombre del modelo.
+- Una versión **no puede publicarse sin los motores** que funcionan sin internet.
+- Tercera auditoría, esta de cadena de suministro: 4 áreas, 2 hallazgos.
+
 ### Novedades 0.65.2
 
 - **Un dictado que no se puede guardar ya no parece guardado.** Si el archivo no

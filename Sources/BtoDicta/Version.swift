@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.65.2"
+    static let numero = "0.65.3"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.65.3", "2026-09-19", [
+            "LO QUE SE DESCARGA SE COMPRUEBA ANTES DE INSTALARSE. Al bajar un modelo se guardaba lo que llegara, sin mirar nada. Si el servidor devolvía un error, un aviso de mantenimiento o una pantalla de inicio de sesión, eso quedaba guardado CON EL NOMBRE DEL MODELO, y el fallo aparecía días después al usarlo, con un mensaje sobre un formato inválido que no llevaba a ninguna parte",
+            "Ahora se mira la respuesta del servidor, el tamaño y el contenido: si no es un modelo de verdad no se instala nada y el registro dice qué llegó. De cada modelo instalado se anota su huella, para poder ver si cambia después sin que nadie lo haya tocado",
+            "Y una versión ya no puede publicarse sin los motores que funcionan sin internet. Viajan dentro de la aplicación copiados desde las carpetas de compilación, y si un día esas carpetas no estaban, el paquete salía sin ellos EN SILENCIO: la aplicación parecía normal hasta que alguien intentaba dictar sin conexión. Ahora se comprueba antes de firmar",
+            "Tercera y última revisión completa, esta de lo que la aplicación no escribió pero sí ejecuta: los motores que lleva dentro y los modelos que se baja",
+        ]),
         ("0.65.2", "2026-09-19", [
             "UN DICTADO QUE NO SE PUEDE GUARDAR YA NO PARECE GUARDADO. Si el archivo donde se escribe el audio no se podía abrir —disco lleno, permisos, un disco externo que se desconecta—, la aplicación seguía como si nada: el contador de bytes subía igual y todo parecía normal. Podías dictar media hora contra el vacío y enterarte al ir a buscarlo",
             "Ahora se dice en el registro con todas las letras, el contador solo sube cuando la escritura ocurrió de verdad, y si el disco se llena A MITAD del dictado también avisa —una vez, no cuarenta veces por minuto—",

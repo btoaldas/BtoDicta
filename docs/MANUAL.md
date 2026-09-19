@@ -1016,6 +1016,18 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### «descarga RECHAZADA» al bajar un modelo
+
+Desde 0.65.3, lo que se descarga se comprueba antes de instalarse. Si ves ese
+mensaje, lo que llegó no era un modelo: lo habitual es que el servidor
+respondiera con un error o que el enlace haya caducado. **No se instala nada**, y
+el registro dice qué llegó — un HTTP 404, una página web, un archivo demasiado
+pequeño.
+
+Antes se guardaba igual, y el problema aparecía días después al usar ese modelo.
+
+La huella de cada modelo instalado queda en `~/.btodicta/modelos-huellas.json`.
+
 ### «este dictado no se está guardando»
 
 Si ves esa frase en el registro, el audio no está llegando al disco: lo habitual
