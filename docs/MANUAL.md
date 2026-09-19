@@ -1039,6 +1039,41 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### Pedir un motor concreto desde otro programa (0.71.0)
+
+Además de `local`, `nube` y `automatico`, la API local acepta el identificador de
+un motor concreto, y entonces responde **ese** motor, sin cascada detrás:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/transcribir \
+  -H "Authorization: Bearer $(cat ~/.btodicta/api-token)" \
+  -H "Content-Type: application/json" \
+  -d '{"archivo":"/ruta/audio.wav","motor":"mistral"}'
+```
+
+Sirve para comparar motores: con respaldo detrás, uno que se equivoca queda
+indistinguible de uno que acierta, porque contesta otro en su lugar. Si el
+identificador no existe o el motor no está activo, la respuesta lo dice y lista
+los activos, en vez de usar otro callando.
+
+**Qué motor conviene.** Medido el 2026-09-19 con 275 palabras de voz sintética en
+español (`scripts/comparar-motores.py`):
+
+| Motor | Error | Tiempo |
+|---|---|---|
+| Mistral (Voxtral nube) | 0,00 % | 3,5 s |
+| Nemotron local | 0,00 % | 5,6 s |
+| Hugging Face (Whisper) | 0,00 % | 22,5 s |
+| Voxtral local | 0,00 % | 36,1 s |
+| Apple Speech | 1,49 % | 0,8 s |
+| Deepgram (Nova) | 1,86 % | 1,8 s |
+| Fish Audio | 1,86 % | 7,7 s |
+| Groq Whisper | 4,09 % | 1,6 s |
+| Whisper local | 8,55 % | 28,1 s |
+
+Son cifras de voz sintética limpia: con voz real, acento y ruido de fondo el
+orden puede cambiar. Sirven para descartar, no para coronar.
+
 ### Un dictado largo salió por un motor que no elegiste
 
 Arreglado en 0.70.0. Los motores locales no avisan «esto es demasiado grande»:
