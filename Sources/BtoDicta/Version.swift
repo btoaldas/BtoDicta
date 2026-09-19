@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.63.4"
+    static let numero = "0.63.5"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.63.5", "2026-09-19", [
+            "LOS DOCE MOTORES SUBEN EL AUDIO DESDE EL DISCO. Antes, enviar un dictado armaba en memoria un paquete que contenía el audio entero: sumado a la copia que ya existía, un dictado de seis horas necesitaba cerca de dos gigas en el momento del envío. Ahora ese paquete se escribe a disco copiando el audio por trozos pequeños y se transmite desde ahí. Medido con seis horas: preparar el envío cuesta 0 MB",
+            "Con esto, un dictado de seis horas ocupa 80 MB de principio a fin —grabar 13, terminar 3, enviar 0— frente a los cerca de 2 000 MB de antes. El audio viaja como una ruta de archivo desde que sueltas la tecla hasta el motor; solo se lee entero para guardarlo en el historial, y ya con la transcripción hecha",
+            "Arreglado de paso el envío por lotes de ElevenLabs, que se había quedado fuera de la corrección de 0.59.0: seguía pidiendo el cierre de la conexión, así que el dictado siguiente heredaba un socket muerto y esperaba en balde hasta agotar su plazo",
+            "Antes de tocar ningún motor se comprobó que el paquete nuevo es EXACTAMENTE el de antes, byte a byte, con audios de un segundo, un minuto y una hora. Esa comprobación queda como prueba permanente: BTODICTA_SUBIDATEST=1",
+        ]),
         ("0.63.4", "2026-09-18", [
             "EL DICTADO DEJA DE VIVIR EN LA MEMORIA. El grabador retenía en RAM todo lo hablado, y al soltar la tecla armaba encima una segunda copia completa para enviarla. Medido en un dictado de seis horas: 1 388 MB. Ahora el audio se escribe al archivo según entra y en memoria solo queda una ventana de tres minutos —lo máximo que la vista previa en vivo puede pedir—, así que soltar la tecla ya no copia nada: devuelve la ruta del archivo que ya estaba escrito. Misma prueba: 80 MB",
             "Lo curioso es que la aplicación creía tener esto resuelto desde 0.60.0, y la medición que lo decía era correcta pero medía otro componente: probaba el escritor de la bitácora, que sí escribe sin acumular, y nunca pasaba por el grabador del dictado. La prueba ahora recorre el camino real, que es de lo que sirve una prueba",

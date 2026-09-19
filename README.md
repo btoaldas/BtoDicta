@@ -34,6 +34,16 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.63.5
+
+- **Los doce motores suben el audio desde el disco.** Enviar un dictado armaba en
+  memoria un paquete con el audio entero dentro. Ahora se escribe a disco por
+  trozos y se transmite desde ahí: **preparar el envío de seis horas cuesta 0 MB**.
+- Un dictado de seis horas ocupa **80 MB de principio a fin** —grabar 13,
+  terminar 3, enviar 0— frente a cerca de 2 000 MB antes.
+- Arreglado el envío por lotes de ElevenLabs, que se quedó fuera de la corrección
+  de 0.59.0 y seguía heredando sockets muertos.
+
 ### Novedades 0.63.4
 
 - **El dictado deja de vivir en la memoria.** El grabador retenía todo lo hablado

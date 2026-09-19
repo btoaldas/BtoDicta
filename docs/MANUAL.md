@@ -1016,6 +1016,16 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### Dictados muy largos: cuánta memoria usa la aplicación
+
+Desde 0.63.5 un dictado de seis horas ocupa **80 MB** de principio a fin. El
+reparto medido: grabar suma 13 MB, soltar la tecla 3 MB, y preparar el envío al
+motor 0 MB. Antes, esas tres etapas juntas pasaban de 1,9 GB, porque el audio se
+acumulaba en memoria y el paquete del envío lo copiaba otra vez dentro.
+
+Puedes comprobarlo tú: `BTODICTA_MEMTEST=6` simula seis horas por el camino real
+e imprime la memoria en cada etapa.
+
 ### Me llegaron varios correos iguales con el resumen
 
 Arreglado en 0.63.4. El registro de qué se había enviado y qué día vivía solo en
