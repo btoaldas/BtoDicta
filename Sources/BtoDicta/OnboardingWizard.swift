@@ -49,7 +49,10 @@ final class WizardWindowController {
         let ruta = Bundle.main.bundlePath
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/bash")
-        p.arguments = ["-c", "sleep 0.6; open \"\(ruta)\""]
+        // La ruta va como ARGUMENTO posicional, no pegada dentro del comando: si
+        // la aplicación viviera en una carpeta con comillas en el nombre, meterla
+        // en el texto rompería el entrecomillado. Mismo patrón que el actualizador.
+        p.arguments = ["-c", "sleep 0.6; open \"$1\"", "btodicta-reinicio", ruta]
         try? p.run()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { NSApp.terminate(nil) }
     }

@@ -2124,6 +2124,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // Que el texto no pueda ejecutar órdenes: BTODICTA_SHELLTEST=1
+        //
+        // La voz local dice en voz alta lo que responde la IA, y la IA redacta a
+        // partir de lo que se lee en la pantalla. Si el texto entra sin escapar
+        // en un comando de shell, la cadena completa es: una web abierta → la IA
+        // → la voz → ejecución. Esta prueba corta esa cadena.
+        if ProcessInfo.processInfo.environment["BTODICTA_SHELLTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("SHELL \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+
+            // Cada uno de estos ejecuta algo si entra sin escapar.
+            let ataques = [
+                "hola $(echo AQUI)", "hola `echo AQUI`", "hola ${HOME}",
+                "cierro\" y ejecuto $(echo AQUI)", "barra\\ y $(echo AQUI)",
+            ]
+            for a in ataques {
+                let e = XttsLocalTTS.escaparParaShell(a)
+                // Lo peligroso queda neutralizado: ningún `$`, backtick ni
+                // comilla se queda sin su barra delante.
+                let sinEscapar = zip(e, e.dropFirst()).contains { previo, actual in
+                    "$`\"".contains(actual) && previo != "\\"
+                }
+                let empiezaMal = e.first.map { "$`\"".contains($0) } ?? false
+                chk(!sinEscapar && !empiezaMal, "«\(a.prefix(26))…» queda inofensivo")
+            }
+            // Y lo normal no se toca.
+            chk(XttsLocalTTS.escaparParaShell("Buenos días, Alberto.") == "Buenos días, Alberto.",
+                "un texto corriente pasa intacto (prueba negativa)")
+            chk(XttsLocalTTS.escaparParaShell("").isEmpty, "el vacío sigue vacío")
+
+            // Ejecución REAL: si el escapado fallara, el archivo aparecería.
+            let testigo = FileManager.default.temporaryDirectory
+                .appendingPathComponent("shelltest-\(UUID().uuidString).txt")
+            let veneno = "hola $(touch \(testigo.path)) adiós"
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            p.arguments = ["-lc", "printf '%s' \"\(XttsLocalTTS.escaparParaShell(veneno))\" > /dev/null"]
+            try? p.run(); p.waitUntilExit()
+            chk(!FileManager.default.fileExists(atPath: testigo.path),
+                "ejecutado de verdad en un shell, el texto NO creó el archivo")
+            try? FileManager.default.removeItem(at: testigo)
+
+            print("SHELL \(mal == 0 ? "TODO OK — el texto no puede ejecutar órdenes" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Las cinco cerraduras de la API local: BTODICTA_APITEST=1
         //
         // Todas son pruebas NEGATIVAS: comprueban que algo NO pasa. Una API que
@@ -2192,7 +2238,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // 5) Tope del cuerpo.
             chk(ApiLocal.topeCuerpo <= 1_048_576, "el cuerpo de una petición está acotado (\(ApiLocal.topeCuerpo / 1024) kB)")
 
-            print("API \(mal == 0 ? "TODO OK — las cinco cerraduras cierran" : "FALLA (\(mal))")")
+            // 6) Tope de peticiones por minuto.
+            ApiLocal.olvidarRitmoQA()
+            let tope = ApiLocal.topePorMinuto()
+            var aceptadas = 0
+            for _ in 0..<(tope + 5) where ApiLocal.cabeOtraPeticion() { aceptadas += 1 }
+            chk(aceptadas == tope, "el tope por minuto se respeta (\(aceptadas) de \(tope + 5) intentos)")
+            chk(!ApiLocal.cabeOtraPeticion(), "y la siguiente se rechaza")
+            ApiLocal.olvidarRitmoQA()
+            chk(ApiLocal.cabeOtraPeticion(), "pasado el minuto vuelve a admitir (prueba negativa)")
+
+            print("API \(mal == 0 ? "TODO OK — las seis cerraduras cierran" : "FALLA (\(mal))")")
             exit(mal == 0 ? 0 : 1)
         }
 

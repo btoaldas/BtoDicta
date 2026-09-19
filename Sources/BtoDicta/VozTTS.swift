@@ -542,12 +542,35 @@ enum XttsLocalTTS {
     }
 
     /// Genera con un comando concreto (para probar una voz sin fijarla activa).
+    /// El escapado para shell, aparte y con nombre, para poder probarlo.
+    static func escaparParaShell(_ texto: String) -> String {
+        texto
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "`", with: "\\`")
+            .replacingOccurrences(of: "$", with: "\\$")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
     static func decirCon(cmd plantilla: String, texto: String, completion: @escaping (URL?) -> Void) {
         guard !plantilla.trimmingCharacters(in: .whitespaces).isEmpty else { completion(nil); return }
         let salida = FileManager.default.temporaryDirectory
             .appendingPathComponent("btodicta-xtts-\(abs(texto.hashValue)).mp3")
-        // Sustitución segura: el texto va escapado entre comillas por la plantilla.
-        let escapado = texto.replacingOccurrences(of: "\"", with: "'")
+        // El texto se ESCAPA para ir dentro de comillas dobles de shell.
+        //
+        // Antes solo se cambiaba la comilla doble por una simple, y eso no basta:
+        // dentro de comillas dobles, zsh sigue interpretando `$(...)`, los
+        // acentos graves y la barra invertida. Un texto con `$(algo)` se
+        // EJECUTABA.
+        //
+        // No es un caso rebuscado: esta función dice en voz alta lo que responde
+        // la IA, y la IA redacta a partir de lo que se lee en la pantalla —
+        // correos, páginas, documentos ajenos—. La cadena era pantalla → IA →
+        // voz → shell, y solo hacía falta que alguien escribiera la frase justa
+        // en una web que estuviera abierta.
+        //
+        // Se escapa en este orden: la barra primero (si no, se escaparían las
+        // barras que añaden los demás), y después lo que abre ejecución.
+        let escapado = escaparParaShell(texto)
         let cmd = plantilla
             .replacingOccurrences(of: "{texto}", with: escapado)
             .replacingOccurrences(of: "{salida}", with: salida.path)

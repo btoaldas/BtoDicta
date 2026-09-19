@@ -107,6 +107,7 @@ enum ApiLocal {
         case noExiste = "el archivo no existe"
         case cuerpoGrande = "la petición es demasiado grande"
         case malFormada = "la petición no se entiende"
+        case demasiadas = "demasiadas peticiones seguidas: espera unos segundos"
         case apagada = "la API local está apagada"
     }
 
@@ -135,6 +136,37 @@ enum ApiLocal {
     /// viaja un JSON pequeño; un megabyte es de sobra y evita que nadie llene la
     /// memoria mandando basura.
     static let topeCuerpo = 1_048_576
+
+    // MARK: Cerradura 6 — cuántas peticiones por minuto
+
+    /// Tope de peticiones por minuto.
+    ///
+    /// Sin esto, un consumidor con un bucle mal escrito —o con prisa— vacía el
+    /// saldo de nube en minutos. El aviso de saldo bajo avisa, pero DESPUÉS. No
+    /// es una defensa contra un atacante, que ya tendría el token: es la red
+    /// contra el programa propio que se equivoca, que es lo que pasa de verdad.
+    static func topePorMinuto() -> Int {
+        max(0, (Config.json0("api_local_tope_minuto") as? Int) ?? 30)
+    }
+
+    private static let candadoRitmo = NSLock()
+    private static var marcas: [Date] = []
+
+    /// `true` si esta petición cabe dentro del tope.
+    static func cabeOtraPeticion(ahora: Date = Date()) -> Bool {
+        let tope = topePorMinuto()
+        guard tope > 0 else { return true }   // 0 = sin tope, decisión del usuario
+        candadoRitmo.lock(); defer { candadoRitmo.unlock() }
+        marcas.removeAll { ahora.timeIntervalSince($0) > 60 }
+        guard marcas.count < tope else { return false }
+        marcas.append(ahora)
+        return true
+    }
+
+    /// Solo para las pruebas: olvida lo contado.
+    static func olvidarRitmoQA() {
+        candadoRitmo.lock(); marcas.removeAll(); candadoRitmo.unlock()
+    }
 
     // MARK: Servidor
 
@@ -268,6 +300,10 @@ enum ApiLocal {
 
         guard let json = try? JSONSerialization.jsonObject(with: cuerpo) as? [String: Any] else {
             rechazar(conexion, 400, .malFormada); return
+        }
+
+        guard cabeOtraPeticion() else {
+            rechazar(conexion, 429, .demasiadas); return
         }
 
         switch (metodo, ruta) {
