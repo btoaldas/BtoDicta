@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.65.1
+
+- **Arreglado un agujero de seguridad real**: el texto que pronuncia la voz local
+  podía ejecutar órdenes del sistema. La cadena era pantalla → IA → voz → shell.
+- La puerta local tiene **tope de peticiones**, para que un bucle mal escrito no
+  te vacíe el saldo.
+- Primera **auditoría de seguridad** completa: 9 áreas, 2 hallazgos, 7 correctas.
+
 ### Novedades 0.65.0
 
 - **Otros programas de tu Mac pueden transcribir con BtoDicta.** Le mandan la

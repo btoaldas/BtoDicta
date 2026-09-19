@@ -1016,6 +1016,15 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### Si usas una voz local con comando propio
+
+Desde 0.65.1 el texto que se le pasa a tu comando va **neutralizado**: si contiene
+algo con forma de orden del sistema, se trata como texto y no se ejecuta. Antes no
+era así, y como la voz pronuncia lo que responde la IA —que redacta leyendo tu
+pantalla—, bastaba con que alguien escribiera la frase adecuada en una web abierta.
+
+Tu plantilla sigue funcionando igual. Comprobación: `BTODICTA_SHELLTEST=1`.
+
 ## Que otros programas de tu Mac transcriban con BtoDicta
 
 Desde 0.65.0, otros proyectos tuyos pueden pedirle a BtoDicta que transcriba un

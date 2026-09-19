@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.65.0"
+    static let numero = "0.65.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.65.1", "2026-09-19", [
+            "ARREGLADO UN AGUJERO DE SEGURIDAD REAL. La voz local construye un comando del sistema con el texto dentro para hablar. Ese texto se protegía a medias, y bastaba que contuviera cierta forma de escritura para que el sistema EJECUTARA lo que hubiera ahí. Suena rebuscado hasta que se ve la cadena entera: la bitácora lee lo que hay en tu pantalla —correos, páginas ajenas—, la IA redacta con ello, y la voz lo pronuncia. Alguien solo tenía que escribir la frase adecuada en una web que estuvieras mirando",
+            "Ahora el texto se neutraliza antes de llegar al sistema. La comprobación no se conforma con revisar el código: EJECUTA de verdad un texto preparado para crear un archivo y comprueba que no aparece",
+            "La puerta local para otros programas tiene ahora un tope de peticiones por minuto, ajustable. Sin él, un programa tuyo con un bucle mal escrito podía vaciarte el saldo de las nubes en minutos, y el aviso de saldo bajo llega después",
+            "Primera revisión de seguridad completa de la aplicación: nueve áreas. Las otras siete estaban bien — ninguna clave aparece en el registro, los archivos con credenciales solo los puede leer su dueño, nadie desactiva la verificación de certificados, la actualización comprueba su firma antes de instalarse, y lo que la IA decide se descarta si no está en el catálogo real",
+        ]),
         ("0.65.0", "2026-09-19", [
             "OTROS PROGRAMAS DE TU MAC PUEDEN TRANSCRIBIR CON BtoDicta. Hasta ahora, cualquier proyecto tuyo que necesitara convertir audio en texto tenía que instalar sus propios modelos de varios gigabytes o contratar otro servicio. Ahora te lo pide a ti: le mandas la ruta de un audio y te devuelve el texto, usando los mismos motores, la misma cascada y el mismo vocabulario que tu dictado. También puede pedirte pulir un texto",
             "Se enciende en Configuración → Ajustes, y VIENE CERRADA. Al abrirla aparece un token: trátalo como una contraseña, porque quien lo tenga puede transcribir con tus motores y gastar tu saldo",
