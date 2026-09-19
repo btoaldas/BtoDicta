@@ -275,10 +275,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // La duración sale del tamaño del archivo: no hace falta cargarlo.
         let segundosCancelado = Double(max(0, Recorder.bytes(de: urlCancelado) - 44)) / 32_000.0
         if segundosCancelado >= Config.cancelarConservaDesdeSegundos() {
-            history?.finish(wav: Recorder.datos(de: urlCancelado), finalText: lastPartial)
+            history?.finish(wavEn: urlCancelado, finalText: lastPartial)
             Log.log(.sistema, "dictado cancelado: conservo \(DictationPanel.reloj(segundosCancelado)) en el historial")
         } else {
-            history?.discard()
+            history?.discard(origen: urlCancelado)
         }
         history = nil
         setIcono(.reposo)
@@ -420,6 +420,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         MlxVozServer.detener() // tampoco dejar Qwen/MLX cargado en Metal/RAM
         AgenteCodex.cancelar()
         CapturaMac.cancelar()
+    }
+
+    /// Memoria residente del proceso, en MB. La usan varias pruebas.
+    func rssMBGlobal() -> Double {
+        var info = mach_task_basic_info()
+        var n = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+        let r = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(n)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &n)
+            }
+        }
+        return r == KERN_SUCCESS ? Double(info.resident_size) / 1_048_576 : -1
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -2105,6 +2117,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // El historial ADOPTA el audio en vez de copiarlo: BTODICTA_ADOPTATEST=1
+        //
+        // Era la última copia completa del camino: el grabador escribía el .wav
+        // y el historial recibía los bytes para volver a escribirlo. Ahora se
+        // mueve, que es un renombrado: cuesta lo mismo con diez segundos que con
+        // seis horas, y de paso el audio de trabajo deja de acumularse porque
+        // deja de existir donde estaba.
+        if ProcessInfo.processInfo.environment["BTODICTA_ADOPTATEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("ADOPTA \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+
+            let rec = Recorder()
+            rec.abrirSalidaQA()
+            let h = HistoryWriter()
+            rec.onChunk = { h.append(chunk: $0) }
+            // 30 s de audio: bastante para que la copia se notara, poco para tardar.
+            let trozo = Data(repeating: 7, count: 32_000)
+            for _ in 0..<30 { rec.inyectarQA(trozo) }
+            let origen = rec.stop()
+            chk(origen != nil, "el grabador deja su .wav en disco")
+            let bytesOrigen = Recorder.bytes(de: origen)
+            chk(bytesOrigen > 0, "y tiene contenido (\(bytesOrigen / 1024) kB)")
+
+            let antes = rssMBGlobal()
+            h.finish(wavEn: origen, finalText: "prueba de adopción")
+            let despues = rssMBGlobal()
+            print("ADOPTA memoria al adoptar: \(Int(despues - antes)) MB")
+            chk(despues - antes < 5, "adoptar no pasa el audio por memoria (+\(Int(despues - antes)) MB)")
+
+            if let o = origen {
+                chk(!FileManager.default.fileExists(atPath: o.path),
+                    "el audio de trabajo YA NO está donde estaba: se movió, no se copió")
+            }
+            let destino = h.wavURLQA
+            chk(FileManager.default.fileExists(atPath: destino.path), "el historial tiene su .wav")
+            chk(Recorder.bytes(de: destino) == bytesOrigen,
+                "y pesa exactamente lo mismo que el original (\(Recorder.bytes(de: destino)) B)")
+
+            // Dos dictados en el mismo segundo no pueden compartir archivo.
+            let hA = HistoryWriter(), hB = HistoryWriter()
+            chk(hA.wavURLQA != hB.wavURLQA,
+                "dos dictados en el mismo segundo van a archivos distintos")
+            hA.discard(); hB.discard()
+
+            // Prueba negativa: sin archivo de origen no se inventa nada ni se rompe.
+            let h2 = HistoryWriter()
+            h2.finish(wavEn: nil, finalText: "sin audio")
+            chk(!FileManager.default.fileExists(atPath: h2.wavURLQA.path),
+                "sin archivo de origen no aparece ningún .wav de la nada")
+            h2.discard()
+
+            // Descartar un dictado retira también su audio de trabajo.
+            let rec3 = Recorder()
+            rec3.abrirSalidaQA()
+            rec3.inyectarQA(trozo)
+            let origen3 = rec3.stop()
+            let h3 = HistoryWriter()
+            h3.discard(origen: origen3)
+            if let o3 = origen3 {
+                chk(!FileManager.default.fileExists(atPath: o3.path),
+                    "descartar un dictado retira también su audio de trabajo")
+            }
+
+            try? FileManager.default.removeItem(at: destino)
+            print("ADOPTA \(mal == 0 ? "TODO OK — el historial adopta el archivo, no lo copia" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Que un reinicio no vuelva a mandar el correo: BTODICTA_CORREOHORARIO=1
         if ProcessInfo.processInfo.environment["BTODICTA_CORREOHORARIO"] == "1" {
             let r = ResumenCorreo.pruebaPersistenciaQA()
@@ -5386,7 +5466,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                       activacion: activacionDictado,
                                       continuacionDictadoAsistido: continuacionDictadoAsistido)
                     } else {
-                        historyActual?.finish(wav: Recorder.datos(de: wavURL), finalText: "")
+                        historyActual?.finish(wavEn: wavURL, finalText: "")
                         self?.avisarSiLibre("⚠️ \(etiquetaFallo) — audio guardado")
                     }
                 }
@@ -5398,7 +5478,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.tcppStream = nil
             guard seconds > 0.4 else {
                 tcpp.cancel()
-                historyActual?.discard()
+                historyActual?.discard(origen: wavURL)
                 panel.update("Muy corto — nada que transcribir")
                 panel.hide(after: 1.2)
                 return
@@ -5471,7 +5551,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let idVivo = Providers.cadena().first(where: { LiveNube.soportan[$0.id] != nil })?.id ?? ""
             let nombreVivo = Self.nombreMotor(id: idVivo, respaldo: "Nube")
             guard seconds > 0.4 else {
-                live.disconnect(); historyActual?.discard()
+                live.disconnect(); historyActual?.discard(origen: wavURL)
                 panel.update("Muy corto — nada que transcribir"); panel.hide(after: 1.2)
                 return
             }
@@ -5526,7 +5606,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard seconds > 0.4 else {
                 stream.disconnect()
                 self.stream = nil
-                historyActual?.discard()
+                historyActual?.discard(origen: wavURL)
                 panel.update("Muy corto — nada que transcribir")
                 panel.hide(after: 1.2)
                 return
@@ -5569,7 +5649,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             liveNube?.disconnect()   // un WS nube que nunca confirmó: cerrarlo (no filtrar la sesión)
             liveNube = nil
             guard seconds > 0.4 else {
-                historyActual?.discard()
+                historyActual?.discard(origen: wavURL)
                 panel.update("Muy corto — nada que transcribir")
                 panel.hide(after: 1.2)
                 return
@@ -5586,7 +5666,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                   continuacionDictadoAsistido: continuacionDictadoAsistido)
                 case .failure(let error):
                     Log.log(.ia, "failover agotado: \(error.localizedDescription)")
-                    historyActual?.finish(wav: Recorder.datos(de: wavURL), finalText: "")
+                    historyActual?.finish(wavEn: wavURL, finalText: "")
                     self?.avisarSiLibre("⚠️ Todos los proveedores fallaron — audio guardado")
                 }
             }
@@ -5623,11 +5703,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         // Del tamaño del archivo: para decir la duración no hace falta el audio.
         let segundos = Double(Recorder.bytes(de: wavURL) - 44) / 32000.0
-        // A partir de aquí el dictado YA está transcrito. Guardarlo en el
-        // historial y cotejarlo con el texto sí necesitan los bytes, así que se
-        // leen UNA vez. El ahorro de la spec 001 es el tramo anterior —grabar y
-        // transcribir—, que es donde convivían las copias.
-        let wav = Recorder.datos(de: wavURL)
+        // El audio NO se lee aquí. Guardarlo en el historial es ahora un
+        // movimiento de archivo, y los demás usos —el cotejo con el audio y los
+        // modos— son ramas que la mayoría de dictados no toma. Cada una lo pide
+        // cuando le toca, y este cierre lo lee UNA sola vez aunque lo pidan
+        // varias: un dictado normal ya no copia nada.
+        var _audioEnMemoria: Data?
+        let wavBytes: () -> Data = {
+            if let d = _audioEnMemoria { return d }
+            let d = Recorder.datos(de: wavURL)
+            _audioEnMemoria = d
+            return d
+        }
         UsageLog.record(provider: proveedor, modelo: modelo, seconds: segundos)
 
         let crudo = TextoTranscrito.limpiar(raw)
@@ -5643,7 +5730,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let terms = Array(Set(reglas.map { $0.replacement })).filter { AudioMatch.tieneMuestras($0) }
             let siglas = Set(reglas.filter { $0.sigla == true }.map { $0.replacement })
             if !terms.isEmpty {
-                let (t, cambios) = AudioMatch.corregirConAudio(texto: textoFinal, wav: wav, terminos: terms, siglas: siglas)
+                // Aquí sí hacen falta: el cotejo compara el texto contra el audio.
+                let (t, cambios) = AudioMatch.corregirConAudio(texto: textoFinal, wav: wavBytes(), terminos: terms, siglas: siglas)
                 textoFinal = t
                 cambios.forEach { Log.write("  2b·audio:    \($0)") }
             }
@@ -5660,7 +5748,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // no se pega nada y el audio queda guardado por si acaso.
         let tieneContenido = textoFinal.unicodeScalars.contains { CharacterSet.alphanumerics.contains($0) }
         guard tieneContenido else {
-            history?.finish(wav: wav, finalText: "")
+            history?.finish(wavEn: wavURL, finalText: "")
             avisarSiLibre("(silencio)")
             return
         }
@@ -5710,7 +5798,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         : "No escuché el pedido — vuelve a decir \(inv.frase)", segundos: 2.4)
                     panel.hide(after: 2.6)
                 }
-                history?.finish(wav: wav, finalText: "")
+                history?.finish(wavEn: wavURL, finalText: "")
                 return
             }
             // Un pedido al asistente que nombra un modo-conexión va DIRECTO a
@@ -5730,7 +5818,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     contenido: inv.contenido)
                 if procesarPlanDelAgente(cadena, crudo: crudoFlujo,
                                          textoNormal: inv.contenido,
-                                         modoNormal: modoNormal, wav: wav,
+                                         modoNormal: modoNormal, wav: wavBytes(),
                                          history: history, confianza: 0.97,
                                          contextoAgente: true) { return }
             }
@@ -5778,7 +5866,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if Config.modoPorVoz(), Config.agenteHerramientaCapturas(),
            AgenteNucleo.necesitaAclararAreaCaptura(textoResolver) {
             pedirAreaParaGrabacion(pedido: textoResolver, crudo: crudoFlujo,
-                                   wav: wav, history: history,
+                                   wav: wavBytes(), history: history,
                                    modoNormal: modoNormal,
                                    contextoAgente: contextoAgente)
             return
@@ -5790,7 +5878,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if contextoAgente, Config.agenteDictadoAsistido() {
             if continuacionDictadoAsistido, DictadoAsistido.esCancelacion(textoResolver) {
                 AgenteLog.registrar("dictado_asistido_cancelado", ["texto": textoResolver])
-                history?.finish(wav: wav, finalText: "")
+                history?.finish(wavEn: wavURL, finalText: "")
                 playSound("Basso")
                 setIcono(.reposo)
                 panel.flash("✕ Dictado asistido cancelado", segundos: 1.4)
@@ -5811,11 +5899,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }()
             if let solicitud {
                 if solicitud.contenido.isEmpty {
-                    prepararSiguienteDictadoAsistido(crudo: crudo, wav: wav,
+                    prepararSiguienteDictadoAsistido(crudo: crudo, wav: wavBytes(),
                                                      history: history,
                                                      operacion: solicitud.operacion)
                 } else {
-                    ejecutarDictadoAsistido(solicitud, crudo: crudo, wav: wav,
+                    ejecutarDictadoAsistido(solicitud, crudo: crudo, wav: wavBytes(),
                                              history: history,
                                              fueContinuacion: continuacionDictadoAsistido)
                 }
@@ -5828,7 +5916,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self?.aplicarResultadoModoConContextoMusical(
                     resultado, crudo: crudoFlujo, textoNormal: textoResolver,
                     modoBase: modoBase, modoNormal: modoNormal,
-                    contextoAgente: contextoAgente, wav: wav, history: history)
+                    contextoAgente: contextoAgente, wav: wavBytes(), history: history)
             }
         }
     }

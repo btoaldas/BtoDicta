@@ -50,7 +50,25 @@ final class HistoryWriter {
             .appendingPathComponent(part("MM"))
             .appendingPathComponent(part("dd"))
         try? FileManager.default.createDirectory(at: dayDir, withIntermediateDirectories: true)
-        base = dayDir.appendingPathComponent(part("HH-mm-ss"))
+        // El nombre es la hora al segundo, así que DOS dictados en el mismo
+        // segundo compartirían archivo y el segundo pisaría al primero. Pasa de
+        // verdad: al terminar un dictado y arrancar otro enseguida, y en las
+        // pruebas automáticas, que van sin pausa. Antes se escribían los bytes y
+        // la colisión solo perdía el audio; ahora el historial ADOPTA el archivo
+        // moviéndolo, así que perdería también el del dictado anterior.
+        //
+        // Se busca el primer nombre libre con sufijo. El del segundo limpio no
+        // lleva ninguno, para no cambiar lo que ya existe.
+        var candidata = dayDir.appendingPathComponent(part("HH-mm-ss"))
+        var sufijo = 2
+        let fm = FileManager.default
+        while fm.fileExists(atPath: candidata.appendingPathExtension("pcm").path)
+            || fm.fileExists(atPath: candidata.appendingPathExtension("wav").path) {
+            candidata = dayDir.appendingPathComponent("\(part("HH-mm-ss"))-\(sufijo)")
+            sufijo += 1
+            if sufijo > 99 { break }   // tope cuerdo: nunca un bucle infinito
+        }
+        base = candidata
         FileManager.default.createFile(atPath: pcmURL.path, contents: nil)
         pcmHandle = try? FileHandle(forWritingTo: pcmURL)
     }
@@ -94,6 +112,43 @@ final class HistoryWriter {
 
     /// Cierre normal: WAV con cabecera + texto final; borra el crudo temporal
     /// SOLO si el .wav quedó bien escrito (disco lleno no debe perder el audio).
+    /// Dónde queda el `.wav` de este dictado. Solo para las pruebas.
+    var wavURLQA: URL { wavURL }
+
+    /// Cierra el dictado adoptando el `.wav` que el grabador ya escribió.
+    ///
+    /// Es el camino bueno: el archivo existe desde que se empezó a hablar, así
+    /// que MOVERLO cuesta lo mismo con un dictado de diez segundos que con uno
+    /// de seis horas —es un renombrado— y no pasa un solo byte por memoria.
+    /// Antes se recibían los bytes y se volvían a escribir: la última copia
+    /// completa que quedaba en el camino.
+    ///
+    /// Mover, además, es lo que impide que el audio de trabajo se acumule: deja
+    /// de existir donde estaba en cuanto pasa al historial.
+    func finish(wavEn origen: URL?, finalText: String) {
+        try? pcmHandle?.close()
+        pcmHandle = nil
+        if !finalText.isEmpty {
+            try? finalText.write(to: txtURL, atomically: true, encoding: .utf8)
+        }
+        guard let origen, FileManager.default.fileExists(atPath: origen.path) else {
+            // Sin archivo de origen no hay nada que adoptar: se conserva el .pcm
+            // crudo, que es recuperable, en vez de perder el dictado.
+            Log.log(.sistema, "historial: el dictado no traía archivo — conservo el .pcm crudo")
+            return
+        }
+        do {
+            try? FileManager.default.removeItem(at: wavURL)
+            try FileManager.default.moveItem(at: origen, to: wavURL)
+            try? FileManager.default.removeItem(at: pcmURL)
+            ContinuoAudio.adoptar(wav: wavURL, instante: Date())
+        } catch {
+            Log.log(.sistema, "historial: no pude adoptar el .wav (\(error.localizedDescription)) — conservo el .pcm crudo")
+        }
+    }
+
+    /// Misma cosa con los bytes en memoria. Queda para quien de verdad los tiene
+    /// así: el rescate de dictados huérfanos y las pruebas.
     func finish(wav: Data, finalText: String) {
         try? pcmHandle?.close()
         pcmHandle = nil
@@ -114,11 +169,16 @@ final class HistoryWriter {
     }
 
     /// Cierre sin dictado útil: borra los restos vacíos.
-    func discard() {
+    ///
+    /// `origen` es el `.wav` de trabajo del grabador: se retira también, porque
+    /// si el dictado no valía, su audio de trabajo tampoco. Solo se toca lo que
+    /// está en la carpeta del grabador y lleva su prefijo.
+    func discard(origen: URL? = nil) {
         try? pcmHandle?.close()
         pcmHandle = nil
         try? FileManager.default.removeItem(at: pcmURL)
         try? FileManager.default.removeItem(at: txtURL)
+        Recorder.descartar(origen)
     }
 
     /// Rescata dictados de sesiones que murieron a medias: cada .pcm huérfano
