@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.67.1"
+    static let numero = "0.68.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.68.0", "2026-09-19", [
+            "LAS TAREAS AUTOMÁTICAS DEJAN DE REPETIRSE AL REABRIR LA APLICACIÓN. Los resúmenes del día y las tandas de transcripción apuntaban en la memoria que ya se habían hecho; al cerrar la aplicación se les olvidaba, y al volver a abrirla después de su hora se hacían otra vez. En los últimos días eso produjo hasta tres resúmenes de la misma jornada, cada uno con su llamada a la IA",
+            "Y el fallo contrario en las que van por intervalo: la cuenta empezaba de cero en cada apertura, así que una rutina de «cada 3 horas» podía no llegar nunca si cerrabas la aplicación antes. Ahora la cuenta sigue donde se quedó",
+            "Es el mismo descuido que ya se corrigió en los correos y en los avisos de saldo, y ahora se ha buscado en TODO el código. Hay además una comprobación automática que lo vigila en cada versión, para que no vuelva por quinta vez",
+        ]),
         ("0.67.1", "2026-09-19", [
             "EL AVISO DE SALDO BAJO DEJA DE REPETIRSE. Estaba pensado para avisarte una vez al día de cada proveedor, pero apuntaba en la memoria a quién ya había avisado: al cerrar la aplicación se le olvidaba, y al volver a abrirla te avisaba otra vez de lo mismo. Un día con varios reinicios llegó a 68 avisos, todos de dos proveedores que ya sabías agotados",
             "Y ahora puedes CALLAR uno concreto: si decidiste no renovar un proveedor, no tiene sentido que te lo recuerde cada día. Los demás siguen avisando. El ruido no solo molesta, entierra el aviso que sí importaba",

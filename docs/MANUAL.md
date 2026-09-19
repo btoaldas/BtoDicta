@@ -1032,6 +1032,16 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### Resúmenes o tandas repetidos el mismo día
+
+Arreglado en 0.68.0. Las tareas automáticas apuntaban en memoria que ya se habían
+hecho, y al cerrar la aplicación se les olvidaba: si la reabrías después de su
+hora, se hacían otra vez. Se vieron hasta tres resúmenes de la misma jornada.
+
+Lo apuntado vive ahora en `~/.btodicta/memoria-tareas.json`. Si alguna vez
+quieres forzar que una tarea vuelva a ejecutarse hoy, basta con borrar su línea de
+ese archivo.
+
 ### Callar el aviso de un proveedor que ya sabes agotado
 
 Si decidiste no renovar uno, no tiene sentido que te lo recuerde cada día. En

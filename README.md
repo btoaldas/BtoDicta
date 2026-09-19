@@ -34,6 +34,15 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.68.0
+
+- **Las tareas automáticas dejan de repetirse al reabrir la app**: hasta tres
+  resúmenes del mismo día, cada uno con su llamada a la IA.
+- Y el fallo contrario en las de intervalo: una rutina de «cada 3 h» podía no
+  llegar nunca si cerrabas antes.
+- El patrón se buscó en **todo el código** y lo vigila una comprobación
+  automática. El QA pasa de 16 a 17 pruebas.
+
 ### Novedades 0.67.1
 
 - **El aviso de saldo bajo deja de repetirse** en cada arranque: 68 avisos en un
