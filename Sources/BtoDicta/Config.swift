@@ -878,8 +878,15 @@ struct Config {
     /// español sesga mejor que una lista pelada. Vacío si no hay términos.
     /// Tope 80 términos: el initial prompt de Whisper admite ~224 tokens y
     /// trunca por el INICIO, así que pasarse silenciosamente pierde términos.
+    /// Términos que se añaden al glosario SOLO durante una petición de la API
+    /// local. No se guardan: el glosario es del usuario y una petición externa
+    /// no tiene por qué cambiárselo para siempre.
+    nonisolated(unsafe) static var glosarioExtraTemporal: [String] = []
+
     static func glosarioPrompt() -> String {
-        let terms = keyterms().prefix(80)
+        // Los términos de una petición de la API local van PRIMERO: son los que
+        // esa petición concreta necesita que se reconozcan bien.
+        let terms = Array(glosarioExtraTemporal + keyterms()).prefix(80)
         guard !terms.isEmpty else { return "" }
         return "Glosario: \(terms.joined(separator: ", "))."
     }

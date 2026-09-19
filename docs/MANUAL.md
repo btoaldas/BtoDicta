@@ -1016,6 +1016,37 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+## Que otros programas de tu Mac transcriban con BtoDicta
+
+Desde 0.65.0, otros proyectos tuyos pueden pedirle a BtoDicta que transcriba un
+audio o pula un texto, en vez de instalar sus propios modelos de varios gigabytes.
+
+Se enciende en *Configuración → Ajustes → Dejar que otros programas de este Mac
+transcriban*. **Viene cerrada.** Al abrirla aparece un token: trátalo como una
+contraseña, porque quien lo tenga puede transcribir con tus motores y gastar tu
+saldo.
+
+```bash
+curl 127.0.0.1:8787/estado
+```
+
+```bash
+curl -X POST 127.0.0.1:8787/transcribir   -H "Authorization: Bearer TU_TOKEN"   -d '{"archivo":"/Users/tu/Downloads/audio.wav","motor":"automatico"}'
+```
+
+`motor` puede ser `automatico`, `local` (no sale nada de tu equipo) o `nube`.
+Puedes añadir `"vocabulario":["UEA","EVA"]` para que reconozca bien tus siglas;
+eso vale solo para esa petición y no toca tu glosario.
+
+Para pulir un texto: `POST /pulir` con `{"texto":"…"}`.
+
+**Lo que NO puede hacer**, por diseño:
+
+- Atender desde otro equipo: escucha solo en `127.0.0.1`.
+- Leer cualquier archivo: solo audios de Descargas, Documentos y la carpeta
+  temporal del sistema.
+- Entrar sin token, ni con uno antiguo si lo cambias desde Ajustes.
+
 ### Entender por qué se apartó un proveedor
 
 Cuando un motor falla, BtoDicta lo aparta un rato y sigue con el siguiente. Desde

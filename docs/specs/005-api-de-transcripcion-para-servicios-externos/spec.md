@@ -1,12 +1,12 @@
 # Spec 005 — API de transcripción para servicios externos
 
-- Estado: Borrador
+- Estado: Implementada (0.65.0)
 - Tipo: funcionalidad
 - Nivel: X
 - Fecha: 2026-09-18
 - Modifica: ninguna
-- Aprobada por: pendiente — puerta 1 abierta parcialmente el 2026-09-18 (ver §9)
-- Rama: [PENDIENTE DE DECISIÓN: toca el camino del dictado, ver §7]
+- Aprobada por: Alberto — 2026-09-19 — «continúa con todo bajo goal y loop… ya no necesito que vuelvas a pararte hasta que termines absolutamente todo»
+- Rama: `main` (razón en §9)
 
 Origen: `docs/SOLICITUD-API-TRANSCRIPCION-EXTERNA.md` (2026-09-15), reconfirmado
 por Alberto el 2026-09-18: «que alguien que quiera ocupar BtoDicta pueda hacerlo
@@ -193,8 +193,8 @@ Un RNF sin cifra es un deseo.
   Un puerto local sin token es alcanzable por cualquier proceso del usuario, y en
   esta Mac hay certificados de firma y credenciales de 23 proveedores. De ahí
   RF-04 y RF-05, ambos P1 y con prueba negativa obligatoria por nivel X.
-- BtoDicta cerrada cuando llega la petición: ¿se rechaza, o el consumidor debe
-  poder levantarla? [PENDIENTE DE DECISIÓN]
+- **BtoDicta cerrada cuando llega la petición: se rechaza**, con un mensaje que
+  diga exactamente eso y cómo arreglarlo. Decidido en §9.
 - Dos peticiones a la vez mientras el usuario dicta: ver RNF-02.
 - Audio de seis horas por el contrato: aplica el troceo que ya existe.
 - El motor local **omitió una frase entera** en un audio real de dos minutos que
@@ -251,8 +251,20 @@ P: ¿el comando `transcribir` se mueve a este repositorio? → R: no, se queda
 fuera hasta que exista la API; entonces se reescribe para consumirla (decisión de
 Alberto registrada el 2026-09-15 en la solicitud).
 
-Siguen abiertos para cerrar la puerta 1: qué hacer cuando la aplicación está
-cerrada (§6) y en qué rama se trabaja.
+P: ¿qué pasa si la aplicación está cerrada cuando llega una petición? → R: **se
+rechaza con un mensaje claro**, no se levanta sola. Decidido por criterio técnico
+bajo la autonomía dada el 2026-09-19, y se anota para que conste:
+
+Levantar una aplicación de interfaz desde una petición HTTP es intrusivo —
+aparecería en pantalla mientras su dueño está en otra cosa—, tarda lo que tarde
+el arranque, y con el motor local aún frío la primera transcripción llegaría
+tardísimo. El consumidor sabe mejor que nosotros si quiere esperar: se le dice
+que no está en marcha y decide. Si algún día hace falta un servicio que viva sin
+la aplicación, eso es otra spec, no un atajo dentro de esta.
+
+P: ¿en qué rama? → R: **`main`**. La misma razón que en la spec 001: cada pieza es
+un añadido independiente que no deja la aplicación inservible entre commits, y
+Alberto pidió en su día no mantener dos ramas a la vez.
 
 ## 8. Datos medidos que sirven al plan
 

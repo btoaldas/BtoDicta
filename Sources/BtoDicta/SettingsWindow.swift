@@ -77,6 +77,8 @@ final class SettingsModel: ObservableObject {
     @Published var cancelarConserva: Double { didSet { Config.set("cancelar_conserva_desde_s", to: cancelarConserva) } }
     @Published var dictadosDias: Double { didSet { Config.set("dictados_conservar_dias", to: Int(dictadosDias)) } }
     @Published var registroTexto: Bool { didSet { Config.set("registro_incluye_texto", to: registroTexto) } }
+    @Published var apiActiva: Bool { didSet { Config.set("api_local_activa", to: apiActiva); ApiLocal.reconfigurar() } }
+    @Published var apiToken: String = ApiLocal.token()
     @Published var pausarMultimedia: Bool { didSet { Config.set("atenuar_multimedia", to: pausarMultimedia) } }
     @Published var bajarVolumen: Bool { didSet { Config.set("silenciar_ademas", to: bajarVolumen) } }
     @Published var postProceso: Bool { didSet { Config.set("post_proceso", to: postProceso) } }
@@ -205,6 +207,7 @@ final class SettingsModel: ObservableObject {
         cancelarConserva = Config.cancelarConservaDesdeSegundos()
         dictadosDias = Double(Config.dictadosConservarDias())
         registroTexto = Config.registroIncluyeTexto()
+        apiActiva = ApiLocal.activa()
         pausarMultimedia = Config.duckMedia()
         bajarVolumen = Config.muteToo()
         postProceso = Config.postProcess()
@@ -708,6 +711,30 @@ struct SettingsView: View {
                 Text("Mientras dictas, el audio se escribe a disco en vez de acumularse en memoria: así una grabación de horas no hace crecer la aplicación. Ese archivo de trabajo se barre pasados estos días. NO es el del historial, que se guarda aparte y no se toca nunca. Ronda los 115 MB por hora dictada; con 0 no se barre nada.")
                     .font(.caption).foregroundStyle(.secondary)
 
+                Divider().padding(.vertical, 6)
+                Text("Dejar que otros programas de este Mac transcriban").font(.headline)
+                Toggle("Abrir la puerta local", isOn: $m.apiActiva)
+                Text("Otros proyectos tuyos pueden pedirle a BtoDicta que transcriba un audio o pula un texto, en vez de instalar sus propios modelos. Escucha SOLO en este equipo (127.0.0.1) y solo atiende a quien traiga el token de abajo. Viene cerrada.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if m.apiActiva {
+                    HStack {
+                        Text("Token").font(.caption)
+                        TextField("", text: .constant(m.apiToken))
+                            .textFieldStyle(.roundedBorder).font(.system(.caption, design: .monospaced))
+                            .disabled(true)
+                        Button("Copiar") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(m.apiToken, forType: .string)
+                        }
+                        Button("Cambiar") { m.apiToken = ApiLocal.regenerarToken() }
+                    }
+                    Text("Trátalo como una contraseña: quien lo tenga puede transcribir con tus motores y gastar tu saldo. Si lo cambias, los programas que lo usaran dejarán de entrar hasta que les des el nuevo. Prueba: curl 127.0.0.1:\(ApiLocal.puerto())/estado")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    Text("Solo puede leer audios de las carpetas de Descargas, Documentos y la temporal del sistema; nada más del disco.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+
+                Divider().padding(.vertical, 6)
                 Toggle("Guardar el texto dictado en el registro", isOn: $m.registroTexto)
                 Text("El registro es local, rota cada semana y no sale de tu equipo; a cambio es lo único que permite reconstruir después qué dictaste y qué devolvió cada motor —así se ve, por ejemplo, que un pulido te recortó el texto—. Apágalo si compartes pantalla a menudo o dictas datos de terceros: las líneas siguen, con la medida en vez del contenido.")
                     .font(.caption).foregroundStyle(.secondary)

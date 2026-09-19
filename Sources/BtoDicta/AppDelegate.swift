@@ -414,6 +414,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         iconoTimer?.invalidate(); iconoVigilante?.invalidate()
         purgaTimer?.invalidate()
         ocupacionTimer?.invalidate()
+        ApiLocal.detener()
         activacionVozTimer?.invalidate()
         if let o = activacionVozObserver { NotificationCenter.default.removeObserver(o) }
         ActivacionVoz.shared.apagar()
@@ -443,6 +444,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // inesperado puede dejarlos, y son del tamaño del dictado que se estaba
         // enviando. Solo borra lo que crea esa función, en su propia carpeta.
         CuerpoMultipart.barrerHuerfanos()
+        // La API local, si está encendida. Apagada de fábrica.
+        ApiLocal.arrancar()
         // Audios de trabajo de dictados viejos, según el ajuste (0 = nunca).
         Recorder.barrerDictadosViejos()
 
@@ -2121,6 +2124,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // Las cinco cerraduras de la API local: BTODICTA_APITEST=1
+        //
+        // Todas son pruebas NEGATIVAS: comprueban que algo NO pasa. Una API que
+        // responde bien a lo correcto no prueba nada; lo que hay que demostrar
+        // es que rechaza lo que debe rechazar.
+        if ProcessInfo.processInfo.environment["BTODICTA_APITEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("API \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            let fm = FileManager.default
+
+            // 1) Apagada de fábrica.
+            let guardado = Config.json0("api_local_activa") as? Bool
+            Config.set("api_local_activa", to: nil as Bool?)
+            chk(ApiLocal.activa() == false, "viene APAGADA de fábrica")
+            if let g = guardado { Config.set("api_local_activa", to: g) }
+
+            // 2) El token: permisos, longitud y comparación.
+            let t1 = ApiLocal.token()
+            chk(t1.count >= 40, "el token tiene cuerpo suficiente (\(t1.count) caracteres)")
+            let permisos = (try? fm.attributesOfItem(atPath: ApiLocal.archivoToken.path)[.posixPermissions] as? Int) ?? nil
+            chk(permisos == 0o600, "el archivo del token es 0600 — solo su dueño (\(String(permisos ?? 0, radix: 8)))")
+            chk(ApiLocal.tokenValido(t1), "el token bueno vale")
+            chk(!ApiLocal.tokenValido(""), "una cadena vacía NO vale")
+            chk(!ApiLocal.tokenValido(String(t1.dropLast()) + "x"), "uno que cambia el último carácter NO vale")
+            chk(!ApiLocal.tokenValido("x" + String(t1.dropFirst())), "ni uno que cambia el primero")
+            let t2 = ApiLocal.regenerarToken()
+            chk(t1 != t2, "regenerar da uno distinto")
+            chk(!ApiLocal.tokenValido(t1), "y el anterior deja de valer")
+
+            // 3) Rutas: lo de dentro entra, lo de fuera no, y el recorrido de
+            //    directorios tampoco — que es el que se cuela si se compara el
+            //    texto sin resolver.
+            let dentro = fm.temporaryDirectory.appendingPathComponent("api-qa-\(UUID().uuidString).wav")
+            try? Data(repeating: 1, count: 100).write(to: dentro)
+            if case .success = ApiLocal.rutaPermitida(dentro.path) { chk(true, "un archivo en carpeta permitida se acepta") }
+            else { chk(false, "un archivo en carpeta permitida se acepta") }
+
+            if case .failure(let r) = ApiLocal.rutaPermitida("/etc/passwd") {
+                chk(r == .rutaFuera, "una ruta de sistema se rechaza (\(r.rawValue))")
+            } else { chk(false, "una ruta de sistema se rechaza") }
+
+            let trampa = fm.temporaryDirectory.path + "/../../../etc/passwd"
+            if case .failure(let r) = ApiLocal.rutaPermitida(trampa) {
+                chk(r == .rutaFuera, "un recorrido de directorios se rechaza aunque empiece en carpeta permitida")
+            } else { chk(false, "un recorrido de directorios se rechaza") }
+
+            if case .failure(let r) = ApiLocal.rutaPermitida(fm.temporaryDirectory.appendingPathComponent("no-existe.wav").path) {
+                chk(r == .noExiste, "un archivo que no existe se distingue de uno prohibido")
+            } else { chk(false, "un archivo que no existe se distingue") }
+
+            // Y el vecino de al lado: /tmpXXX no debe colar como /tmp.
+            let hermana = fm.temporaryDirectory.deletingLastPathComponent()
+                .appendingPathComponent(fm.temporaryDirectory.lastPathComponent + "-ajena")
+            try? fm.createDirectory(at: hermana, withIntermediateDirectories: true)
+            let enHermana = hermana.appendingPathComponent("x.wav")
+            try? Data(repeating: 1, count: 10).write(to: enHermana)
+            if case .failure = ApiLocal.rutaPermitida(enHermana.path) {
+                chk(true, "una carpeta con el mismo prefijo de nombre NO cuela")
+            } else { chk(false, "una carpeta con el mismo prefijo de nombre NO cuela") }
+            try? fm.removeItem(at: hermana)
+            try? fm.removeItem(at: dentro)
+
+            // 4) Escucha solo en loopback.
+            chk(ApiLocal.host == "127.0.0.1", "solo escucha en loopback, nunca en 0.0.0.0")
+
+            // 5) Tope del cuerpo.
+            chk(ApiLocal.topeCuerpo <= 1_048_576, "el cuerpo de una petición está acotado (\(ApiLocal.topeCuerpo / 1024) kB)")
+
+            print("API \(mal == 0 ? "TODO OK — las cinco cerraduras cierran" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // NO HAY PRUEBA AUTOMÁTICA DE LA PURGA, Y ES A PROPÓSITO.
         //
         // Se intentó, y salió cara: la purga trabaja sobre `ContinuoIndice.shared`,
