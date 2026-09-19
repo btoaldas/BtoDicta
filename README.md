@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.64.2
+
+- Los resúmenes del día ya no salen cortos por generarse con el día a medio
+  transcribir, ni congelan la ventana mientras se preparan.
+- Limpieza de trocitos de audio que la purga nunca alcanzaba.
+- El trozo que se está grabando ya no entra al índice a medio escribir.
+- Arrastrar un deslizador ya no reinicia el planificador en cada paso.
+
 ### Novedades 0.64.1
 
 - **Se acabaron los archivos huérfanos al cerrar.** Medido: de 2–4 por arranque a

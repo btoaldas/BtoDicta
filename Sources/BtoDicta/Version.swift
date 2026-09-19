@@ -8,11 +8,18 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.64.1"
+    static let numero = "0.64.2"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.64.2", "2026-09-19", [
+            "Los resúmenes del día ya no se quedan cortos sin explicación. Si una rutina se disparaba mientras la bitácora estaba transcribiendo, generaba su documento igual, con el día a medio procesar. Ahora espera unos minutos y lo hace con el material completo",
+            "Y ya no congelan la aplicación mientras se preparan: armar el material de un día entero —que puede pasar de doscientos mil caracteres— se hacía en el mismo hilo que dibuja la ventana",
+            "Limpieza de restos que nadie alcanzaba: los trocitos de audio de menos de medio segundo no se pueden transcribir, así que no entraban al índice; y como la limpieza solo borra lo indexado, se quedaban en disco para siempre",
+            "El trozo que se está grabando en este momento ya no entra al índice a medio escribir, con una duración que todavía no es la suya",
+            "Arrastrar un deslizador de los ajustes de la bitácora reiniciaba el planificador en cada paso del arrastre. Ahora espera a que sueltes",
+        ]),
         ("0.64.1", "2026-09-19", [
             "SE ACABARON LOS ARCHIVOS HUÉRFANOS AL CERRAR. Al salir, la bitácora encolaba el cierre del trozo que estaba grabando y volvía al instante, así que el proceso moría antes de que llegara a cerrarlo: uno huérfano por cada cierre, treinta y ocho en dos semanas. El rescate del arranque los recuperaba, pero recuperar es peor que no romper. Medido después: cero, en dos ciclos completos de cerrar y abrir",
             "EL AUDIO DEL SISTEMA VUELVE SOLO. Un error del flujo lo dejaba muerto hasta que alguien tocara los ajustes, y nada te avisaba de que había dejado de grabar. Lo que lo tumba suele ser pasajero —cambiar de salida de audio, una pantalla que se desconecta—, así que ahora reintenta con espera creciente hasta cinco veces",
