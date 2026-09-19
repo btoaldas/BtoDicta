@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.70.0"
+    static let numero = "0.71.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.71.0", "2026-09-19", [
+            "AHORA SE PUEDE PEDIR UN MOTOR CONCRETO por la API local, por su nombre y sin cascada detrás. Sirve para comparar motores de verdad: con respaldo, un motor que falla queda indistinguible de uno que acierta, porque contesta otro en su lugar. Si el nombre no existe, lo dice y lista los activos en vez de callar y usar otro",
+            "Con eso se midieron los 20 motores con el mismo audio y la misma referencia. Cuatro transcriben sin un solo error; el que la cascada usa primero comete 1,86 %",
+        ]),
         ("0.70.0", "2026-09-19", [
             "LOS MOTORES LOCALES YA NO SE RINDEN CON UN DICTADO LARGO. Medido: una hora de audio hacía que Voxtral pidiera 64 GB de memoria, fallara en dos segundos y devolviera vacío. Como no contestaba «demasiado grande» sino nada, la aplicación creía que el audio estaba en silencio y no lo troceaba: se saltaba tu motor preferido y usaba otro. Ahora comprueba si el audio tiene voz; si la tiene, el vacío es del motor y se parte y reintenta. La misma hora ahora sale completa por Voxtral, con MENOS de la mitad de errores que el motor al que caía",
             "Y el caso hermano, que era peor porque no fallaba: un motor que transcribe los primeros minutos y devuelve eso como si fuera todo. La llamada salía «bien» y nadie echaba en falta lo que faltaba. Ahora, si el texto es demasiado poco para la cantidad de voz que hay en el audio, se reintenta partido",

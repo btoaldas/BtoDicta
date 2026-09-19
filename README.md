@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.71.0
+
+- **Motor concreto por la API**: `{"motor": "mistral"}` en vez de solo
+  local/nube/automatico, sin cascada detrás — necesario para comparar motores.
+- `scripts/comparar-motores.py` mide todos con el mismo audio y referencia.
+
 ### Novedades 0.70.0
 
 - **Los motores locales ya no se rinden con un dictado largo**: una hora hacía

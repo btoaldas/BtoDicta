@@ -357,7 +357,23 @@ enum ApiLocal {
         switch motor {
         case "local": cadena = Providers.cadena().filter { $0.tipo == "local" }
         case "nube":  cadena = Providers.cadena().filter { $0.tipo != "local" }
-        default:      cadena = Providers.cadena()
+        case "automatico": cadena = Providers.cadena()
+        default:
+            // Un motor CONCRETO por su identificador, y él solo: sin cascada
+            // detrás. Comparar motores exige que la respuesta venga de quien se
+            // pidió — con respaldo, un motor que falla queda indistinguible de
+            // uno que acierta, porque contesta otro en su lugar.
+            //
+            // Vale también para quien quiera fijar un motor a propósito. Si el
+            // identificador no existe, se dice en vez de caer en la cascada
+            // callando: elegir mal un motor y que conteste otro es el tipo de
+            // silencio que cuesta una tarde de diagnóstico.
+            cadena = Providers.cadena().filter { $0.id == motor }
+            if cadena.isEmpty {
+                let ids = Providers.cadena().map { $0.id }.sorted().joined(separator: ", ")
+                responder(conexion, 400, ["error": "no hay ningún motor activo con el identificador «\(motor)». Activos: \(ids)"])
+                return
+            }
         }
         guard !cadena.isEmpty else {
             responder(conexion, 503, ["error": "no hay ningún motor \(motor) configurado"]); return
