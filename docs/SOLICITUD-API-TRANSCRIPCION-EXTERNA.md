@@ -2,7 +2,8 @@
 
 **Fecha:** 2026-09-15
 **Pedido por:** Alberto
-**Estado:** propuesta, sin implementar
+**Estado:** IMPLEMENTADO en 0.65.0. Este documento se conserva como el origen
+citado por la spec 005; lo vigente está en `docs/specs/005-api-de-transcripcion-para-servicios-externos/`.
 
 ## Qué se pide
 
