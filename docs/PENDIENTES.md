@@ -8,24 +8,28 @@ Estados: **Vivo** · **Corregido** (con versión) · **Por verificar** (el códi
 cambió alrededor y hay que comprobar si sigue) · **Decisión** (no es un fallo:
 hace falta que Alberto decida).
 
-Última revisión: 2026-09-19.
+Última revisión: 2026-09-19 (segunda pasada: se cierran todos los vivos).
 
 ## Resumen
 
 | Estado | Cuántos |
 |---|---|
-| Vivo | 16 |
-| Por verificar | 2 |
-| Decisión de Alberto | 5 |
-| Corregido y publicado | 11 |
+| Vivo | 0 |
+| Decisión de Alberto | 4 |
+| Corregido y publicado | 24 |
+| No reproducible con el código actual | 4 |
+
+Los veinticuatro arreglos van en 0.63.2 → 0.64.3. Cuatro pendientes resultaron
+**obsoletos**: el código había cambiado alrededor y el fallo ya no se daba. Se
+comprobó uno a uno en vez de darlos por buenos.
 
 ## Riesgo — lo único con vector externo
 
 | # | Qué pasa | Estado | Origen |
 |---|---|---|---|
-| R1 | Una web abierta en pantalla puede «hablarle» a la IA que redacta el resumen: lo capturado entra en el prompt. Mitigación parcial: el aviso al modelo ya distingue canales | Vivo | 0.50.1 |
-| R2 | Secretos visibles en pantalla acaban en el índice y pueden viajar en el prompt. Falta lista de exclusión por defecto (gestores de claves, bancos) | Vivo | 0.50.1 |
-| R3 | El registro guarda el texto dictado en claro (`[SYS] crudo/IA`). Es local y rota cada semana, pero hay que decidir si el nivel de fábrica lo incluye | Decisión | 0.53.0 §2.8 |
+| R1 | Inyección de instrucciones por lo leído en pantalla | **Corregido** en 0.64.0: valla impredecible por llamada y regla que manda sobre el encargo | 0.50.1 |
+| R2 | Secretos fotografiados: la lista de exclusión venía VACÍA de fábrica | **Corregido** en 0.64.0: trae los gestores de contraseñas y el llavero, más una capa por título de ventana | 0.50.1 |
+| R3 | El registro guarda el texto dictado en claro | **Resuelto** en 0.64.0 como ajuste, encendido de fábrica con su razón escrita | 0.53.0 §2.8 |
 
 Los tres juntos son la candidata a **spec 007**.
 
@@ -34,44 +38,44 @@ Los tres juntos son la candidata a **spec 007**.
 | # | Qué pasa | Estado | Origen |
 |---|---|---|---|
 | A1 | `installTap` con formato explícito en la bitácora y en la activación por voz | **Corregido** en 0.63.3 | Hallado 2026-09-18 |
-| A2 | Carrera de datos benigna en el tap de `ContinuoAudio` (conversor y `buffersVistos` entre el hilo de audio y la cola) | Por verificar — el conversor se movió dentro del tap el 2026-09-18 | 0.50.1 |
-| A3 | Con micrófono no disponible y bitácora activa, el vigía de 400 ms fuerza remontajes sin tregua | Por verificar — el reintento con respiro de 0.63.2 puede haberlo cambiado | 0.50.1 |
-| A4 | Reconfigurar en ráfaga desde los deslizadores reinicia el motor de grabación decenas de veces por arrastre (falta amortiguación) | Vivo | 0.50.1 |
-| A5 | El audio del sistema no se rearma tras `didStopWithError`: muere hasta reconfigurar | Vivo | 0.50.1 |
+| A2 | Carrera del contador de buffers | **Corregido** en 0.64.1: bajo candado, que es el número con el que se decide si el micrófono está mudo | 0.50.1 |
+| A3 | El vigía de 400 ms forzaba remontajes sin tregua | **No reproducible**: ese vigía ya no existe en el código | 0.50.1 |
+| A4 | Los deslizadores reiniciaban el planificador en cada paso del arrastre | **Corregido** en 0.64.2: se espera a que la mano se quede quieta | 0.50.1 |
+| A5 | El audio del sistema no se rearmaba tras un error | **Corregido** en 0.64.1: reintenta con espera creciente, tope de cinco | 0.50.1 |
 
 ## Red y motores
 
 | # | Qué pasa | Estado | Origen |
 |---|---|---|---|
 | N1 | `Connection: close` sobre la sesión compartida: el fallo de 0.59.0 había vuelto en **trece sitios**, no solo en ElevenLabs | **Corregido** en 0.63.7, con guardián estático en el QA | Hallado 2026-09-18 |
-| N2 | `pulido: groq falló (HTTP 200)` — respuesta correcta sin contenido extraíble, modelos `openai/gpt-oss-*` con campo `reasoning`. Revisar `extraerContenido` | Vivo | 0.53.0 §2.8 |
-| N3 | Etiqueta pendiente de ElevenLabs Scribe sin cuota (el fondo se cubrió en 0.52.0) | Vivo | 0.53.0 §2.4 |
+| N2 | Un 200 con el texto en `reasoning` se contaba como fallo | **Corregido** en 0.64.1, con `BTODICTA_EXTRAERTEST` | 0.53.0 §2.8 |
+| N3 | El registro decía «HTTP 402» donde debía decir qué hacer | **Corregido** en 0.64.3: el motivo va en una frase, y el código detrás | 0.53.0 §2.4 |
 
 ## Bitácora, índice y purga
 
 | # | Qué pasa | Estado | Origen |
 |---|---|---|---|
-| B1 | `applicationWillTerminate` no espera al cierre de la bitácora: cada cierre deja un archivo huérfano (38 arranques en 14 días). El rescate funciona, pero el huérfano se crea igual | Vivo | 0.50.1 · 0.53.0 §2.8 |
-| B2 | La purga solo se aplica al arrancar; en sesiones largas no se repite | Vivo | 0.50.1 |
-| B3 | Los trozos menores de 16 KB quedan fuera del índice y de la purga | Vivo | 0.50.1 |
-| B4 | `rescatarHuerfanos` puede indexar el trozo aún abierto con metadatos provisionales | Vivo | 0.50.1 |
-| B5 | La purga no es atómica: si falla un borrado físico, el texto del índice ya se perdió | Vivo | 0.50.1 |
-| B6 | Dos dictados en el mismo segundo compartían archivo y el segundo pisaba al primero | **Corregido** en 0.63.7. Queda vivo el caso equivalente en los DOCUMENTOS, que es otro camino | Vivo (documentos) · 0.50.1 |
-| B7 | `cargarExplorador` recorre dos veces el árbol completo en cada refresco. Con meses de historial la pestaña tarda | Vivo | 0.51.1 |
-| B8 | `huellaPrevia` y `ultimaEscritura` de `ContinuoPantalla` se mutan desde el hilo principal y desde el ejecutor de la captura | Vivo | 0.51.1 |
-| B9 | `ContinuoPantalla`: estado compartido entre el hilo principal y el ejecutor del Task | Vivo | 0.50.1 |
+| B1 | Un archivo huérfano por cada cierre | **Corregido** en 0.64.1. Medido: de 2–4 por arranque a cero | 0.50.1 · 0.53.0 §2.8 |
+| B2 | La purga solo corría al arrancar | **Corregido** en 0.64.1: se repasa cada seis horas | 0.50.1 |
+| B3 | Migajas de audio que la limpieza nunca alcanzaba | **Corregido** en 0.64.2: se retiran donde se descubren. Había ocho | 0.50.1 |
+| B4 | El trozo en escritura entraba al índice a medias | **Corregido** en 0.64.2: se salta lo tocado en el último minuto | 0.50.1 |
+| B5 | Se des-indexaba lo que no se había conseguido borrar | **Corregido** en 0.64.1: fila a fila, solo las de los archivos que de verdad se fueron | 0.50.1 |
+| B6 | Dos dictados —y dos documentos— en el mismo segundo compartían archivo | **Corregido** en 0.63.7 (dictados) y 0.64.3 (documentos) | 0.50.1 |
+| B7 | La pestaña recorría el árbol entero dos veces por refresco | **Corregido** en 0.64.1: un solo recorrido | 0.51.1 |
+| B8 | Carrera en los diccionarios de la captura | **No reproducible**: todos los accesos viven ya dentro de su cola | 0.51.1 |
+| B9 | Estado compartido en la captura de pantalla | **No reproducible**: igual que B8 | 0.50.1 |
 
 ## Rutinas, modos y tareas
 
 | # | Qué pasa | Estado | Origen |
 |---|---|---|---|
-| M1 | Dos rutinas a la vez: la segunda recibe «tanda en curso» y genera su documento sin esperar material fresco | Vivo | 0.50.1 |
-| M2 | Rutinas y resumen arman el material del día en el hilo principal | Vivo | 0.50.1 |
-| M3 | Modo Tarea: verbos sueltos crean tareas por error (preexistente) | Vivo | 0.50.1 |
-| M4 | Recordatorio periódico de tareas encendido de fábrica y sin interruptor visible (preexistente) | Vivo | 0.50.1 |
-| M5 | Router global por IA: hasta ~30 s de latencia en manos libres, sin plan determinista | Vivo | 0.50.1 |
-| M6 | `dictadoOcupado` lee estado del hilo principal desde la cola del lote sin salto | Vivo | 0.50.1 |
-| M7 | `pmset` síncrono en el hilo principal en cada tic con «solo con corriente» | Vivo | 0.50.1 |
+| M1 | Una rutina generaba su documento con el día a medio transcribir | **Corregido** en 0.64.2: se aplaza cinco minutos | 0.50.1 |
+| M2 | El resumen armaba el material en el hilo principal y congelaba la ventana | **Corregido** en 0.64.2 | 0.50.1 |
+| M3 | Verbos sueltos creaban tareas por error | **No reproducible**: «comprar», «revisar», «llamar» y «hacer» no disparan ningún modo | 0.50.1 |
+| M4 | Aviso periódico sin interruptor visible | **No reproducible**: el interruptor está en la pestaña de Notas | 0.50.1 |
+| M5 | Router por IA sin plan determinista delante | **Resuelto**: el determinista decide primero y la IA es el último recurso | 0.50.1 |
+| M6 | El estado de «hay alguien dictando» se leía desde otra cola | **Corregido** en 0.64.2: el hilo principal lo publica en una bandera atómica | 0.50.1 |
+| M7 | Lanzaba un proceso para saber si el equipo está enchufado, en cada tic | **Corregido** en 0.64.1: se guarda la respuesta 30 s | 0.50.1 |
 
 ## Decisiones de Alberto (no son fallos)
 
@@ -81,7 +85,7 @@ Los tres juntos son la candidata a **spec 007**.
 | D2 | Qué hacer con los 17,5 GB de PCM sin recomprimir (la recompresión automática ya existe) | 0.53.0 §4 |
 | D3 | ElevenLabs sin créditos: renovar o bajarlo en la cascada. Hoy AssemblyAI va primero y el TTS ya cae a la voz de macOS | 0.53.0 §4 |
 | D4 | Ollama apagado en esta Mac: la capa semántica de modos degrada a exacto y raíz | 0.53.0 §4 |
-| D5 | Si el registro debe guardar el texto dictado en claro de fábrica (= R3) | 0.53.0 §2.8 |
+
 
 ## Corregido y publicado
 

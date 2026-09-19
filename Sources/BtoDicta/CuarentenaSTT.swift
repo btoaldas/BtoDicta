@@ -70,7 +70,29 @@ enum CuarentenaSTT {
         lock.lock()
         tabla[id] = Entrada(hasta: Date().addingTimeInterval(minutos * 60), codigo: code, causa: causa)
         lock.unlock()
-        Log.log(.ia, "failover: \(nombre) en cuarentena \(Int(minutos)) min por HTTP \(code) (\(causa)) — se salta hasta entonces")
+        Log.log(.ia, "failover: \(nombre) apartado \(Int(minutos)) min — \(enCristiano(code, b)) [HTTP \(code): \(causa)]")
+    }
+
+    /// El motivo en una frase que se entienda, sin tener que saberse los
+    /// códigos de HTTP. El código sigue apareciendo después, para diagnosticar.
+    ///
+    /// Leer «en cuarentena 30 min por HTTP 402» no dice si hay que recargar una
+    /// cuenta, cambiar una clave o esperar; y esa es justo la decisión que toma
+    /// quien lee el registro.
+    private static func enCristiano(_ code: Int, _ cuerpo: String) -> String {
+        if cuerpo.contains("quota") || cuerpo.contains("credit") || cuerpo.contains("balance") {
+            return "se quedó sin saldo o sin cuota"
+        }
+        switch code {
+        case 401: return "no acepta la clave (¿caducó o se copió mal?)"
+        case 402: return "la cuenta necesita saldo"
+        case 403: return "la clave no tiene permiso para esto"
+        case 404: return "el modelo o el punto de acceso ya no existe"
+        case 400: return "rechazó la petición por cómo va escrita"
+        case 429: return "demasiadas peticiones seguidas"
+        case 500...599: return "el servidor del proveedor falló"
+        default: return "respondió con un error"
+        }
     }
 
     static func limpiar(_ id: String) {

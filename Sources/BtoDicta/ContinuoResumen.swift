@@ -470,6 +470,17 @@ enum ContinuoResumen {
             if FileManager.default.fileExists(atPath: url.path) {
                 let hs = DateFormatter(); hs.dateFormat = "HHmmss"
                 url = carpeta.appendingPathComponent("\(prefijo)-\(f.string(from: dia))-\(hs.string(from: Date())).md")
+                // Y si hasta el segundo coincide —dos rutinas que caen a la vez,
+                // o una manual justo encima de una automática— se sigue contando.
+                // Comprobar y escribir después no es atómico, pero con el nombre
+                // ya distinto por segundos y este último desempate, el hueco que
+                // queda es de microsegundos en un archivo que se escribe cada
+                // pocas horas. Lo que NO puede pasar es que uno pise al otro.
+                var n = 2
+                while FileManager.default.fileExists(atPath: url.path), n < 100 {
+                    url = carpeta.appendingPathComponent("\(prefijo)-\(f.string(from: dia))-\(hs.string(from: Date()))-\(n).md")
+                    n += 1
+                }
             }
         }
 
