@@ -8,11 +8,19 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.64.0"
+    static let numero = "0.64.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.64.1", "2026-09-19", [
+            "SE ACABARON LOS ARCHIVOS HUÉRFANOS AL CERRAR. Al salir, la bitácora encolaba el cierre del trozo que estaba grabando y volvía al instante, así que el proceso moría antes de que llegara a cerrarlo: uno huérfano por cada cierre, treinta y ocho en dos semanas. El rescate del arranque los recuperaba, pero recuperar es peor que no romper. Medido después: cero, en dos ciclos completos de cerrar y abrir",
+            "EL AUDIO DEL SISTEMA VUELVE SOLO. Un error del flujo lo dejaba muerto hasta que alguien tocara los ajustes, y nada te avisaba de que había dejado de grabar. Lo que lo tumba suele ser pasajero —cambiar de salida de audio, una pantalla que se desconecta—, así que ahora reintenta con espera creciente hasta cinco veces",
+            "La pestaña de la bitácora va más ligera: pedía los documentos y las transcripciones por separado, y cada petición recorría el árbol ENTERO. Con meses de historial son decenas de miles de archivos recorridos dos veces en cada refresco. Ahora es un solo recorrido",
+            "La retención que fijaste vuelve a aplicarse sola cada pocas horas. Solo se revisaba al arrancar, y esta aplicación se deja abierta días: una sesión larga seguía guardando material que ya debería haberse ido",
+            "Y la limpieza dejó de mentir: si un archivo no se puede borrar —permisos, disco lleno, un disco externo desconectado— su ficha se queda en el índice en vez de desaparecer. Antes el archivo seguía en disco sin que nada supiera que existía, y la retención parecía cumplida sin estarlo",
+            "Un pulido que volvía correcto pero vacío ya no se pierde: los modelos que razonan devuelven a veces el texto en otro campo, y se contaba como fallo con un código de éxito al lado",
+        ]),
         ("0.64.0", "2026-09-19", [
             "LA BITÁCORA YA NO FOTOGRAFÍA TU GESTOR DE CONTRASEÑAS. Podía excluir aplicaciones desde el primer día, pero la lista venía vacía: si no la rellenabas a mano, no protegía nada. Ahora trae de fábrica 1Password, Bitwarden, KeePassXC, Dashlane, Proton Pass, el llavero del sistema y Contraseñas de Apple, entre otros. Sus ventanas no aparecen siquiera en la imagen",
             "Y una segunda defensa para lo que no se puede excluir por aplicación: una pestaña del banco en el navegador. Puedes indicar palabras que, si salen en el TÍTULO de la ventana, impiden guardar esa captura. Viene vacía a propósito, porque una palabra demasiado común te dejaría sin bitácora media jornada",

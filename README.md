@@ -34,6 +34,17 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.64.1
+
+- **Se acabaron los archivos huérfanos al cerrar.** Medido: de 2–4 por arranque a
+  **cero**.
+- **El audio del sistema vuelve solo** tras un error, en vez de quedarse muerto
+  sin avisar.
+- La pestaña de la bitácora recorría el árbol **dos veces** por refresco.
+- La retención vuelve a aplicarse sola cada pocas horas, no solo al arrancar.
+- La limpieza dejó de des-indexar archivos que no consiguió borrar.
+- Un pulido que vuelve correcto pero con el texto en otro campo ya no se pierde.
+
 ### Novedades 0.64.0
 
 - **La bitácora ya no fotografía tu gestor de contraseñas.** Podía excluir apps
