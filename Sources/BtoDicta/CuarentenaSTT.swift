@@ -49,9 +49,14 @@ enum CuarentenaSTT {
         guard case ScribeError.http(let code, let body) = error else { return }
         let b = body.lowercased()
         let minutos: Double
+        // Quedarse sin saldo NO se arregla solo. Un 429 sí: es prisa, y en
+        // minutos se pasa. Tratarlos igual hacía que cada media hora se gastara
+        // otra llamada contra una cuenta vacía, para recibir el mismo error.
+        let sinSaldo = ["quota", "credit", "balance", "insufficient", "payment"]
+            .contains { b.contains($0) }
         switch code {
         case 401, 402, 403, 404:
-            minutos = 30
+            minutos = sinSaldo ? 360 : 30
         case 400:
             // ¿Es de configuración (parámetro/modelo) o de ESTE audio (corto, corrupto)?
             let esConfig = ["param", "deprecat", "model", "invalid", "unsupported", "unknown"].contains { b.contains($0) }
@@ -92,6 +97,20 @@ enum CuarentenaSTT {
         case 429: return "demasiadas peticiones seguidas"
         case 500...599: return "el servidor del proveedor falló"
         default: return "respondió con un error"
+        }
+    }
+
+    /// Cuántos minutos se apartaría un proveedor por este error. Solo pruebas.
+    static func minutosQA(codigo: Int, cuerpo: String) -> Int {
+        let b = cuerpo.lowercased()
+        let sinSaldo = ["quota", "credit", "balance", "insufficient", "payment"]
+            .contains { b.contains($0) }
+        switch codigo {
+        case 401, 402, 403, 404: return sinSaldo ? 360 : 30
+        case 429: return 5
+        case 500...599: return 2
+        case 413, 415, 422: return 0
+        default: return 0
         }
     }
 

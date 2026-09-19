@@ -77,14 +77,26 @@ Los tres juntos son la candidata a **spec 007**.
 | M6 | El estado de «hay alguien dictando» se leía desde otra cola | **Corregido** en 0.64.2: el hilo principal lo publica en una bandera atómica | 0.50.1 |
 | M7 | Lanzaba un proceso para saber si el equipo está enchufado, en cada tic | **Corregido** en 0.64.1: se guarda la respuesta 30 s | 0.50.1 |
 
-## Decisiones de Alberto (no son fallos)
+## Decisiones de Alberto — medidas el 2026-09-19
 
-| # | Qué hay que decidir | Origen |
+Dos resultaron **obsoletas**: el propio código las había resuelto por el camino y
+nadie lo había comprobado. Las otras dos siguen siendo suyas, pero ya con cifras.
+
+| # | Qué había que decidir | Estado tras medir |
 |---|---|---|
-| D1 | Notarizar con Apple (99 USD/año) o mantener «Abrir de todos modos» en las notas de release | 0.53.0 §4 |
-| D2 | Qué hacer con los 17,5 GB de PCM sin recomprimir (la recompresión automática ya existe) | 0.53.0 §4 |
-| D3 | ElevenLabs sin créditos: renovar o bajarlo en la cascada. Hoy AssemblyAI va primero y el TTS ya cae a la voz de macOS | 0.53.0 §4 |
-| D4 | Ollama apagado en esta Mac: la capa semántica de modos degrada a exacto y raíz | 0.53.0 §4 |
+| D1 | Notarizar con Apple (99 USD/año) | **Sin urgencia, medido**: los releases acumulan **2 descargas en total**. El coste por usuario no tiene sentido hoy. Se revisa si algún día hay usuarios de verdad |
+| D2 | Qué hacer con los 17,5 GB de PCM | **OBSOLETA**: quedan **0,09 GB** sin comprimir de 3,34 GB totales. La recompresión automática de 0.53.0 hizo el trabajo: 35 541 archivos comprimidos |
+| D3 | ElevenLabs sin créditos: ¿renovar? | **Sin urgencia, medido**: va **4.º** en la cascada, los tres primeros funcionan, y hay **otros cinco** motores con texto en vivo activos. No se pierde ninguna capacidad |
+| D4 | Ollama apagado: la capa semántica degrada | **OBSOLETA**: la aplicación usa su **motor interno** de embeddings, que corre y responde `{"status":"ok"}`. `MODOSEMTEST` en verde. Ollama ni se consulta |
+
+### Lo que sí salió de medirlas
+
+Al comprobar D3 apareció que quedarse sin saldo se trataba como cualquier otro
+error de autorización: media hora de cuarentena. Pero el saldo **no vuelve solo**
+en media hora. Resultado: **57 llamadas gastadas hoy** contra cuentas vacías,
+para recibir el mismo error. Corregido en 0.65.4: seis horas cuando el servidor
+dice que falta saldo o cuota, media hora cuando es la clave, cinco minutos cuando
+solo hay prisa.
 
 
 ## Corregido y publicado

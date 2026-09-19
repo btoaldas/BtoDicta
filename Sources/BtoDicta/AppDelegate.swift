@@ -2124,6 +2124,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // Apartar por el tiempo que toca: BTODICTA_CUARENTENATEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_CUARENTENATEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("CUARENTENA \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+
+            // Sin saldo no se arregla solo: seis horas.
+            chk(CuarentenaSTT.minutosQA(codigo: 401, cuerpo: "quota_exceeded") == 360,
+                "sin cuota se aparta 6 h, no media hora")
+            chk(CuarentenaSTT.minutosQA(codigo: 402, cuerpo: "insufficient balance") == 360,
+                "sin saldo, igual")
+            // Una clave equivocada tampoco, pero se cambia a mano: media hora basta.
+            chk(CuarentenaSTT.minutosQA(codigo: 401, cuerpo: "invalid api key") == 30,
+                "una clave mala sigue siendo media hora (prueba negativa)")
+            // Prisa: se pasa en minutos.
+            chk(CuarentenaSTT.minutosQA(codigo: 429, cuerpo: "rate limit") == 5,
+                "demasiadas peticiones son 5 minutos")
+            chk(CuarentenaSTT.minutosQA(codigo: 503, cuerpo: "unavailable") == 2,
+                "un servidor caído, 2 minutos")
+            chk(CuarentenaSTT.minutosQA(codigo: 413, cuerpo: "too large") == 0,
+                "lo que es culpa del archivo no aparta al proveedor")
+
+            print("CUARENTENA \(mal == 0 ? "TODO OK — cada error se aparta lo que toca" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Que no se instale como modelo lo que no lo es: BTODICTA_MODELOTEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_MODELOTEST"] == "1" {
             var mal = 0
