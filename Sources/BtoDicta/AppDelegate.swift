@@ -2352,6 +2352,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // 5) Tope del cuerpo.
             chk(ApiLocal.topeCuerpo <= 1_048_576, "el cuerpo de una petición está acotado (\(ApiLocal.topeCuerpo / 1024) kB)")
 
+            // 5b) Una carpeta demasiado amplia en la configuración se IGNORA.
+            //     Pasó de verdad: al configurar el primer consumidor se puso
+            //     `/var/folders`, que es la temporal de TODAS las aplicaciones.
+            let carpetasPrevias = Config.json0("api_local_carpetas") as? [String]
+            Config.set("api_local_carpetas", to: ["/var/folders", "/Users", "/"])
+            let permitidas = ApiLocal.carpetasPermitidas()
+            chk(!permitidas.contains("/var/folders") && !permitidas.contains("/") && !permitidas.contains("/Users"),
+                "una carpeta demasiado amplia se ignora aunque esté en la configuración")
+            chk(permitidas.count >= 3, "y las de fábrica siguen ahí (\(permitidas.count))")
+            Config.set("api_local_carpetas", to: ["/tmp/carpeta-de-prueba-api"])
+            chk(ApiLocal.carpetasPermitidas().contains("/tmp/carpeta-de-prueba-api"),
+                "una carpeta concreta SÍ se añade (prueba negativa)")
+            chk(ApiLocal.carpetasPermitidas().count > 3,
+                "y se SUMA a las de fábrica en vez de sustituirlas")
+            if let p = carpetasPrevias { Config.set("api_local_carpetas", to: p) }
+            else { Config.set("api_local_carpetas", to: [String]()) }
+
             // 6) Tope de peticiones por minuto.
             ApiLocal.olvidarRitmoQA()
             let tope = ApiLocal.topePorMinuto()

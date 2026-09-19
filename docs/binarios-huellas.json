@@ -1,28 +1,28 @@
 {
   "libggml-cpu.0.dylib": {
     "arq": "arm64",
-    "bytes": 846080,
-    "sha256": "601b2991c250f141848d3af5537da64d946f146257b5331338924cd1ea5b4ed1"
+    "bytes": 913840,
+    "sha256": "53481dede765edf10d6ca0aa77a973edf6783bffb6492ea01c57159309169130"
   },
   "libggml-metal.0.dylib": {
     "arq": "arm64",
-    "bytes": 832776,
-    "sha256": "9f9bf5c35cdc89abcfa5ed4a0f8796de46b274d1e606d87d51d9d2538e16c39b"
+    "bytes": 2128264,
+    "sha256": "576e8423c68c4e82271c10bc97aa2c06f0b2d1ce3a4ca6f054949cf649a4a3de"
   },
   "libggml.0.dylib": {
     "arq": "arm64",
-    "bytes": 59808,
-    "sha256": "ab8fc55bafb6ad57f12c9dc0d1b52b1af51c9dd0fc8fe802bc8a107e05955f6e"
+    "bytes": 60224,
+    "sha256": "846b1f3acee5ea8003b492a3e62ba26aa72154544f6f167d16f13ea795991bb7"
   },
   "libwhisper.1.dylib": {
     "arq": "arm64",
-    "bytes": 424304,
-    "sha256": "94b5b6905fcfb5f6f61627e1a8d95b258b2caca33d28482d26c51899854e14ca"
+    "bytes": 431152,
+    "sha256": "f2717b42f5c4070d9acf9f45d0a68531a6bf4af8feab9bb069f7fdfb2f96b4a8"
   },
   "llama-server": {
     "arq": "arm64",
-    "bytes": 15493232,
-    "sha256": "83470e5c90f0d4bd6ca67fadc965c001d44065193e49d2327c0b338e20e12d1e"
+    "bytes": 17725200,
+    "sha256": "4a4cf32be24d020144d43d4fdb2d8654a0ae2d6d1b77555fa1cd9533fb9cd190"
   },
   "transcribe-cli": {
     "arq": "arm64",
@@ -31,12 +31,12 @@
   },
   "whisper-cli": {
     "arq": "arm64",
-    "bytes": 845064,
-    "sha256": "1ace862ca9aaeaa22cdeecf87d31a866ab953a4ce4200f412b3d4858a427421f"
+    "bytes": 847304,
+    "sha256": "134aed580282e36feb60691ceeb1c8f3ce425265faa8cc185c77a58c579f323d"
   },
   "whisper-server": {
     "arq": "arm64",
-    "bytes": 1230464,
-    "sha256": "c849d74da1a821fe63ead8ed0b86a7c36fd6ee617802d62678e4d1658c12488f"
+    "bytes": 1233584,
+    "sha256": "13a8fa87c02831cce1e5c0f5e692faba1dc0766c757b1e06f85a43ce48795f41"
   }
 }

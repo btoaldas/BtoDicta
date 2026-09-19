@@ -91,13 +91,32 @@ enum ApiLocal {
     /// disco entero: una ruta arbitraria convertiría esta API en un lector
     /// universal de archivos para cualquier proceso que tenga el token.
     static func carpetasPermitidas() -> [String] {
-        if let l = Config.json0("api_local_carpetas") as? [String], !l.isEmpty {
-            return l.map { ($0 as NSString).expandingTildeInPath }
-        }
         let inicio = FileManager.default.homeDirectoryForCurrentUser
-        return [FileManager.default.temporaryDirectory.path,
-                inicio.appendingPathComponent("Downloads").path,
-                inicio.appendingPathComponent("Documents").path]
+        let deFabrica = [FileManager.default.temporaryDirectory.path,
+                         inicio.appendingPathComponent("Downloads").path,
+                         inicio.appendingPathComponent("Documents").path]
+        // Lo configurado se SUMA a lo de fábrica, no lo sustituye.
+        //
+        // Sustituirlo invitaba a un error fácil y caro: quien añadiera una
+        // carpeta para un consumidor nuevo tenía que acordarse de repetir las
+        // tres de siempre, y al hacerlo era tentador poner la carpeta temporal
+        // del sistema ENTERA —`/var/folders`— en vez de la del proceso. Eso
+        // abre la temporal de todas las aplicaciones del equipo. Pasó en la
+        // primera configuración real, y lo cazó la prueba.
+        let extra = (Config.json0("api_local_carpetas") as? [String] ?? [])
+            .map { ($0 as NSString).expandingTildeInPath }
+            .filter { ruta in
+                // Una carpeta demasiado amplia no se acepta ni pedida: abrirlas
+                // convierte esta API en un lector del disco entero.
+                let prohibidas = ["/", "/var", "/var/folders", "/tmp", "/Users", "/etc",
+                                  "/System", "/Library", inicio.path]
+                if prohibidas.contains(ruta) {
+                    Log.log(.sistema, "api local: ignoro la carpeta «\(ruta)» de la configuración — es demasiado amplia")
+                    return false
+                }
+                return true
+            }
+        return deFabrica + extra
     }
 
     enum Rechazo: String, Error, Equatable {
