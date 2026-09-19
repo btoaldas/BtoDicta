@@ -253,7 +253,7 @@ enum ContinuoLote {
                 semaforo.signal()
             }
         } else if motor == "apple_speech" {
-            AppleSpeechSTT.run(wav: wav) { r in salida = r; semaforo.signal() }
+            AppleSpeechSTT.run(wav: CuerpoMultipart.Origen.datos(wav)) { r in salida = r; semaforo.signal() }
         } else if motor == "whisper_local" {
             WhisperServer.transcribe(wav: wav) { r in salida = r; semaforo.signal() }
         } else {

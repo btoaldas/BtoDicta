@@ -143,7 +143,7 @@ enum RedSeguridadDictado {
             responder(vivo, nil)
         }
         let wavTramo = HistoryWriter.wavData(pcm: pcm.subdata(in: inicio..<pcm.count))
-        TranscribeCpp.run(wav: wavTramo, modelo: motor.modelo) { r in
+        TranscribeCpp.run(wav: CuerpoMultipart.Origen.datos(wavTramo), modelo: motor.modelo) { r in
             DispatchQueue.main.async {
                 let ms = Int(Date().timeIntervalSince(t0) * 1000)
                 switch r {
@@ -249,7 +249,7 @@ enum RedSeguridadDictado {
             guard b - a > bytesPorSegundo else { siguienteHueco(i + 1); return }
             Log.log(.ia, "dictado: \(h.origen.rawValue) hacia el segundo \(h.byte / bytesPorSegundo) — reviso ese tramo")
             let wavV = HistoryWriter.wavData(pcm: pcm.subdata(in: a..<b))
-            TranscribeCpp.run(wav: wavV, modelo: motor.modelo) { r in
+            TranscribeCpp.run(wav: CuerpoMultipart.Origen.datos(wavV), modelo: motor.modelo) { r in
                 DispatchQueue.main.async {
                     guard !entregado else { return }
                     switch r {

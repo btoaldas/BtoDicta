@@ -51,6 +51,51 @@ enum CuerpoMultipart {
             }
         }
 
+        /// Una ruta en la carpeta temporal que apunta al MISMO audio, sin
+        /// copiarlo: un enlace duro cuando el sistema lo permite.
+        ///
+        /// Los binarios locales escriben su salida junto al archivo de entrada,
+        /// así que no se les puede dar el del historial —les ensuciaría la
+        /// carpeta—, pero tampoco hace falta duplicar seiscientos megas para
+        /// eso. Un enlace duro es una entrada de directorio más apuntando a los
+        /// mismos bloques: cuesta lo mismo con un segundo de audio que con seis
+        /// horas. Si el sistema no lo permite —otro volumen— se copia, que es lo
+        /// que se hacía siempre.
+        ///
+        /// Devuelve la ruta y si hay que retirarla al terminar.
+        func enlaceTemporal(prefijo: String) -> (url: URL, retirar: Bool)? {
+            let fm = FileManager.default
+            let destino = fm.temporaryDirectory
+                .appendingPathComponent("\(prefijo)-\(UUID().uuidString).wav")
+            if let propio = archivoURL {
+                if (try? fm.linkItem(at: propio, to: destino)) != nil { return (destino, true) }
+                if (try? fm.copyItem(at: propio, to: destino)) != nil { return (destino, true) }
+                return nil
+            }
+            guard (try? leer().write(to: destino)) != nil else { return nil }
+            return (destino, true)
+        }
+
+        /// Ejecuta el bloque con una RUTA de archivo, venga el audio de donde
+        /// venga. Si ya está en disco se usa el suyo tal cual; si está en
+        /// memoria se escribe un temporal y se retira al salir.
+        ///
+        /// Para los motores locales, que pasan el audio a un binario o a un
+        /// servidor y necesitan un archivo: antes leían los bytes y los volvían
+        /// a escribir, o sea dos copias completas de algo que ya estaba en disco.
+        func conArchivo<T>(_ bloque: (URL) throws -> T) rethrows -> T? {
+            switch self {
+            case .archivo(let u):
+                return try bloque(u)
+            case .datos(let d):
+                let tmp = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("btodicta-local-\(UUID().uuidString).wav")
+                guard (try? d.write(to: tmp)) != nil else { return nil }
+                defer { try? FileManager.default.removeItem(at: tmp) }
+                return try bloque(tmp)
+            }
+        }
+
         /// La ruta, si la hay. Permite subir con `fromFile:` sin pasar por RAM.
         var archivoURL: URL? {
             if case .archivo(let u) = self { return u }

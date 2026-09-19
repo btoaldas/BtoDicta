@@ -16,7 +16,7 @@ enum WhisperCLI {
         return FileManager.default.isExecutableFile(atPath: dev.path) ? dev : nil
     }
 
-    static func run(wav: Data, modelo archivo: String,
+    static func run(wav: CuerpoMultipart.Origen, modelo archivo: String,
                     completion: @escaping (Result<String, Error>) -> Void) {
         guard let cli = cliURL else {
             completion(.failure(ScribeError.ws("whisper-cli no encontrado"))); return
@@ -26,10 +26,15 @@ enum WhisperCLI {
             completion(.failure(ScribeError.ws("Falta el modelo \(archivo)"))); return
         }
         DispatchQueue.global(qos: .userInitiated).async {
-            let tmp = FileManager.default.temporaryDirectory
-                .appendingPathComponent("beto-red-\(UUID().uuidString).wav")
-            try? wav.write(to: tmp)
-            defer { try? FileManager.default.removeItem(at: tmp) }
+            // Enlace duro al audio, no copia: el binario escribe su salida junto
+            // al archivo de entrada, así que necesita una ruta temporal, pero no
+            // hay por qué duplicar el audio para dársela.
+            guard let enlace = wav.enlaceTemporal(prefijo: "btodicta-cli") else {
+                DispatchQueue.main.async { completion(.failure(ScribeError.ws("no pude preparar el audio para el motor local"))) }
+                return
+            }
+            let tmp = enlace.url
+            defer { if enlace.retirar { try? FileManager.default.removeItem(at: tmp) } }
             let salidaBase = tmp.deletingPathExtension()
             let salidaTxt = salidaBase.appendingPathExtension("txt")
             defer { try? FileManager.default.removeItem(at: salidaTxt) }
@@ -44,7 +49,7 @@ enum WhisperCLI {
             task.standardError = FileHandle.nullDevice
             do {
                 try task.run()
-                let guardia = vigilar(task, wav: wav.count)
+                let guardia = vigilar(task, wav: wav.bytes)
                 task.waitUntilExit()
                 guardia.cancel()
                 let texto = ((try? String(contentsOf: salidaTxt, encoding: .utf8)) ?? "")

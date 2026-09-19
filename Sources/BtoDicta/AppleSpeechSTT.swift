@@ -52,7 +52,7 @@ enum AppleSpeechSTT {
 
     /// Transcribe un wav (batch). Bridge async→completion para encajar en la
     /// cascada de `TranscribeProviders`.
-    static func run(wav: Data, idioma: String? = nil,
+    static func run(wav: CuerpoMultipart.Origen, idioma: String? = nil,
                     completion: @escaping (Result<String, Swift.Error>) -> Void) {
         guard disponible else { completion(.failure(Error.sinSoporte)); return }
         #if canImport(Speech)
@@ -76,12 +76,15 @@ enum AppleSpeechSTT {
 
     #if canImport(Speech)
     @available(macOS 26, *)
-    private static func transcribir(wav: Data, idioma: String) async throws -> String {
-        // 1) wav en Data → archivo temporal (AVAudioFile necesita URL). Se auto-convierte.
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("btodicta-apple-\(UInt64(wav.count)).wav")
-        try wav.write(to: tmp)
-        defer { try? FileManager.default.removeItem(at: tmp) }
+    private static func transcribir(wav: CuerpoMultipart.Origen, idioma: String) async throws -> String {
+        // 1) `AVAudioFile` necesita una URL. Si el audio ya está en disco se usa
+        //    el suyo; solo se escribe un temporal cuando viene de memoria, y
+        //    entonces se retira al terminar.
+        let propio = wav.archivoURL
+        let tmp = propio ?? FileManager.default.temporaryDirectory
+            .appendingPathComponent("btodicta-apple-\(UUID().uuidString).wav")
+        if propio == nil { try wav.leer().write(to: tmp) }
+        defer { if propio == nil { try? FileManager.default.removeItem(at: tmp) } }
 
         let audioFile = try AVAudioFile(forReading: tmp)
         let dur = Double(audioFile.length) / audioFile.processingFormat.sampleRate

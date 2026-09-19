@@ -820,13 +820,13 @@ enum Failover {
 
             case "elevenlabs": transcribeBatch(wav: fuente, model: elevenModel(p)) { cb($0) }
             case "groq": GroqTranscribe.run(wav: fuente, model: p.modelo ?? "whisper-large-v3") { cb($0) }
-            case "apple_speech": AppleSpeechSTT.run(wav: fuente.leer(), idioma: p.modelo) { cb($0) }
+            case "apple_speech": AppleSpeechSTT.run(wav: fuente, idioma: p.modelo) { cb($0) }
             case "whisper_local": WhisperLocal.run(wav: fuente) { cb($0) }
             case "voxtral_local":
                 // La familia Voxtral tiene dos motores: el Mini 3B corre en
                 // llama.cpp (server residente); el Realtime 4B en transcribe.cpp.
                 if TcppStreamClient.esModeloStreaming(p.modelo ?? "") {
-                    TranscribeCpp.run(wav: fuente.leer(), modelo: p.modelo ?? "") { cb($0) }
+                    TranscribeCpp.run(wav: fuente, modelo: p.modelo ?? "") { cb($0) }
                 } else if VoxtralServer.corriendo {
                     VoxtralServer.transcribe(wav: fuente.leer()) { cb($0) }
                 } else if VoxtralServer.diagnostico == nil {
@@ -837,7 +837,7 @@ enum Failover {
                     cb(.failure(ScribeError.ws(VoxtralServer.diagnostico ?? "voxtral no disponible")))
                 }
             case "nemotron_local", "canary_local":
-                TranscribeCpp.run(wav: fuente.leer(), modelo: p.modelo ?? "") { cb($0) }
+                TranscribeCpp.run(wav: fuente, modelo: p.modelo ?? "") { cb($0) }
             case "openai":
                 OpenAITranscribe.run(wav: fuente, model: p.modelo ?? "gpt-4o-mini-transcribe") { cb($0) }
             case "mistral":

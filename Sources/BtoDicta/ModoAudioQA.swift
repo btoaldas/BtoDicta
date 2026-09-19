@@ -147,7 +147,7 @@ enum ModoAudioQA {
                     siguiente(); return
                 }
                 try? FileManager.default.removeItem(at: wavURL)
-                AppleSpeechSTT.run(wav: wav) { resultado in
+                AppleSpeechSTT.run(wav: CuerpoMultipart.Origen.datos(wav)) { resultado in
                     switch resultado {
                     case .failure(let error):
                         fallos += 1

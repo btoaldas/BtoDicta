@@ -33,7 +33,7 @@ enum TranscribeCpp {
 
     /// Los modelos ggml de whisper (.bin) los ejecuta whisper-cli, no
     /// transcribe-cli: se despacha solo para que quien llama no lo sepa.
-    static func run(wav: Data, modelo archivo: String,
+    static func run(wav: CuerpoMultipart.Origen, modelo archivo: String,
                     completion: @escaping (Result<String, Error>) -> Void) {
         if archivo.hasSuffix(".bin") {
             WhisperCLI.run(wav: wav, modelo: archivo, completion: completion); return
@@ -46,9 +46,16 @@ enum TranscribeCpp {
             completion(.failure(ScribeError.ws("Falta el modelo — descárgalo en Modelos"))); return
         }
         DispatchQueue.global().async {
-            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("beto-\(UUID().uuidString).wav")
-            try? wav.write(to: tmp)
-            defer { try? FileManager.default.removeItem(at: tmp) }
+            // Si el audio ya está en disco se le pasa al binario TAL CUAL. Antes
+            // se leía entero y se volvía a escribir en un temporal: dos copias
+            // completas de algo que ya existía. Solo se crea temporal cuando el
+            // audio viene de memoria, y entonces sí se retira al terminar.
+            guard let enlace = wav.enlaceTemporal(prefijo: "btodicta-cpp") else {
+                DispatchQueue.main.async { completion(.failure(ScribeError.ws("no pude preparar el audio para el motor local"))) }
+                return
+            }
+            let tmp = enlace.url
+            defer { if enlace.retirar { try? FileManager.default.removeItem(at: tmp) } }
 
             let task = Process()
             task.executableURL = cli
@@ -68,7 +75,7 @@ enum TranscribeCpp {
             task.standardError = Pipe()
             do {
                 try task.run()
-                let guardia = WhisperCLI.vigilar(task, wav: wav.count)
+                let guardia = WhisperCLI.vigilar(task, wav: wav.bytes)
                 let data = out.fileHandleForReading.readDataToEndOfFile()
                 task.waitUntilExit()
                 guardia.cancel()

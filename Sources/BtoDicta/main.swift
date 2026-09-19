@@ -142,7 +142,7 @@ if let ruta = ProcessInfo.processInfo.environment["BTODICTA_WAKEAUDIOTEST"],
         print("WAKEAUDIOTEST FALLA no pude leer \(ruta)"); exit(4)
     }
     var recibido: Result<String, Swift.Error>?
-    AppleSpeechSTT.run(wav: wav) { recibido = $0 }
+    AppleSpeechSTT.run(wav: CuerpoMultipart.Origen.datos(wav)) { recibido = $0 }
     let limite = Date().addingTimeInterval(90)
     while recibido == nil, Date() < limite {
         _ = RunLoop.current.run(mode: .default,

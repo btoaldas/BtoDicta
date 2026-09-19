@@ -1070,7 +1070,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let wav = try? Data(contentsOf: URL(fileURLWithPath: ruta)) else {
                 print("APPLESTT: no pude leer el archivo"); exit(1)
             }
-            AppleSpeechSTT.run(wav: wav) { r in
+            AppleSpeechSTT.run(wav: CuerpoMultipart.Origen.datos(wav)) { r in
                 switch r {
                 case .success(let t): print("APPLESTT OK → \(t)")
                 case .failure(let e): print("APPLESTT FALLÓ → \(e.localizedDescription)")
@@ -2178,6 +2178,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if let o3 = origen3 {
                 chk(!FileManager.default.fileExists(atPath: o3.path),
                     "descartar un dictado retira también su audio de trabajo")
+            }
+
+            // El enlace temporal que reciben los motores locales NO duplica el
+            // audio: es otra entrada de directorio apuntando a los mismos bloques.
+            let rec4 = Recorder()
+            rec4.abrirSalidaQA()
+            for _ in 0..<30 { rec4.inyectarQA(trozo) }
+            if let o4 = rec4.stop(), let enlace = CuerpoMultipart.Origen.archivo(o4).enlaceTemporal(prefijo: "qa") {
+                let fm = FileManager.default
+                let a1 = try? fm.attributesOfItem(atPath: o4.path)
+                let a2 = try? fm.attributesOfItem(atPath: enlace.url.path)
+                let inodo1 = a1?[.systemFileNumber] as? Int
+                let inodo2 = a2?[.systemFileNumber] as? Int
+                chk(inodo1 != nil && inodo1 == inodo2,
+                    "el enlace para el motor local apunta al MISMO archivo, no a una copia")
+                chk((a2?[.size] as? Int) == (a1?[.size] as? Int), "y ve el mismo tamaño")
+                if enlace.retirar { try? fm.removeItem(at: enlace.url) }
+                chk(fm.fileExists(atPath: o4.path), "retirar el enlace no se lleva el audio original")
+                Recorder.descartar(o4)
+            } else {
+                chk(false, "el enlace temporal para el motor local debería crearse")
             }
 
             try? FileManager.default.removeItem(at: destino)
