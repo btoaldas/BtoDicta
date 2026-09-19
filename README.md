@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.67.0
+
+- **El panel dice en qué se va el dinero**: gasto por motor y por mes. El primer
+  vistazo revela que ElevenLabs se llevaba el **98-99 %** del total.
+- **Y cuánto tarda cada motor**, medido al usarlos. Mediana, no promedio.
+- No reordena nada solo: pone los números delante para que decidas.
+
 ### Novedades 0.66.2
 
 - **El silencio deja de viajar a la nube.** La bitácora mandaba a transcribir sus

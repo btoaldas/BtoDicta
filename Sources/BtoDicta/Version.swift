@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.66.2"
+    static let numero = "0.67.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.67.0", "2026-09-19", [
+            "EL PANEL DE SALUD TE DICE EN QUÉ SE VA EL DINERO. Hasta ahora sabías cuánto SALDO te queda, que es otra pregunta. Ahora ves, mes a mes y motor a motor, en qué se ha ido: horas usadas e importe. El saldo dice lo que queda; esto dice lo que se gastó, y es lo que permite decidir si un motor vale lo que cobra",
+            "El primer vistazo ya explica algo: ElevenLabs se llevaba entre el 98 y el 99 por ciento de todo el gasto. Desde que se quedó sin saldo, el mes va en poco más de un dólar y medio",
+            "Y ENSEÑA CUÁNTO TARDA CADA MOTOR. El orden en que se prueban estaba puesto a mano, y no había forma de revisarlo con criterio porque solo uno medía su tiempo. Ahora se miden todos, al usarlos, sin llamadas de más. No se reordena nada solo: esa decisión es tuya, porque la velocidad no es lo único que cuenta —también está el coste y si el audio sale o no de tu equipo—",
+            "El número que se enseña es la MEDIANA, no el promedio: un cuelgue aislado de veinte segundos arrastra el promedio de cien llamadas buenas y te haría creer que un motor es lento cuando no lo es",
+        ]),
         ("0.66.2", "2026-09-19", [
             "EL SILENCIO DEJA DE VIAJAR A LA NUBE. La bitácora graba de continuo, y buena parte de lo que graba es silencio: nadie habla, o estás delante del equipo sin decir nada. Cada uno de esos trozos se mandaba igual a un motor de transcripción, que contestaba —con razón— que no había nada que transcribir, y la aplicación lo tomaba por un fallo y probaba con el siguiente motor. En un solo día: 312 llamadas gastadas para no obtener nada",
             "Ahora se mira el audio antes, aquí mismo y en milésimas de segundo. Si no suena nada, no sale del equipo",

@@ -1032,6 +1032,23 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### Saber en qué se te va el dinero y qué motor es más rápido
+
+*Configuración → Salud* tiene ahora dos secciones nuevas:
+
+**En qué se va el dinero** — horas e importe por motor, mes a mes. El coste sale
+de las horas usadas por la tarifa de cada modelo, no de la factura del proveedor:
+sirve para comparar motores entre sí, no para cuadrar con el banco.
+
+**Cuánto tarda cada motor** — la mediana de sus últimas cincuenta llamadas. Se
+mide sola al ir usando los motores, sin llamadas de más. Es la mediana y no el
+promedio porque un cuelgue aislado arrastraría el promedio y te haría creer que
+un motor es lento cuando no lo es.
+
+Con esos dos números puedes decidir el orden de la cascada en *Modelos*. La
+aplicación no lo cambia sola: la velocidad no es lo único que cuenta — también
+está el coste, y si el audio sale o no de tu equipo.
+
 ### «N en silencio, no enviados» en el resumen de la tanda
 
 Desde 0.66.2, la bitácora mira sus trozos antes de mandarlos a transcribir: si no
