@@ -2163,6 +2163,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             exit(mal == 0 ? 0 : 1)
         }
 
+        // Cuánto tarda cada motor: BTODICTA_LATENCIATEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_LATENCIATEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("LATENCIA \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            LatenciaMotores.olvidarQA()
+
+            // La MEDIANA, no la media: un cuelgue no puede arrastrar el número.
+            for ms in [800, 900, 1000, 1100, 19000] { LatenciaMotores.anotar("Prueba", ms: ms) }
+            let r = LatenciaMotores.resumen()
+            let prueba = r.first { $0.motor == "Prueba" }
+            chk(prueba?.ms == 1000,
+                "con 800·900·1000·1100·19000 la mediana es 1000, no la media de 4560 (\(prueba?.ms ?? -1))")
+            chk(prueba?.medidas == 5, "cuenta las cinco medidas")
+
+            // Lo absurdo no entra.
+            LatenciaMotores.anotar("Prueba", ms: 0)
+            LatenciaMotores.anotar("Prueba", ms: -5)
+            LatenciaMotores.anotar("Prueba", ms: 9_999_999)
+            chk(LatenciaMotores.resumen().first { $0.motor == "Prueba" }?.medidas == 5,
+                "un 0, un negativo y un valor imposible se descartan (prueba negativa)")
+
+            // Varios motores, ordenados del más rápido al más lento.
+            for ms in [3000, 3200, 3100] { LatenciaMotores.anotar("Lento", ms: ms) }
+            for ms in [200, 220, 210] { LatenciaMotores.anotar("Rápido", ms: ms) }
+            let orden = LatenciaMotores.resumen().map(\.motor)
+            chk(orden.first == "Rápido" && orden.last == "Lento",
+                "se ordenan del más rápido al más lento: \(orden.joined(separator: " < "))")
+
+            // Solo se recuerdan las últimas: el número refleja cómo va AHORA.
+            LatenciaMotores.olvidarQA()
+            for i in 0..<80 { LatenciaMotores.anotar("Tope", ms: 100 + i) }
+            chk((LatenciaMotores.resumen().first { $0.motor == "Tope" }?.medidas ?? 0) <= 50,
+                "no guarda más de 50 medidas por motor")
+
+            LatenciaMotores.olvidarQA()
+            print("LATENCIA \(mal == 0 ? "TODO OK — se mide lo que tarda cada motor" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
+        // En qué se va el dinero: BTODICTA_GASTOTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_GASTOTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("GASTO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            let meses = UsageLog.gastoPorMes(ultimos: 12)
+            chk(!meses.isEmpty, "hay uso registrado que analizar (\(meses.count) meses)")
+            for m in meses.prefix(6) {
+                let top = m.porMotor.prefix(3)
+                    .map { "\($0.0) \(String(format: "%.1f", $0.1))h $\(String(format: "%.2f", $0.2))" }
+                    .joined(separator: " · ")
+                print("GASTO   \(m.mes): \(String(format: "%.1f", m.horas)) h  $\(String(format: "%.2f", m.dolares))  → \(top)")
+            }
+            // Los totales tienen que cuadrar con la suma de sus partes.
+            for m in meses {
+                let suma = m.porMotor.reduce(0.0) { $0 + $1.2 }
+                chk(abs(suma - m.dolares) < 0.001, "en \(m.mes) el total cuadra con la suma por motor")
+            }
+            chk(meses.allSatisfy { $0.horas >= 0 && $0.dolares >= 0 }, "ni horas ni importes negativos")
+            // Ordenado de más reciente a más antiguo.
+            chk(meses.map(\.mes) == meses.map(\.mes).sorted(by: >), "los meses van del más reciente al más viejo")
+            // Y dentro de cada mes, lo más caro arriba.
+            chk(meses.allSatisfy { m in m.porMotor.map(\.2) == m.porMotor.map(\.2).sorted(by: >) },
+                "dentro de cada mes, lo más caro va primero")
+            print("GASTO \(mal == 0 ? "TODO OK — el gasto por motor y mes cuadra" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // No mandar silencio a la nube: BTODICTA_SILENCIOTEST=1
         //
         // Se prueba contra los trozos REALES de la bitácora de esta máquina, no

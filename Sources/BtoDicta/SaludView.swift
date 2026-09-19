@@ -24,6 +24,10 @@ struct SaludView: View {
                 encabezado
                 saldosSeccion
                 Divider()
+                gastoSeccion
+                Divider()
+                latenciaSeccion
+                Divider()
                 vidaSeccion
                 Divider()
                 cuarentenasSeccion
@@ -39,6 +43,79 @@ struct SaludView: View {
     }
 
     // MARK: Piezas
+
+    /// Lo que tarda cada motor, medido.
+    ///
+    /// El orden de la cascada estaba puesto a mano. Esto no lo cambia solo —esa
+    /// decisión es de quien la usa, y la velocidad no es lo único que importa:
+    /// también están el coste y la privacidad— pero pone los números delante.
+    private var latenciaSeccion: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Cuánto tarda cada motor").font(.headline)
+            let medidas = LatenciaMotores.resumen()
+            if medidas.isEmpty {
+                Text("Aún no hay medidas. Se toman solas al ir usando los motores.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(medidas, id: \.motor) { m in
+                    HStack {
+                        Text(m.motor)
+                        Spacer()
+                        Text("\(m.ms) ms").monospacedDigit()
+                            .foregroundStyle(m.ms < 2000 ? .primary : .secondary)
+                        Text("(\(m.medidas))").font(.caption).foregroundStyle(.secondary)
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+                Text("Es la MEDIANA de las últimas medidas, no la media: un cuelgue aislado arrastra la media de cien llamadas buenas, y aquí interesa lo que tarda normalmente. Entre paréntesis, cuántas medidas hay detrás.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// Lo que cuesta cada motor, mes a mes.
+    ///
+    /// El saldo dice cuánto QUEDA; esto dice en qué se ha ido. Son preguntas
+    /// distintas, y la segunda es la que permite decidir si un motor vale lo que
+    /// cobra. Estaba calculado desde hace tiempo, pero solo se veía recortado a
+    /// tres líneas en el menú de la barra.
+    private var gastoSeccion: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("En qué se va el dinero").font(.headline)
+            let meses = UsageLog.gastoPorMes(ultimos: 6)
+            if meses.isEmpty {
+                Text("Todavía no hay uso registrado.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(meses) { m in
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text(m.mes).bold().monospacedDigit()
+                            Spacer()
+                            Text(String(format: "%.1f h", m.horas)).monospacedDigit()
+                                .foregroundStyle(.secondary)
+                            Text(m.dolares < 0.01 ? "—" : String(format: "$%.2f", m.dolares))
+                                .monospacedDigit()
+                        }
+                        ForEach(m.porMotor.prefix(6), id: \.0) { motor, horas, dolares in
+                            HStack {
+                                Text("· \(motor)").font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                Text(String(format: "%.1f h", horas)).font(.caption)
+                                    .monospacedDigit().foregroundStyle(.secondary)
+                                Text(dolares < 0.01 ? "—" : String(format: "$%.2f", dolares))
+                                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                                    .frame(width: 54, alignment: .trailing)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                Text("El coste sale de las horas usadas por la tarifa de cada modelo, no de la factura del proveedor: sirve para comparar motores entre sí, no para cuadrar con el banco. Los motores locales y los de capa gratuita aparecen sin importe.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
 
     private var encabezado: some View {
         HStack {

@@ -160,6 +160,48 @@ struct UsageLog {
     }
 
     /// Minutos por proveedor en [hoy, semana, mes, año] + costo estimado del mes.
+    /// Lo gastado por MES y por motor, para el panel de salud.
+    ///
+    /// `resumen()` ya calculaba el coste, pero solo del mes en curso y recortado
+    /// a los tres primeros motores del menú. Saber qué cuesta cada motor al cabo
+    /// de los meses es lo que permite decidir si uno vale lo que cobra — y eso
+    /// no cabe en una línea de menú.
+    struct GastoMes: Identifiable {
+        var id: String { mes }
+        let mes: String              // "2026-09"
+        let porMotor: [(String, Double, Double)]   // motor, horas, dólares
+        var horas: Double { porMotor.reduce(0) { $0 + $1.1 } }
+        var dolares: Double { porMotor.reduce(0) { $0 + $1.2 } }
+    }
+
+    static func gastoPorMes(ultimos: Int = 6) -> [GastoMes] {
+        guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else { return [] }
+        let iso = ISO8601DateFormatter()
+        var acc: [String: [String: (Double, Double)]] = [:]   // mes → motor → (seg, $)
+        for line in text.split(separator: "\n") {
+            guard let data = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let fechaStr = json["fecha"] as? String,
+                  let fecha = iso.date(from: fechaStr),
+                  let proveedorRaw = json["proveedor"] as? String,
+                  let seg = json["segundos"] as? Double else { continue }
+            let mes = String(fechaStr.prefix(7))
+            _ = fecha
+            let motor = motorCanonico(proveedorRaw)
+            let coste = tarifaRegistro(modelo: json["modelo"] as? String, motor: motor) * seg / 3600
+            var porMotor = acc[mes] ?? [:]
+            let previo = porMotor[motor] ?? (0, 0)
+            porMotor[motor] = (previo.0 + seg, previo.1 + coste)
+            acc[mes] = porMotor
+        }
+        return acc.keys.sorted(by: >).prefix(ultimos).map { mes in
+            let motores = (acc[mes] ?? [:])
+                .map { ($0.key, $0.value.0 / 3600, $0.value.1) }
+                .sorted { $0.2 == $1.2 ? $0.1 > $1.1 : $0.2 > $1.2 }
+            return GastoMes(mes: mes, porMotor: motores)
+        }
+    }
+
     static func resumen() -> [String] {
         guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else {
             return ["Sin uso registrado todavía"]

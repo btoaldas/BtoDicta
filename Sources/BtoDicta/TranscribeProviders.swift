@@ -800,10 +800,16 @@ enum Failover {
         default: modeloUsado = p.modelo ?? ""
         }
 
+        // Se mide SIEMPRE, no solo cuando falla: lo que interesa es cuánto
+        // tarda un motor cuando funciona, que es lo que decide si merece ir
+        // primero en la cascada.
+        let arranque = Date()
         let siguiente: (Result<String, Error>) -> Void = { r in
+            let ms = Int(Date().timeIntervalSince(arranque) * 1000)
             switch r {
             case .success(let texto):
-                Log.log(.ia, "failover: \(p.nombre) OK")
+                LatenciaMotores.anotar(p.nombre, ms: ms)
+                Log.log(.ia, "failover: \(p.nombre) OK en \(ms) ms")
                 CuarentenaSTT.limpiar(p.id)
                 completion(.success((texto, p.nombre, modeloUsado)))
             case .failure(let e):
