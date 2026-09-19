@@ -1016,6 +1016,21 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### La bitácora dejó de grabar sin decir nada
+
+Arreglado en 0.63.3. Era el mismo fallo de abajo, en otro sitio: la bitácora leía
+el formato del micrófono antes de que macOS terminara de conmutar de aparato, y
+la escucha se rechazaba. A diferencia del dictado, aquí no hay nadie mirando: la
+bitácora simplemente no grababa, y no se notaba hasta buscar audio que no existía.
+
+Se corrigió igual que en el grabador, y además el mapa de canales viaja ahora con
+el conversor: con la cancelación de eco activa el micrófono llega con **nueve
+canales**, y sin ese mapa la conversión a mono devuelve cero marcos y el audio se
+pierde en silencio.
+
+Comprobación: `BTODICTA_CONVIVENCIATEST=1` enciende la bitácora, le hace ceder el
+micrófono y graba con un grabador real mientras suena una voz por los parlantes.
+
 ### «El micrófono no aceptó la escucha» y hay que reiniciar
 
 Arreglado en 0.63.2. Pasaba al pulsar la tecla **justo cuando la bitácora acababa

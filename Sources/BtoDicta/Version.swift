@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.63.2"
+    static let numero = "0.63.3"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.63.3", "2026-09-18", [
+            "El fallo corregido en 0.63.2 —«el micrófono no aceptó la escucha»— estaba también en la BITÁCORA y en la activación por voz, con el mismo patrón línea por línea. En la bitácora era peor que en el grabador, porque ahí nadie está mirando: si la escucha no entraba, dejaba de grabar EN SILENCIO y no había ninguna señal hasta buscar audio que no existía",
+            "Los dos pasan a resolver el formato en el momento de instalar la escucha y a armar el conversor con el primer audio real, rearmándolo si el micrófono cambia de frecuencia a mitad de la grabación",
+            "En la bitácora, el mapa de canales viaja ahora con el conversor. Importa: con la cancelación de eco activa el micrófono llega con NUEVE canales, y sin ese mapa la conversión a mono devuelve cero marcos y el audio se pierde sin avisar",
+            "Comprobado con la bitácora encendida cediendo el micrófono a un grabador real mientras suena voz por los parlantes: 182 208 bytes capturados con nivel máximo. Y en la aplicación real, dos arranques seguidos de la bitácora, los dos con audio",
+        ]),
         ("0.63.2", "2026-09-18", [
             "ARREGLADO el fallo que obligaba a cerrar y volver a abrir la aplicación: «el micrófono no aceptó la escucha». Ocurría al pulsar la tecla justo cuando la bitácora acababa de soltar el micrófono. La aplicación leía el formato del aparato inmediatamente después de fijarlo, y macOS todavía no había terminado de conmutar, así que devolvía el del aparato ANTERIOR —44 100 Hz cuando ya estaba en 48 000, o al revés—. Ese formato es válido, de modo que pasaba la comprobación añadida en 0.54.1, y la escucha se rechazaba con «format mismatch»: el dictado no arrancaba y no había forma de seguir sin reiniciar",
             "Ahora no se le pasa ningún formato: lo resuelve el propio motor de audio en el instante de instalar la escucha, así que la discrepancia no puede existir. El conversor se arma con el formato del primer trozo de audio REAL y se rearma solo si el micrófono cambia de frecuencia a mitad de la grabación",

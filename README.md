@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.63.3
+
+- **El mismo fallo de 0.63.2 estaba en la bitácora**, y ahí era peor: si la
+  escucha no entraba, **dejaba de grabar en silencio**. Corregido igual, más el
+  mapa de canales, que ahora viaja con el conversor — con la cancelación de eco
+  el micrófono llega con nueve canales y sin ese mapa el audio se perdía sin
+  avisar. La activación por voz recibe el mismo arreglo.
+
 ### Novedades 0.63.2
 
 - **Arreglado el «el micrófono no aceptó la escucha»** que obligaba a cerrar y
