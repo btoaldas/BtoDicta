@@ -72,10 +72,20 @@ siete piezas falla nombrándolas una a una.
 
 ## Riesgos residuales, dichos claros
 
-1. **La primera descarga se confía.** Se comprueba que lo que llega es un modelo
-   del formato correcto, no que sea **el** modelo correcto. Un repositorio
-   comprometido serviría un GGUF alterado y pasaría las comprobaciones. Cerrarlo
-   exigiría huellas publicadas y fijadas para cada modelo del catálogo.
+1. ~~**La primera descarga se confía.**~~ **Cerrado el 2026-09-19 (0.66.1).** Las
+   huellas de los cuatro modelos del catálogo están fijadas en
+   `Resources/modelos-conocidos.json`, tomadas de la cabecera `x-linked-etag`
+   que Hugging Face publica para cada archivo LFS y **contrastadas una a una
+   contra los archivos ya instalados**: las cuatro coincidían.
+
+   Ahora un modelo del catálogo que no sea exactamente el esperado se rechaza,
+   aunque venga del sitio de siempre y tenga el formato correcto. Un modelo que
+   NO esté en el catálogo se sigue aceptando: el usuario puede bajar el GGUF que
+   quiera, y no es cosa nuestra impedirlo.
+
+   Los ya instalados también se comprueban, una vez al arrancar y en segundo
+   plano. Solo avisa: que un modelo cambie puede ser legítimo —su repositorio lo
+   actualizó— y esa decisión es de su dueño, no de la aplicación.
 2. **Los binarios se compilan a mano** en las carpetas del desarrollador. No hay
    compilación reproducible: dos máquinas darían huellas distintas. Lo que se
    vigila es que no cambien sin motivo, no de dónde vienen.

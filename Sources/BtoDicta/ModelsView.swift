@@ -40,9 +40,18 @@ final class Descargas: ObservableObject {
                         Log.log(.ia, "descarga \(nombre) RECHAZADA — \(motivo). No se instala nada")
                         return
                     }
+                    // Y si es un modelo del catálogo, tiene que ser EXACTAMENTE
+                    // el esperado. Aquí se calcula sobre el temporal: un archivo
+                    // que no cuadra no llega a ocupar el sitio del bueno.
+                    let huella = ModeloDescargado.huella(de: tmp)
+                    if let motivo = ModeloDescargado.motivoPorHuella(huella,
+                                                                     archivo: destino.lastPathComponent) {
+                        try? FileManager.default.removeItem(at: tmp)
+                        Log.log(.ia, "descarga \(nombre) RECHAZADA — \(motivo). No se instala nada")
+                        return
+                    }
                     try? FileManager.default.removeItem(at: destino)
                     try? FileManager.default.moveItem(at: tmp, to: destino)
-                    let huella = ModeloDescargado.huella(de: destino)
                     Log.log(.ia, "\(nombre) descargado y comprobado · \(ModeloDescargado.tamañoLegible(destino)) · sha256 \(huella.prefix(16))…")
                     ModeloDescargado.anotarHuella(huella, de: destino, nombre: nombre)
                 } else if (err as NSError?)?.code == NSURLErrorCancelled {
@@ -672,6 +681,23 @@ struct CloudRow: View {
 
 enum ModeloDescargado {
 
+    /// Huellas FIJADAS de los modelos del catálogo, por nombre de archivo.
+    ///
+    /// Comprobar el formato evita guardar una página de error con nombre de
+    /// modelo, pero no dice que sea EL modelo correcto: un repositorio
+    /// comprometido serviría un GGUF alterado y pasaría esa comprobación.
+    ///
+    /// Con la huella fijada, un archivo que no sea exactamente el esperado se
+    /// rechaza aunque venga del sitio de siempre y tenga el formato correcto.
+    static let conocidos: [String: String] = {
+        guard let ruta = Bundle.main.url(forResource: "modelos-conocidos", withExtension: "json"),
+              let datos = try? Data(contentsOf: ruta),
+              let json = try? JSONSerialization.jsonObject(with: datos) as? [String: Any],
+              let modelos = json["modelos"] as? [String: [String: String]]
+        else { return [:] }
+        return modelos.compactMapValues { $0["sha256"] }
+    }()
+
     /// Firmas de los formatos que la aplicación sabe cargar.
     private static let firmas: [(String, [UInt8])] = [
         ("GGUF", Array("GGUF".utf8)),      // llama.cpp y derivados
@@ -703,6 +729,21 @@ enum ModeloDescargado {
         guard reconocido else {
             let vistos = cabecera.prefix(4).map { String(format: "%02x", $0) }.joined(separator: " ")
             return "no reconozco el formato (empieza por \(vistos))"
+        }
+        return nil
+    }
+
+    /// Por qué NO instalar esto según su huella, o `nil` si se puede.
+    ///
+    /// Un modelo que no está en el catálogo se acepta: el usuario puede bajar
+    /// cualquier GGUF que quiera, y no somos quién para impedirlo. Lo que no
+    /// puede pasar es que un modelo DEL CATÁLOGO llegue distinto de lo esperado.
+    static func motivoPorHuella(_ huella: String, archivo: String) -> String? {
+        guard let esperada = conocidos[archivo] else { return nil }
+        guard !huella.isEmpty else { return "no pude calcular su huella" }
+        guard huella == esperada else {
+            return "su huella no es la que debería (\(huella.prefix(12))… en vez de \(esperada.prefix(12))…). "
+                 + "O el modelo cambió en su repositorio, o lo que llegó no es lo que se pidió"
         }
         return nil
     }
@@ -741,6 +782,26 @@ enum ModeloDescargado {
         guard let d = try? JSONSerialization.data(withJSONObject: tabla, options: [.prettyPrinted]) else { return }
         Config.asegurarDirSeguro()
         try? d.write(to: registro, options: .atomic)
+    }
+
+    /// Comprueba los modelos del catálogo YA instalados contra su huella fijada.
+    ///
+    /// Los que se instalaron antes de que existieran estas huellas nunca se
+    /// habían comprobado. Esto lo hace una vez, al arrancar, y solo avisa: no
+    /// borra nada. Un modelo que no cuadra puede ser un repositorio que lo
+    /// actualizó, y eso lo decide su dueño, no la aplicación.
+    static func revisarCatalogoInstalado() -> [(archivo: String, esperada: String, encontrada: String)] {
+        var malos: [(String, String, String)] = []
+        for (archivo, esperada) in conocidos {
+            for carpeta in [TranscribeCpp.modelsDir,
+                            Config.dir.appendingPathComponent("embeddings-engine")] {
+                let ruta = carpeta.appendingPathComponent(archivo)
+                guard FileManager.default.fileExists(atPath: ruta.path) else { continue }
+                let ahora = huella(de: ruta)
+                if !ahora.isEmpty, ahora != esperada { malos.append((archivo, esperada, ahora)) }
+            }
+        }
+        return malos
     }
 
     /// ¿Algún modelo instalado cambió de contenido desde que se descargó?

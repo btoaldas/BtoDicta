@@ -448,6 +448,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ApiLocal.arrancar()
         // Audios de trabajo de dictados viejos, según el ajuste (0 = nunca).
         Recorder.barrerDictadosViejos()
+        // Los modelos del catálogo, contra su huella fijada. En segundo plano y
+        // con retraso: son varios gigas y no puede estorbar al arranque. Solo
+        // avisa; que un modelo cambie puede ser legítimo y lo decide su dueño.
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 60) {
+            let malos = ModeloDescargado.revisarCatalogoInstalado()
+            for m in malos {
+                Log.log(.ia, "modelo: «\(m.archivo)» NO coincide con su huella conocida "
+                           + "(\(m.encontrada.prefix(12))… en vez de \(m.esperada.prefix(12))…). "
+                           + "O se actualizó en su repositorio, o el archivo se alteró")
+            }
+            if malos.isEmpty {
+                Log.debug("modelos: los del catálogo coinciden con su huella")
+            }
+        }
 
         if ProcessInfo.processInfo.environment["BTODICTA_WAKEDETECTTEST"] == "1" {
             let esperarNinguno = ProcessInfo.processInfo.environment["BTODICTA_WAKEEXPECTNONE"] == "1"
@@ -2195,6 +2209,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let ckpt = archivo("v.ckpt", Data([0x50, 0x4B, 0x03, 0x04]) + relleno)
             chk(ModeloDescargado.motivoParaRechazar(ckpt, respuesta: resp200) == nil,
                 "y un punto de control de PyTorch")
+
+            // Huellas FIJADAS: un modelo del catálogo tiene que ser el esperado.
+            let catalogo = ModeloDescargado.conocidos
+            chk(catalogo.count >= 4, "el catálogo trae huellas fijadas (\(catalogo.count) modelos)")
+            if let (nombreReal, huellaReal) = catalogo.first {
+                chk(ModeloDescargado.motivoPorHuella(huellaReal, archivo: nombreReal) == nil,
+                    "la huella correcta de «\(nombreReal.prefix(24))…» pasa")
+                let falsa = String(huellaReal.dropLast()) + (huellaReal.hasSuffix("a") ? "b" : "a")
+                chk(ModeloDescargado.motivoPorHuella(falsa, archivo: nombreReal) != nil,
+                    "una huella que cambia UN carácter se rechaza")
+                chk(ModeloDescargado.motivoPorHuella("", archivo: nombreReal) != nil,
+                    "sin huella no se instala un modelo del catálogo")
+            }
+            chk(ModeloDescargado.motivoPorHuella("loquesea", archivo: "modelo-que-el-usuario-bajo.gguf") == nil,
+                "un modelo que NO es del catálogo se acepta igual (prueba negativa)")
 
             // La huella: misma entrada, misma salida; cambio de un byte, otra.
             let h1 = ModeloDescargado.huella(de: bueno)

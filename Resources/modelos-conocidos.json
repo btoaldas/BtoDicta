@@ -1,0 +1,38 @@
+{
+  "_comentario": [
+    "Huellas sha256 FIJADAS de los modelos del catálogo.",
+    "Comprobar el formato de lo descargado evita guardar una página de error con",
+    "nombre de modelo, pero no dice que sea EL modelo correcto: un repositorio",
+    "comprometido serviría un GGUF alterado y pasaría esa comprobación.",
+    "",
+    "Estas huellas se tomaron el 2026-09-19 de la cabecera x-linked-etag que",
+    "Hugging Face publica para cada archivo LFS, y se contrastaron una a una con",
+    "los archivos ya instalados en esta máquina: las cuatro coincidían.",
+    "",
+    "Si un modelo se actualiza en su repositorio, su huella cambia y la descarga",
+    "se rechazará hasta que se anote la nueva aquí. Es a propósito: un modelo que",
+    "cambia sin avisar es exactamente lo que hay que notar."
+  ],
+  "modelos": {
+    "bge-m3-Q4_K_M.gguf": {
+      "sha256": "6d39681b26c61279ac1f82db35a04a05009e94c415b51c858ff571489a82fc06",
+      "origen": "gpustack/bge-m3-GGUF",
+      "para": "embeddings de la búsqueda semántica"
+    },
+    "ggml-large-v3-turbo.bin": {
+      "sha256": "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
+      "origen": "ggerganov/whisper.cpp",
+      "para": "transcripción local por defecto"
+    },
+    "Voxtral-Mini-4B-Realtime-2602-Q4_K_M.gguf": {
+      "sha256": "39dc1f65539373a406edea7490505822d77c12edff521744678717eef4da4723",
+      "origen": "handy-computer/Voxtral-Mini-4B-Realtime-2602-GGUF",
+      "para": "transcripción local en tiempo real"
+    },
+    "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf": {
+      "sha256": "b94545b313b3223fda7b2857a52681da813935c2127643d1e9ff0c23d988089c",
+      "origen": "handy-computer/nemotron-3.5-asr-streaming-0.6b-GGUF",
+      "para": "transcripción local ligera"
+    }
+  }
+}
