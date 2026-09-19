@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.64.2"
+    static let numero = "0.64.3"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.64.3", "2026-09-19", [
+            "EL REGISTRO YA TE DICE QUÉ HACER, no un número. Cuando un proveedor se aparta, en vez de «en cuarentena 30 min por HTTP 402» leerás «se quedó sin saldo o sin cuota», «no acepta la clave (¿caducó o se copió mal?)» o «demasiadas peticiones seguidas». El código sigue apareciendo detrás, para diagnosticar",
+            "Dos resúmenes generados en el mismo segundo ya no comparten archivo. El nombre escalaba a la hora y al segundo, pero dos rutinas que caen a la vez —o una manual justo encima de una automática— todavía se pisaban",
+            "Con esto se cierran los veinticuatro pendientes que venían arrastrándose desde versiones anteriores. Otros cuatro resultaron ser cosas que el código ya había arreglado por el camino, y se comprobó uno a uno en vez de darlos por buenos",
+        ]),
         ("0.64.2", "2026-09-19", [
             "Los resúmenes del día ya no se quedan cortos sin explicación. Si una rutina se disparaba mientras la bitácora estaba transcribiendo, generaba su documento igual, con el día a medio procesar. Ahora espera unos minutos y lo hace con el material completo",
             "Y ya no congelan la aplicación mientras se preparan: armar el material de un día entero —que puede pasar de doscientos mil caracteres— se hacía en el mismo hilo que dibuja la ventana",

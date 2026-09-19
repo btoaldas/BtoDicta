@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.64.3
+
+- **El registro dice qué hacer, no un número**: «se quedó sin saldo», «no acepta
+  la clave», en vez de «HTTP 402». El código sigue detrás.
+- Dos resúmenes del mismo segundo ya no comparten archivo.
+- Con esto se cierran los **24 pendientes** arrastrados de versiones anteriores.
+
 ### Novedades 0.64.2
 
 - Los resúmenes del día ya no salen cortos por generarse con el día a medio

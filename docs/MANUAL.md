@@ -1016,6 +1016,19 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### Entender por qué se apartó un proveedor
+
+Cuando un motor falla, BtoDicta lo aparta un rato y sigue con el siguiente. Desde
+0.64.3 el registro dice el motivo en una frase antes del código:
+
+```
+failover: ElevenLabs apartado 30 min — se quedó sin saldo o sin cuota [HTTP 402: …]
+failover: Groq apartado 5 min — demasiadas peticiones seguidas [HTTP 429: …]
+```
+
+Lo tienes también en *Configuración → Salud*, con quién está apartado y hasta
+cuándo.
+
 ### El resumen del día salió corto
 
 Desde 0.64.2 no debería volver a pasar por esta causa. Si una rutina se disparaba
