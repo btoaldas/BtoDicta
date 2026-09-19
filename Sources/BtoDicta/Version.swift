@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.69.0"
+    static let numero = "0.70.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.70.0", "2026-09-19", [
+            "LOS MOTORES LOCALES YA NO SE RINDEN CON UN DICTADO LARGO. Medido: una hora de audio hacía que Voxtral pidiera 64 GB de memoria, fallara en dos segundos y devolviera vacío. Como no contestaba «demasiado grande» sino nada, la aplicación creía que el audio estaba en silencio y no lo troceaba: se saltaba tu motor preferido y usaba otro. Ahora comprueba si el audio tiene voz; si la tiene, el vacío es del motor y se parte y reintenta. La misma hora ahora sale completa por Voxtral, con MENOS de la mitad de errores que el motor al que caía",
+            "Y el caso hermano, que era peor porque no fallaba: un motor que transcribe los primeros minutos y devuelve eso como si fuera todo. La llamada salía «bien» y nadie echaba en falta lo que faltaba. Ahora, si el texto es demasiado poco para la cantidad de voz que hay en el audio, se reintenta partido",
+            "Vale para los más de veinte motores a la vez, porque el arreglo está en el sitio por el que pasan todos, no en cada uno",
+        ]),
         ("0.69.0", "2026-09-19", [
             "LA APP YA NO SE COME CASI 5 GB AL ABRIRSE. Al arrancar comprueba que tus modelos siguen siendo los que descargaste; esa comprobación leía los archivos de a un mega, pero no soltaba lo leído, así que retenía los 4,8 GB de modelos enteros. Ahora ocupa 1 MB. Si tu Mac se ponía lenta durante el primer minuto tras abrir BtoDicta, era esto",
             "Dictado largo comprobado con el micrófono de verdad durante 63 minutos seguidos: 37 796 trozos de audio, ni un hueco, y la memoria plana en 28 MB de principio a fin",

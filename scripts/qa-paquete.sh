@@ -164,6 +164,9 @@ else
   # pero sin soltar lo leído, y dejaba ~5 GB de huella en cada arranque.
   # Se omite sola si no hay ningún modelo grande instalado.
   ejecutar "huella_modelos_memoria" "BTODICTA_HUELLAMEMTEST" "1" 180
+  # Leer por trozos no sirve de nada si no se suelta cada trozo: llegó a
+  # retener 4,9 GB en cada arranque por comprobar la huella de los modelos.
+  estatica "lectura_por_trozos" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-lectura-por-trozos.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "memoria_en_disco" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-memoria-en-disco.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "conexion_compartida" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-conexion-compartida.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
 fi

@@ -205,9 +205,29 @@ enum Troceo {
     /// No se pregunta «¿cuál es el límite?», sino «¿este fallo es compatible con
     /// haberme pasado?». Las credenciales, la cuota y el audio sin voz NO lo
     /// son: ahí partir no arregla nada y solo gasta dinero y tiempo.
-    static func pareceDeTamano(_ e: Error, bytes: Int) -> Bool {
+    /// ¿El fallo huele a «no pude con algo tan grande»?
+    ///
+    /// `conVoz` dice si el audio contiene habla. Importa para un solo caso, pero
+    /// es el que dejaba pasar el fallo más caro: ver abajo.
+    static func pareceDeTamano(_ e: Error, bytes: Int, conVoz: Bool = false) -> Bool {
         guard bytes > minimoParaPartir else { return false }
-        if case ScribeError.sinTexto = e { return false }
+        if case ScribeError.sinTexto = e {
+            // Un motor que no devuelve texto puede estar diciendo dos cosas muy
+            // distintas, y durante mucho tiempo se supuso siempre la primera:
+            //
+            //   a) «aquí no hay nadie hablando» — partir el silencio no produce
+            //      texto, así que trocear sería puro gasto.
+            //   b) «no pude con esto» — los motores LOCALES no contestan 413: se
+            //      quedan sin memoria y salen sin escribir nada. Medido el
+            //      2026-09-19: con 61 min de audio, Voxtral pide un buffer de
+            //      64 GB, falla en 1,7 s y devuelve vacío. Como esto se leía como
+            //      el caso (a), no se troceaba NUNCA y la hora entera se perdía
+            //      en ese motor.
+            //
+            // Los distingue el propio audio: si tiene voz, el vacío no es del
+            // audio, es del motor.
+            return conVoz
+        }
         if case ScribeError.sinApiKey = e { return false }
         if case ScribeError.http(let code, _) = e {
             switch code {
@@ -223,6 +243,50 @@ enum Troceo {
                     NSURLErrorDataLengthExceedsMaximum].contains(n.code)
         }
         return false
+    }
+
+    // MARK: ¿Vino todo?
+
+    /// Segundos de audio con voz dentro de un WAV, con el mismo criterio que usa
+    /// la bitácora para no mandar silencio a la nube.
+    ///
+    /// Se mide sobre el audio que se va a enviar, no sobre su duración total:
+    /// media hora de reunión con diez minutos de habla debe juzgarse por los
+    /// diez, o cualquier umbral sobre el texto daría falsa alarma.
+    static func segundosDeVoz(_ wav: CuerpoMultipart.Origen) -> Double {
+        let umbral = AudioSilencio.umbralPico()
+        guard umbral > 0 else { return Double(max(0, wav.bytes - 44)) / Double(RedSeguridadDictado.bytesPorSegundo) }
+        var sonoras = 0
+        let datos = wav.leer()
+        guard datos.count > 44 else { return 0 }
+        datos.withUnsafeBytes { crudo in
+            let muestras = crudo.bindMemory(to: Int16.self)
+            var i = 22                                   // saltar los 44 B de cabecera
+            while i < muestras.count {
+                if Int(muestras[i].magnitude) >= umbral { sonoras += 1 }
+                i += 1
+            }
+        }
+        return Double(sonoras) / Double(RedSeguridadDictado.bytesPorSegundo / 2)
+    }
+
+    /// ¿El texto devuelto es demasiado poco para lo que se oye en el audio?
+    ///
+    /// Este es el fallo hermano del anterior, y el más peligroso de los dos: un
+    /// motor que se atraganta con audio largo no siempre falla. A veces
+    /// transcribe los primeros minutos, se detiene y devuelve ESO como si fuera
+    /// todo. La llamada sale bien, el registro dice «OK», y lo que falta no lo
+    /// echa en falta nadie — salvo quien dictó.
+    ///
+    /// El umbral es deliberadamente flojo: hablando despacio salen unas 100
+    /// palabras por minuto, y aquí se exige una sola cada tres segundos de VOZ.
+    /// No pretende juzgar la calidad; solo cazar al motor que entregó un tercio
+    /// de lo dictado. Con menos de dos minutos de voz no opina: en lo corto, una
+    /// respuesta breve puede ser legítima.
+    static func pareceTruncado(texto: String, segundosDeVoz voz: Double) -> Bool {
+        guard voz >= 120 else { return false }
+        let palabras = texto.split { $0 == " " || $0 == "\n" || $0 == "\t" }.count
+        return Double(palabras) < voz / 3.0
     }
 
     // MARK: Partir y coser
@@ -268,15 +332,36 @@ enum Troceo {
                 return
             }
         }
+        // Cuánta voz trae el audio. Se calcula UNA vez y solo cuando el audio es
+        // grande: es recorrer las muestras, y en lo corto no decide nada.
+        let voz: Double = wav.bytes > minimoParaPartir ? segundosDeVoz(wav) : 0
+
         enviar(wav) { r in
             switch r {
             case .success(let texto):
+                // Un éxito con muy poco texto para lo que se oye no es un éxito:
+                // es un motor que se detuvo a medias y no lo dijo. Se trata como
+                // lo que es —no pudo con el tamaño— y se reintenta partido.
+                if profundidad < 4, pareceTruncado(texto: texto, segundosDeVoz: voz),
+                   case let partes = tramos(wav.leer(), bytesPorTramo: RedSeguridadDictado.par((wav.bytes - 44) / 2)),
+                   partes.count > 1 {
+                    Log.log(.ia, "\(motor): devolvió \(texto.split(separator: " ").count) palabras para \(Int(voz)) s de voz — parece que se quedó a medias, lo reintento en \(partes.count) tramos")
+                    anotarRechazo(motor, bytes: wav.bytes)
+                    encadenar(partes, motor: motor, profundidad: profundidad + 1,
+                              enviar: enviar, completion: completion)
+                    return
+                }
                 anotarExito(motor, bytes: wav.bytes)
                 completion(.success(texto))
             case .failure(let e):
-                guard profundidad < 4, pareceDeTamano(e, bytes: wav.bytes) else {
+                guard profundidad < 4, pareceDeTamano(e, bytes: wav.bytes, conVoz: voz > 0.5) else {
                     completion(.failure(e)); return
                 }
+                // Un motor local sin memoria no contesta un código: se va en
+                // silencio. Ese caso también deja medida, porque su techo es
+                // estable —depende de la RAM del equipo, no del servidor de
+                // nadie— y conviene recordarlo para el próximo dictado largo.
+                if case ScribeError.sinTexto = e { anotarRechazo(motor, bytes: wav.bytes) }
                 // Partir SÍ se intenta siempre que el fallo encaje; APRENDER
                 // solo cuando contestó el servidor. Un cuelgue de red merece un
                 // reintento en trozos —por si acaso—, pero jamás una medida.

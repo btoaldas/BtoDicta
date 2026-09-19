@@ -1838,9 +1838,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             chk(!Troceo.pareceDeTamano(ScribeError.http(402, "sin crédito"), bytes: grande),
                 "sin saldo NO se parte: partir no paga la factura")
             chk(!Troceo.pareceDeTamano(ScribeError.http(401, ""), bytes: grande), "credencial mala tampoco")
-            chk(!Troceo.pareceDeTamano(ScribeError.sinTexto, bytes: grande), "audio sin voz tampoco")
+            chk(!Troceo.pareceDeTamano(ScribeError.sinTexto, bytes: grande, conVoz: false),
+                "audio SIN voz que no da texto: no se parte, partir silencio no habla")
+            chk(Troceo.pareceDeTamano(ScribeError.sinTexto, bytes: grande, conVoz: true),
+                "audio CON voz que no da texto: SÍ se parte — el vacío es del motor, no del audio")
             chk(!Troceo.pareceDeTamano(ScribeError.http(400, ""), bytes: 1_000),
                 "y con audio pequeño nunca: ahí el problema es otro")
+
+            // 3 bis) El motor que se queda a medias y no lo dice. Un éxito con
+            //        cuatro palabras para media hora de voz es un fallo disfrazado.
+            chk(Troceo.pareceTruncado(texto: "hola que tal", segundosDeVoz: 1_800),
+                "3 palabras para 30 min de voz: se queda a medias")
+            chk(!Troceo.pareceTruncado(texto: String(repeating: "palabra ", count: 600), segundosDeVoz: 1_800),
+                "600 palabras para 30 min de voz: eso sí es una transcripción")
+            chk(!Troceo.pareceTruncado(texto: "sí", segundosDeVoz: 30),
+                "media hora NO, treinta segundos: una respuesta corta puede ser legítima")
+            chk(!Troceo.pareceTruncado(texto: "", segundosDeVoz: 0),
+                "sin voz no se opina")
 
             // 4) Lo aprendido se desdice solo. Es el caso que preocupa: si el
             //    internet se cae a mitad de un envío, el motor NO puede quedar

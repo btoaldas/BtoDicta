@@ -1039,6 +1039,17 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### Un dictado largo salió por un motor que no elegiste
+
+Arreglado en 0.70.0. Los motores locales no avisan «esto es demasiado grande»:
+se quedan sin memoria y devuelven vacío. La aplicación interpretaba ese vacío
+como «aquí no habla nadie» y pasaba al siguiente motor de la cascada, en vez de
+partir el audio. Con una hora de dictado, Voxtral llegaba a pedir 64 GB.
+
+Ahora se mira si el audio tiene voz. Si la tiene, el vacío es del motor: se parte
+el audio y se reintenta con el mismo. Si notabas que los dictados largos salían
+con otro motor, era esto.
+
 ### Resúmenes o tandas repetidos el mismo día
 
 Arreglado en 0.68.0. Las tareas automáticas apuntaban en memoria que ya se habían

@@ -59,12 +59,23 @@ enum AudioSilencio {
             _ = try? h.read(upToCount: 44)
         }
         var sonoras = 0, total = 0
-        while let trozo = try? h.read(upToCount: 262_144), !trozo.isEmpty {
-            trozo.withUnsafeBytes { crudo in
-                let muestras = crudo.bindMemory(to: Int16.self)
-                total += muestras.count
-                for m in muestras where Int(m.magnitude) >= umbral { sonoras += 1 }
+        // El `autoreleasepool` no sobra: `read` devuelve un `Data` autoliberado
+        // y sin drenar el depósito los trozos se acumulan hasta acabar el bucle.
+        // Con una hora de audio son 112 MB retenidos por mirar si hay silencio.
+        // Es el mismo descuido que en la comprobación de huella de los modelos,
+        // que llegó a retener 4,9 GB: leer por trozos no sirve de nada si no se
+        // suelta cada trozo.
+        while true {
+            let fin = autoreleasepool { () -> Bool in
+                guard let trozo = try? h.read(upToCount: 262_144), !trozo.isEmpty else { return true }
+                trozo.withUnsafeBytes { crudo in
+                    let muestras = crudo.bindMemory(to: Int16.self)
+                    total += muestras.count
+                    for m in muestras where Int(m.magnitude) >= umbral { sonoras += 1 }
+                }
+                return false
             }
+            if fin { break }
         }
         guard total > 0 else { return true }
         return Double(sonoras) / Double(total) < proporcionMinima()
@@ -76,13 +87,18 @@ enum AudioSilencio {
         defer { try? h.close() }
         if archivo.pathExtension.lowercased() == "wav" { _ = try? h.read(upToCount: 44) }
         var pico = 0
-        while let trozo = try? h.read(upToCount: 262_144), !trozo.isEmpty {
-            trozo.withUnsafeBytes { crudo in
-                for m in crudo.bindMemory(to: Int16.self) {
-                    let v = Int(m.magnitude)
-                    if v > pico { pico = v }
+        while true {                       // mismo motivo que en `esSilencio`
+            let fin = autoreleasepool { () -> Bool in
+                guard let trozo = try? h.read(upToCount: 262_144), !trozo.isEmpty else { return true }
+                trozo.withUnsafeBytes { crudo in
+                    for m in crudo.bindMemory(to: Int16.self) {
+                        let v = Int(m.magnitude)
+                        if v > pico { pico = v }
+                    }
                 }
+                return false
             }
+            if fin { break }
         }
         return pico
     }

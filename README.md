@@ -34,6 +34,15 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.70.0
+
+- **Los motores locales ya no se rinden con un dictado largo**: una hora hacía
+  que Voxtral pidiera 64 GB y devolviera vacío; como no era un error de tamaño
+  explícito, no se troceaba. Ahora sí. Misma hora, 0,43 % de error.
+- **Y el caso que no fallaba**: un motor que devuelve solo los primeros minutos
+  como si fueran todo. Se detecta por desproporción texto/voz y se reintenta.
+- Ambos en el punto por el que pasan los 20+ motores. QA de 18 a 19.
+
 ### Novedades 0.69.0
 
 - **Casi 5 GB de memoria menos al arrancar**: la comprobación de huella de los
