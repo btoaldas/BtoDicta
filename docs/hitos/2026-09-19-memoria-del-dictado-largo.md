@@ -49,15 +49,23 @@ resuelto. La prueba corregida **da rojo** contra el código anterior, que es la
 Por eso la fase A fue la red de seguridad y no el cambio: antes de tocar un solo
 motor se comprobó byte a byte que el cuerpo nuevo era idéntico al viejo.
 
-## Riesgos residuales
+## Riesgos residuales — los cuatro cerrados el 2026-09-19 (0.63.7)
 
-1. El historial lee el audio entero al guardarlo, ya transcrito. Es la última
-   copia del camino.
-2. Los motores locales siguen recibiendo el audio en memoria.
-3. El audio de trabajo ocupa ~115 MB por hora dictada; con el ajuste en 0 no se
-   barre nunca, que es lo que ese valor significa.
-4. No se ha auditado si queda algún otro punto fuera de la sesión compartida del
-   dictado, además del de ElevenLabs que se corrigió aquí.
+1. ~~El historial lee el audio entero al guardarlo.~~ **Resuelto**: lo adopta
+   moviéndolo. 0 MB medidos.
+2. ~~Los motores locales reciben el audio en memoria.~~ **Resuelto**: lo reciben
+   por enlace duro, comprobado por número de nodo del sistema de archivos.
+3. ~~El audio de trabajo se acumula.~~ **Resuelto por el punto 1**: deja de
+   existir donde estaba en cuanto pasa al historial. El barrido por antigüedad
+   queda como red para lo que no llegue a moverse, no como única defensa.
+4. ~~Sin auditar el resto de la aplicación.~~ **Auditada**: el patrón había
+   vuelto en trece sitios. Retirado en todos, y vigilado desde el QA por
+   `scripts/qa-conexion-compartida.py`.
+
+Al cerrarlos apareció **un fallo que podía perder un dictado**: dos dictados en
+el mismo segundo compartían archivo y el segundo pisaba al primero. Estaba
+anotado como pendiente menor; con la adopción por movimiento dejaba de serlo.
+Corregido y con prueba.
 
 ## Evidencia
 

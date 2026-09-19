@@ -8,17 +8,16 @@ Estados: **Vivo** · **Corregido** (con versión) · **Por verificar** (el códi
 cambió alrededor y hay que comprobar si sigue) · **Decisión** (no es un fallo:
 hace falta que Alberto decida).
 
-Última revisión: 2026-09-18.
+Última revisión: 2026-09-19.
 
 ## Resumen
 
 | Estado | Cuántos |
 |---|---|
-| Vivo | 19 |
+| Vivo | 16 |
 | Por verificar | 2 |
 | Decisión de Alberto | 5 |
-| Corregido, esperando release | 2 |
-| Corregido y publicado | 7 |
+| Corregido y publicado | 11 |
 
 ## Riesgo — lo único con vector externo
 
@@ -34,7 +33,7 @@ Los tres juntos son la candidata a **spec 007**.
 
 | # | Qué pasa | Estado | Origen |
 |---|---|---|---|
-| A1 | `installTap` con formato explícito en la bitácora y en la activación por voz: el mismo fallo de «format mismatch» del grabador | **Corregido, esperando release** | Hallado 2026-09-18 |
+| A1 | `installTap` con formato explícito en la bitácora y en la activación por voz | **Corregido** en 0.63.3 | Hallado 2026-09-18 |
 | A2 | Carrera de datos benigna en el tap de `ContinuoAudio` (conversor y `buffersVistos` entre el hilo de audio y la cola) | Por verificar — el conversor se movió dentro del tap el 2026-09-18 | 0.50.1 |
 | A3 | Con micrófono no disponible y bitácora activa, el vigía de 400 ms fuerza remontajes sin tregua | Por verificar — el reintento con respiro de 0.63.2 puede haberlo cambiado | 0.50.1 |
 | A4 | Reconfigurar en ráfaga desde los deslizadores reinicia el motor de grabación decenas de veces por arrastre (falta amortiguación) | Vivo | 0.50.1 |
@@ -44,7 +43,7 @@ Los tres juntos son la candidata a **spec 007**.
 
 | # | Qué pasa | Estado | Origen |
 |---|---|---|---|
-| N1 | `ScribeBatchClient` usa `URLSession.shared` en sus dos envíos, así que el arreglo de `Connection: close` de 0.59.0 **no lo cubre**: puede heredar un socket cerrado y esperar en balde | Vivo | Hallado 2026-09-18 |
+| N1 | `Connection: close` sobre la sesión compartida: el fallo de 0.59.0 había vuelto en **trece sitios**, no solo en ElevenLabs | **Corregido** en 0.63.7, con guardián estático en el QA | Hallado 2026-09-18 |
 | N2 | `pulido: groq falló (HTTP 200)` — respuesta correcta sin contenido extraíble, modelos `openai/gpt-oss-*` con campo `reasoning`. Revisar `extraerContenido` | Vivo | 0.53.0 §2.8 |
 | N3 | Etiqueta pendiente de ElevenLabs Scribe sin cuota (el fondo se cubrió en 0.52.0) | Vivo | 0.53.0 §2.4 |
 
@@ -57,7 +56,7 @@ Los tres juntos son la candidata a **spec 007**.
 | B3 | Los trozos menores de 16 KB quedan fuera del índice y de la purga | Vivo | 0.50.1 |
 | B4 | `rescatarHuerfanos` puede indexar el trozo aún abierto con metadatos provisionales | Vivo | 0.50.1 |
 | B5 | La purga no es atómica: si falla un borrado físico, el texto del índice ya se perdió | Vivo | 0.50.1 |
-| B6 | `guardar()` de documentos hace comprobar-luego-escribir sin exclusión: dos en el mismo segundo colisionan | Vivo | 0.50.1 |
+| B6 | Dos dictados en el mismo segundo compartían archivo y el segundo pisaba al primero | **Corregido** en 0.63.7. Queda vivo el caso equivalente en los DOCUMENTOS, que es otro camino | Vivo (documentos) · 0.50.1 |
 | B7 | `cargarExplorador` recorre dos veces el árbol completo en cada refresco. Con meses de historial la pestaña tarda | Vivo | 0.51.1 |
 | B8 | `huellaPrevia` y `ultimaEscritura` de `ContinuoPantalla` se mutan desde el hilo principal y desde el ejecutor de la captura | Vivo | 0.51.1 |
 | B9 | `ContinuoPantalla`: estado compartido entre el hilo principal y el ejecutor del Task | Vivo | 0.50.1 |
