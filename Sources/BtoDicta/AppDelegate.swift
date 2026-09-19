@@ -2124,6 +2124,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // Que un fallo al escribir NO pase desapercibido: BTODICTA_ESCRITURATEST=1
+        //
+        // El peor fallo de esta aplicación no es que avise de un problema: es que
+        // no avise. Grabar contra un archivo que no se abrió deja al usuario
+        // dictando media hora contra el vacío, con todo pareciendo normal.
+        if ProcessInfo.processInfo.environment["BTODICTA_ESCRITURATEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("ESCRITURA \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+
+            // Un escritor normal: cuenta lo que escribe.
+            let bueno = HistoryWriter()
+            let trozo = Data(repeating: 5, count: 32_000)
+            for _ in 0..<3 { bueno.append(chunk: trozo) }
+            chk(bueno.bytesEscritos == 96_000, "lo que sí se escribe se cuenta (\(bueno.bytesEscritos) B)")
+            chk(Recorder.bytes(de: bueno.pcmURLQA) == 96_000, "y está de verdad en el archivo")
+            bueno.discard()
+
+            // Ahora uno al que le quitamos el archivo por debajo, que es lo que
+            // pasa cuando el disco se llena o un volumen se desconecta.
+            let roto = HistoryWriter()
+            roto.cerrarArchivoQA()
+            let antes = roto.bytesEscritos
+            for _ in 0..<3 { roto.append(chunk: trozo) }
+            chk(roto.bytesEscritos == antes,
+                "sin poder escribir, el contador NO sube: antes mentía y decía \(antes + 96_000)")
+            roto.discard()
+
+            print("ESCRITURA \(mal == 0 ? "TODO OK — un fallo al escribir se nota" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Que el texto no pueda ejecutar órdenes: BTODICTA_SHELLTEST=1
         //
         // La voz local dice en voz alta lo que responde la IA, y la IA redacta a

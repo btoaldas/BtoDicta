@@ -71,6 +71,13 @@ final class HistoryWriter {
         base = candidata
         FileManager.default.createFile(atPath: pcmURL.path, contents: nil)
         pcmHandle = try? FileHandle(forWritingTo: pcmURL)
+        if pcmHandle == nil {
+            // Si el archivo no se abre —disco lleno, permisos, un volumen que se
+            // fue— hay que DECIRLO. Callarlo dejaba a la aplicación grabando
+            // contra el vacío: el contador de bytes subía igual y todo parecía
+            // normal hasta que alguien buscaba un dictado que nunca existió.
+            Log.log(.sistema, "historial: NO pude abrir \(pcmURL.lastPathComponent) para escribir — este dictado no se está guardando")
+        }
     }
 
     /// Cuántos bytes de PCM llevan escritos. Es la MEDIDA del dictado: la
@@ -80,8 +87,29 @@ final class HistoryWriter {
 
     /// Audio crudo a disco al instante — sobrevive a cualquier crash.
     func append(chunk: Data) {
-        pcmHandle?.write(chunk)
-        bytesEscritos += chunk.count
+        guard let h = pcmHandle else {
+            // Sin archivo no hay nada escrito, y el contador NO debe decir que
+            // sí: es la medida con la que el resto de la aplicación decide si
+            // hubo dictado y cuánto duró.
+            avisarUnaVez("historial: llega audio pero no hay dónde escribirlo — el dictado NO se está guardando")
+            return
+        }
+        do {
+            try h.write(contentsOf: chunk)
+            bytesEscritos += chunk.count
+        } catch {
+            // Escribir puede fallar a mitad aunque abrir haya ido bien: el disco
+            // se llena mientras se dicta. Avisar una vez, no en cada trozo.
+            avisarUnaVez("historial: no puedo seguir escribiendo el audio (\(error.localizedDescription)) — revisa el espacio en disco")
+        }
+    }
+
+    /// Un aviso por escritor, no uno por trozo: hay cuarenta trozos por minuto.
+    private var yaAvise = false
+    private func avisarUnaVez(_ mensaje: String) {
+        guard !yaAvise else { return }
+        yaAvise = true
+        Log.log(.sistema, mensaje)
     }
 
     /// Lee un tramo del audio ya grabado, directamente del archivo.
@@ -107,11 +135,21 @@ final class HistoryWriter {
     func savePartial(_ text: String, force: Bool = false) {
         guard force || Date().timeIntervalSince(lastTextWrite) > 0.5 else { return }
         lastTextWrite = Date()
-        try? text.write(to: txtURL, atomically: true, encoding: .utf8)
+        do { try text.write(to: txtURL, atomically: true, encoding: .utf8) }
+        catch { Log.log(.sistema, "historial: no pude guardar el texto (\(error.localizedDescription))") }
     }
 
     /// Cierre normal: WAV con cabecera + texto final; borra el crudo temporal
     /// SOLO si el .wav quedó bien escrito (disco lleno no debe perder el audio).
+    /// El `.pcm` en curso. Solo para las pruebas.
+    var pcmURLQA: URL { pcmURL }
+
+    /// Cierra el archivo a mitad, para reproducir un disco lleno. Solo pruebas.
+    func cerrarArchivoQA() {
+        try? pcmHandle?.close()
+        pcmHandle = nil
+    }
+
     /// Dónde queda el `.wav` de este dictado. Solo para las pruebas.
     var wavURLQA: URL { wavURL }
 
@@ -129,7 +167,8 @@ final class HistoryWriter {
         try? pcmHandle?.close()
         pcmHandle = nil
         if !finalText.isEmpty {
-            try? finalText.write(to: txtURL, atomically: true, encoding: .utf8)
+            do { try finalText.write(to: txtURL, atomically: true, encoding: .utf8) }
+            catch { Log.log(.sistema, "historial: no pude guardar el texto del dictado (\(error.localizedDescription))") }
         }
         guard let origen, FileManager.default.fileExists(atPath: origen.path) else {
             // Sin archivo de origen no hay nada que adoptar: se conserva el .pcm
@@ -153,7 +192,8 @@ final class HistoryWriter {
         try? pcmHandle?.close()
         pcmHandle = nil
         if !finalText.isEmpty {
-            try? finalText.write(to: txtURL, atomically: true, encoding: .utf8)
+            do { try finalText.write(to: txtURL, atomically: true, encoding: .utf8) }
+            catch { Log.log(.sistema, "historial: no pude guardar el texto del dictado (\(error.localizedDescription))") }
         }
         do {
             try wav.write(to: wavURL)
