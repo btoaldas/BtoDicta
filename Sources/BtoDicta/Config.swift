@@ -1016,8 +1016,34 @@ struct Config {
 
     /// Identificadores de paquete excluidos de la captura (banca, gestores de
     /// contraseñas y lo que el usuario decida).
+    ///
+    /// **De fábrica vienen los gestores de contraseñas y el llavero.** Estaba
+    /// vacía, y era un agujero real: la bitácora fotografía la pantalla cada
+    /// pocos segundos, esas capturas se indexan, y el índice alimenta el texto
+    /// que se le manda a la IA para el resumen. Un gestor abierto en ese
+    /// instante es una clave fotografiada, indexada y camino de un servidor
+    /// ajeno. La exclusión la aplica el propio sistema al componer la imagen:
+    /// esas ventanas no llegan a aparecer en ella.
+    ///
+    /// Quien quiera capturarlas puede vaciar la lista; lo que no puede pasar es
+    /// que el valor de fábrica sea el peligroso.
     static func continuoPantallaAppsExcluidas() -> [String] {
-        (json()["continuo_pantalla_apps_excluidas"] as? [String]) ?? []
+        if let l = json()["continuo_pantalla_apps_excluidas"] as? [String] { return l }
+        return [
+            "com.1password.1password",          // 1Password 8
+            "com.agilebits.onepassword7",       // 1Password 7
+            "com.agilebits.onepassword-osx",    // 1Password 6
+            "com.bitwarden.desktop",
+            "org.keepassxc.keepassxc",
+            "com.apple.keychainaccess",         // Acceso a Llaveros
+            "com.apple.Passwords",              // Contraseñas (macOS 15+)
+            "com.dashlane.dashlanephoenix",
+            "in.sinew.Enpass-Desktop",
+            "me.proton.pass.electron",
+            "com.markmcguill.strongbox.mac",
+            "com.nordpass.macos",
+            "com.callpod.keeper-mac",
+        ]
     }
 
     /// Guardar con cada captura qué aplicaciones estaban a la vista (la activa
@@ -1165,6 +1191,31 @@ struct Config {
     static func cancelarConservaDesdeSegundos() -> Double {
         min(60, max(0, (json()["cancelar_conserva_desde_s"] as? Double) ?? 2))
     }
+    /// Escribir en el registro el TEXTO de lo dictado, no solo su medida.
+    ///
+    /// **Encendido de fábrica, y a conciencia.** El registro es local, rota cada
+    /// semana y no sale de la máquina; a cambio, es la única forma de reconstruir
+    /// después qué se dictó y qué entregó cada motor, que es lo que permite ver
+    /// que un pulido recortó el texto o que un proveedor devolvió otra cosa. Sin
+    /// él, el diagnóstico es adivinanza.
+    ///
+    /// Apagarlo deja las mismas líneas con la medida y el proveedor, pero sin el
+    /// contenido. Tiene sentido si la pantalla se comparte a menudo, si el equipo
+    /// es de trabajo compartido, o si se dictan datos de terceros.
+    static func registroIncluyeTexto() -> Bool {
+        (json()["registro_incluye_texto"] as? Bool) ?? true
+    }
+
+    /// Palabras en el TÍTULO de la ventana que también impiden la captura.
+    ///
+    /// Va aparte de la lista de aplicaciones porque un navegador se llama igual
+    /// esté donde esté: lo que distingue una pestaña del banco es su título.
+    /// Vacía de fábrica: una palabra demasiado común dejaría a la bitácora sin
+    /// capturar media jornada, y esa decisión es de quien la usa.
+    static func continuoPantallaTitulosExcluidos() -> [String] {
+        (json()["continuo_pantalla_titulos_excluidos"] as? [String]) ?? []
+    }
+
     /// Cuántos días se conserva el `.wav` de trabajo de cada dictado antes de
     /// barrerlo. Ese archivo es la copia que el grabador escribe mientras hablas
     /// —desde 0.63.4 el audio ya no vive en memoria—, y no sustituye al del

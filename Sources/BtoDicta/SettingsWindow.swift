@@ -76,6 +76,7 @@ final class SettingsModel: ObservableObject {
     @Published var cancelarConfirma: Bool { didSet { Config.set("cancelar_confirma", to: cancelarConfirma) } }
     @Published var cancelarConserva: Double { didSet { Config.set("cancelar_conserva_desde_s", to: cancelarConserva) } }
     @Published var dictadosDias: Double { didSet { Config.set("dictados_conservar_dias", to: Int(dictadosDias)) } }
+    @Published var registroTexto: Bool { didSet { Config.set("registro_incluye_texto", to: registroTexto) } }
     @Published var pausarMultimedia: Bool { didSet { Config.set("atenuar_multimedia", to: pausarMultimedia) } }
     @Published var bajarVolumen: Bool { didSet { Config.set("silenciar_ademas", to: bajarVolumen) } }
     @Published var postProceso: Bool { didSet { Config.set("post_proceso", to: postProceso) } }
@@ -203,6 +204,7 @@ final class SettingsModel: ObservableObject {
         cancelarConfirma = Config.cancelarConfirma()
         cancelarConserva = Config.cancelarConservaDesdeSegundos()
         dictadosDias = Double(Config.dictadosConservarDias())
+        registroTexto = Config.registroIncluyeTexto()
         pausarMultimedia = Config.duckMedia()
         bajarVolumen = Config.muteToo()
         postProceso = Config.postProcess()
@@ -704,6 +706,10 @@ struct SettingsView: View {
                     }
                 }
                 Text("Mientras dictas, el audio se escribe a disco en vez de acumularse en memoria: así una grabación de horas no hace crecer la aplicación. Ese archivo de trabajo se barre pasados estos días. NO es el del historial, que se guarda aparte y no se toca nunca. Ronda los 115 MB por hora dictada; con 0 no se barre nada.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                Toggle("Guardar el texto dictado en el registro", isOn: $m.registroTexto)
+                Text("El registro es local, rota cada semana y no sale de tu equipo; a cambio es lo único que permite reconstruir después qué dictaste y qué devolvió cada motor —así se ve, por ejemplo, que un pulido te recortó el texto—. Apágalo si compartes pantalla a menudo o dictas datos de terceros: las líneas siguen, con la medida en vez del contenido.")
                     .font(.caption).foregroundStyle(.secondary)
 
                 Divider().padding(.vertical, 6)

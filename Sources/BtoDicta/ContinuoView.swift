@@ -36,6 +36,7 @@ final class ContinuoModel: ObservableObject {
     @Published var pantallaPausar: Bool { didSet { Config.set("continuo_pantalla_pausar_bloqueada", to: pantallaPausar) } }
     @Published var pantallaTodas: Bool { didSet { Config.set("continuo_pantalla_todos_monitores", to: pantallaTodas); aplicar() } }
     @Published var appsExcluidas: String { didSet { Config.set("continuo_pantalla_apps_excluidas", to: listaDe(appsExcluidas)) } }
+    @Published var titulosExcluidos: String { didSet { Config.set("continuo_pantalla_titulos_excluidos", to: listaDe(titulosExcluidos)) } }
 
     @Published var soloCorriente: Bool { didSet { Config.set("continuo_solo_con_corriente", to: soloCorriente) } }
 
@@ -207,6 +208,7 @@ final class ContinuoModel: ObservableObject {
         pantallaPausar = Config.continuoPantallaPausarBloqueada()
         pantallaTodas = Config.continuoPantallaTodosMonitores()
         appsExcluidas = Config.continuoPantallaAppsExcluidas().joined(separator: ", ")
+        titulosExcluidos = Config.continuoPantallaTitulosExcluidos().joined(separator: ", ")
         soloCorriente = Config.continuoSoloConCorriente()
         retencionDias = Double(Config.continuoRetencionDias())
         retencionAuto = Config.continuoRetencionAutomatica()
@@ -600,6 +602,13 @@ struct ContinuoView: View {
                         Text("Apps excluidas (identificadores separados por comas)").font(.caption)
                         TextField("com.ejemplo.banca, com.ejemplo.claves", text: $m.appsExcluidas)
                             .textFieldStyle(.roundedBorder)
+                        Text("De fábrica vienen los gestores de contraseñas y el llavero del sistema: sus ventanas no aparecen en la captura. Vacía el campo si quieres capturarlas.")
+                            .font(.caption2).foregroundStyle(.secondary)
+                        Text("Títulos de ventana excluidos (palabras separadas por comas)").font(.caption)
+                        TextField("banco, extracto, tarjeta", text: $m.titulosExcluidos)
+                            .textFieldStyle(.roundedBorder)
+                        Text("Para lo que no se puede excluir por aplicación: una pestaña del banco en el navegador. Si el título contiene una de estas palabras, no se guarda la captura. Vacío de fábrica, porque una palabra demasiado común te dejaría sin bitácora media jornada.")
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
                 }
             }

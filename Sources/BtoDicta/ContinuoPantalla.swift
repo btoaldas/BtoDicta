@@ -194,6 +194,18 @@ final class ContinuoPantalla {
             let frente = NSWorkspace.shared.frontmostApplication
             let app = frente?.localizedName
             let ventana = Self.tituloVentanaAlFrente()
+
+            // Segunda capa, sobre la exclusión que ya hace el sistema por
+            // aplicación: un navegador se llama igual esté donde esté, y lo que
+            // distingue la pestaña del banco es su TÍTULO. Se comprueba antes de
+            // escribir nada, porque una captura que no debe existir no debe
+            // existir tampoco un instante en disco.
+            if let motivo = Self.motivoParaNoCapturar(app: app, ventana: ventana) {
+                // Se anota QUE se omitió, nunca QUÉ se vio: decir el título sería
+                // filtrar por el registro justo lo que se está protegiendo.
+                Self.avisarOmision(motivo)
+                return
+            }
             let visibles = Config.continuoPantallaAppsVisibles()
                 ? Self.appsALaVista(excluyendo: app)
                 : []
@@ -237,6 +249,31 @@ final class ContinuoPantalla {
 
     /// Miniatura de 16×16 en gris. Comparar dos de estas cuesta microsegundos y
     /// basta para saber si la pantalla cambió de verdad.
+    /// Por qué no se guarda esta captura, o `nil` si sí se puede.
+    ///
+    /// La exclusión POR APLICACIÓN la hace el sistema al componer la imagen
+    /// (`SCContentFilter`), así que aquí solo se mira el título de la ventana,
+    /// que es lo que el sistema no puede filtrar.
+    static func motivoParaNoCapturar(app: String?, ventana: String?) -> String? {
+        let titulo = (ventana ?? "").lowercased()
+        if !titulo.isEmpty {
+            for palabra in Config.continuoPantallaTitulosExcluidos()
+            where !palabra.isEmpty && titulo.contains(palabra.lowercased()) {
+                return "título excluido"
+            }
+        }
+        return nil
+    }
+
+    /// Una sola línea cada diez minutos: si no, una tarde con el gestor de
+    /// contraseñas abierto llena el registro de avisos idénticos.
+    private static var ultimoAvisoOmision = Date.distantPast
+    private static func avisarOmision(_ motivo: String) {
+        guard Date().timeIntervalSince(ultimoAvisoOmision) > 600 else { return }
+        ultimoAvisoOmision = Date()
+        Log.log(.sistema, "bitácora: no capturo la pantalla (\(motivo)) — es una de las que decidiste proteger")
+    }
+
     private static func huella(de imagen: CGImage) -> [UInt8] {
         let lado = 16
         var pixeles = [UInt8](repeating: 0, count: lado * lado)
