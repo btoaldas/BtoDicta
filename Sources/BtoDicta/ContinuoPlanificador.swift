@@ -89,8 +89,11 @@ enum ContinuoPlanificador {
             // La marca por día evita repetir la tanda si el minuto se comprueba
             // dos veces, y evita perderla si el equipo estaba dormido a esa hora:
             // en cuanto despierta y ya pasó la hora, se dispara una sola vez.
-            if minutoActual >= Config.continuoLoteMinutoDelDia(), ultimaHoraDisparada != sello {
-                ultimaHoraDisparada = sello
+            // La marca va a DISCO. En memoria se perdía al cerrar, y al volver
+            // a abrir después de la hora la tanda se repetía: transcribir de
+            // nuevo lo ya transcrito, gastando motores y tiempo.
+            if minutoActual >= Config.continuoLoteMinutoDelDia(),
+               !MemoriaPersistente.yaHechoHoy(tema: "tanda-hora", clave: sello, ahora: ahora) {
                 ContinuoLote.ejecutar()
                 return
             }
@@ -98,9 +101,16 @@ enum ContinuoPlanificador {
 
         if disparadores.contains("intervalo") {
             let minutos = Config.continuoLoteIntervaloMinutos()
-            let transcurridos = Int(Date().timeIntervalSince(ultimaTanda) / 60)
-            if transcurridos >= minutos {
-                ultimaTanda = Date()
+            // Igual que en las rutinas: la cuenta arrancaba de cero en cada
+            // apertura, así que con reinicios frecuentes una tanda «cada 60 min»
+            // podía no llegar nunca. Ahora sigue donde se quedó.
+            let ultima = MemoriaPersistente.ultimaVez(tema: "tanda-intervalo", clave: "lote")
+            guard let ultima else {
+                MemoriaPersistente.anotarAhora(tema: "tanda-intervalo", clave: "lote")
+                return
+            }
+            if Int(Date().timeIntervalSince(ultima) / 60) >= minutos {
+                MemoriaPersistente.anotarAhora(tema: "tanda-intervalo", clave: "lote")
                 ContinuoLote.ejecutar()
             }
         }

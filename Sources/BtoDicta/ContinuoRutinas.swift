@@ -93,15 +93,25 @@ enum ContinuoRutinas {
         for r in activas() {
             switch r.cuando {
             case "hora":
-                if minutoActual >= r.minutoDelDia, ultimoDia[r.id] != hoy {
-                    ultimoDia[r.id] = hoy
+                // La nota de «ya se disparó hoy» va a DISCO: en memoria se
+                // perdía al cerrar la aplicación, y al reabrirla después de la
+                // hora la rutina volvía a dispararse. Se vieron tres resúmenes
+                // del mismo día, cada uno con su llamada a la IA.
+                if minutoActual >= r.minutoDelDia,
+                   !MemoriaPersistente.yaHechoHoy(tema: "rutinas-hora", clave: r.id, ahora: ahora) {
                     listas.append(r)
                 }
             case "intervalo":
-                let ultimo = ultimoInstante[r.id] ?? ahora   // al arrancar, cuenta desde ya
-                if ultimoInstante[r.id] == nil { ultimoInstante[r.id] = ahora; continue }
+                // Aquí el fallo era el contrario: al arrancar se contaba desde
+                // cero, así que una rutina «cada 3 h» no se disparaba nunca si la
+                // aplicación se reiniciaba antes. Ahora la cuenta sigue donde
+                // estaba, aunque se haya cerrado por medio.
+                guard let ultimo = MemoriaPersistente.ultimaVez(tema: "rutinas-intervalo", clave: r.id) else {
+                    MemoriaPersistente.anotarAhora(tema: "rutinas-intervalo", clave: r.id, ahora: ahora)
+                    continue
+                }
                 if ahora.timeIntervalSince(ultimo) >= Double(r.cadaMinutos) * 60 {
-                    ultimoInstante[r.id] = ahora
+                    MemoriaPersistente.anotarAhora(tema: "rutinas-intervalo", clave: r.id, ahora: ahora)
                     listas.append(r)
                 }
             default:

@@ -160,6 +160,7 @@ else
   ejecutar "almacen_tareas_notas" "BTODICTA_NOTATEST" "1" 90
   ejecutar "autoayuda" "BTODICTA_HELPTEST" "1" 90
   ejecutar "permisos" "BTODICTA_PERMISSIONSTEST" "1" 90
+  estatica "memoria_en_disco" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-memoria-en-disco.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "conexion_compartida" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-conexion-compartida.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
 fi
 

@@ -2163,6 +2163,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             exit(mal == 0 ? 0 : 1)
         }
 
+        // «Esto ya lo hice» tras cerrar la app: BTODICTA_MEMORIATEST=1
+        //
+        // El mismo fallo apareció cuatro veces en sitios distintos: correos
+        // repetidos, avisos repetidos, resúmenes repetidos y tandas repetidas.
+        // Esta prueba cubre el sitio común donde ahora se apunta, para que no
+        // haya una quinta.
+        if ProcessInfo.processInfo.environment["BTODICTA_MEMORIATEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("MEMORIA \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            MemoriaPersistente.olvidarTemaQA("prueba")
+
+            // Una vez al día, aunque se cierre y se abra por medio.
+            chk(!MemoriaPersistente.yaHechoHoy(tema: "prueba", clave: "diaria"), "la primera vez NO estaba hecho")
+            chk(MemoriaPersistente.yaHechoHoy(tema: "prueba", clave: "diaria"), "la segunda dice que sí")
+            MemoriaPersistente.simularReinicioQA()
+            chk(MemoriaPersistente.yaHechoHoy(tema: "prueba", clave: "diaria"),
+                "y DESPUÉS DE REINICIAR lo sigue sabiendo — este era el fallo")
+
+            // Mañana vuelve a tocar.
+            let manana = Date().addingTimeInterval(26 * 3600)
+            chk(!MemoriaPersistente.yaHechoHoy(tema: "prueba", clave: "diaria", ahora: manana),
+                "mañana vuelve a tocar (prueba negativa)")
+
+            // Dos claves del mismo tema no se pisan.
+            MemoriaPersistente.olvidarTemaQA("prueba")
+            _ = MemoriaPersistente.yaHechoHoy(tema: "prueba", clave: "una")
+            chk(!MemoriaPersistente.yaHechoHoy(tema: "prueba", clave: "otra"),
+                "marcar una clave no marca las demás")
+
+            // Y la cuenta de intervalos sigue donde estaba.
+            MemoriaPersistente.olvidarTemaQA("prueba")
+            let hace2h = Date().addingTimeInterval(-7200)
+            MemoriaPersistente.anotarAhora(tema: "prueba", clave: "cada3h", ahora: hace2h)
+            MemoriaPersistente.simularReinicioQA()
+            let leida = MemoriaPersistente.ultimaVez(tema: "prueba", clave: "cada3h")
+            chk(leida != nil && abs(leida!.timeIntervalSince(hace2h)) < 2,
+                "tras reiniciar, una cuenta de intervalo NO empieza de cero")
+
+            MemoriaPersistente.olvidarTemaQA("prueba")
+            chk(MemoriaPersistente.valor(tema: "prueba", clave: "diaria") == nil, "olvidar un tema lo deja limpio")
+
+            print("MEMORIA \(mal == 0 ? "TODO OK — lo hecho se recuerda tras cerrar la aplicación" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Que un aviso no se repita en cada arranque: BTODICTA_AVISOTEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_AVISOTEST"] == "1" {
             var mal = 0
