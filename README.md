@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.67.1
+
+- **El aviso de saldo bajo deja de repetirse** en cada arranque: 68 avisos en un
+  día por un registro que vivía en memoria.
+- Puedes **silenciar un proveedor** que ya sabes agotado, sin callar a los demás.
+
 ### Novedades 0.67.0
 
 - **El panel dice en qué se va el dinero**: gasto por motor y por mes. El primer

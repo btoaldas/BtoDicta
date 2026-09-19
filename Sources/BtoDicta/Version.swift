@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.67.0"
+    static let numero = "0.67.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.67.1", "2026-09-19", [
+            "EL AVISO DE SALDO BAJO DEJA DE REPETIRSE. Estaba pensado para avisarte una vez al día de cada proveedor, pero apuntaba en la memoria a quién ya había avisado: al cerrar la aplicación se le olvidaba, y al volver a abrirla te avisaba otra vez de lo mismo. Un día con varios reinicios llegó a 68 avisos, todos de dos proveedores que ya sabías agotados",
+            "Y ahora puedes CALLAR uno concreto: si decidiste no renovar un proveedor, no tiene sentido que te lo recuerde cada día. Los demás siguen avisando. El ruido no solo molesta, entierra el aviso que sí importaba",
+        ]),
         ("0.67.0", "2026-09-19", [
             "EL PANEL DE SALUD TE DICE EN QUÉ SE VA EL DINERO. Hasta ahora sabías cuánto SALDO te queda, que es otra pregunta. Ahora ves, mes a mes y motor a motor, en qué se ha ido: horas usadas e importe. El saldo dice lo que queda; esto dice lo que se gastó, y es lo que permite decidir si un motor vale lo que cobra",
             "El primer vistazo ya explica algo: ElevenLabs se llevaba entre el 98 y el 99 por ciento de todo el gasto. Desde que se quedó sin saldo, el mes va en poco más de un dólar y medio",

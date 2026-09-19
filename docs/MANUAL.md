@@ -1032,6 +1032,18 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### Callar el aviso de un proveedor que ya sabes agotado
+
+Si decidiste no renovar uno, no tiene sentido que te lo recuerde cada día. En
+`~/.btodicta/config.json`:
+
+```json
+"saldo_aviso_silenciados": ["elevenlabs", "novita"]
+```
+
+Los demás siguen avisando. Desde 0.67.1 el aviso tampoco se repite al reiniciar
+la aplicación, que era de donde venía casi todo el ruido.
+
 ### Saber en qué se te va el dinero y qué motor es más rápido
 
 *Configuración → Salud* tiene ahora dos secciones nuevas:
