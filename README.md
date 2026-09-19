@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.65.4
+
+- **Deja de gastar llamadas contra cuentas vacías.** Un proveedor sin saldo se
+  apartaba media hora, pero el saldo no vuelve solo en media hora: 57 llamadas
+  desperdiciadas en un día. Ahora el tiempo depende de si el problema se arregla
+  solo.
+
 ### Novedades 0.65.3
 
 - **Lo que se descarga se comprueba antes de instalarse**: una página de error ya

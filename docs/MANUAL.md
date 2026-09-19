@@ -1016,6 +1016,22 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### Cuánto se aparta un proveedor que falla
+
+Desde 0.65.4 el tiempo depende de si el problema se arregla solo:
+
+| Lo que pasa | Cuánto se aparta |
+|---|---|
+| Se quedó sin saldo o sin cuota | **6 horas** |
+| La clave no vale | 30 minutos |
+| Demasiadas peticiones seguidas | 5 minutos |
+| El servidor del proveedor está caído | 2 minutos |
+
+Antes todo lo de autorización eran treinta minutos, así que con una cuenta vacía
+se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
+el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
+al cambiarla se olvida lo apartado.
+
 ### «descarga RECHAZADA» al bajar un modelo
 
 Desde 0.65.3, lo que se descarga se comprueba antes de instalarse. Si ves ese

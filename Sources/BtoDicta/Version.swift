@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.65.3"
+    static let numero = "0.65.4"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.65.4", "2026-09-19", [
+            "DEJA DE GASTAR LLAMADAS CONTRA CUENTAS VACÍAS. Cuando un proveedor se quedaba sin saldo, se apartaba media hora — el mismo tiempo que si la clave estuviera mal. Pero el saldo no vuelve solo en media hora, así que cada treinta minutos se gastaba otra llamada para recibir exactamente el mismo error. En un solo día se contaron 57",
+            "Ahora el tiempo depende de si el problema se arregla solo: seis horas cuando falta saldo o cuota, media hora cuando es la clave —que puedes cambiar en cualquier momento—, cinco minutos cuando solo hay prisa, y dos cuando el servidor del proveedor está caído",
+        ]),
         ("0.65.3", "2026-09-19", [
             "LO QUE SE DESCARGA SE COMPRUEBA ANTES DE INSTALARSE. Al bajar un modelo se guardaba lo que llegara, sin mirar nada. Si el servidor devolvía un error, un aviso de mantenimiento o una pantalla de inicio de sesión, eso quedaba guardado CON EL NOMBRE DEL MODELO, y el fallo aparecía días después al usarlo, con un mensaje sobre un formato inválido que no llevaba a ninguna parte",
             "Ahora se mira la respuesta del servidor, el tamaño y el contenido: si no es un modelo de verdad no se instala nada y el registro dice qué llegó. De cada modelo instalado se anota su huella, para poder ver si cambia después sin que nadie lo haya tocado",
