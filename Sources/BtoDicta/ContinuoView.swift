@@ -169,8 +169,9 @@ final class ContinuoModel: ObservableObject {
             ContinuoIndice.shared.abrir()
             let a = ContinuoIndice.shared.recientes(material: .audio)
             let p = ContinuoIndice.shared.recientes(material: .pantalla)
-            let d = ContinuoBitacora.documentosRecientes()
-            let tr = ContinuoBitacora.transcripcionesRecientes()
+            // Un solo recorrido del árbol para las dos listas: antes eran dos
+            // pasadas completas por refresco.
+            let (d, tr) = ContinuoBitacora.documentosYTranscripciones()
             DispatchQueue.main.async {
                 self?.explorarAudio = a
                 self?.explorarPantalla = p

@@ -24,6 +24,9 @@ final class ContinuoAudioSistema: NSObject {
 
     private let cola = DispatchQueue(label: "btodicta.continuo.sistema")
     private var flujo: SCStream?
+    /// Cuántas veces seguidas se ha intentado recuperar tras un error. Se
+    /// pone a cero en cuanto vuelve a entrar audio.
+    private var reintentosTrasError = 0
 
     private var mano: FileHandle?
     private var rutaTrozo: URL?
@@ -266,6 +269,8 @@ extension ContinuoAudioSistema: SCStreamOutput, SCStreamDelegate {
 
     func stream(_ stream: SCStream, didOutputSampleBuffer muestra: CMSampleBuffer,
                 of tipo: SCStreamOutputType) {
+        // Entra audio: la recuperación funcionó, el contador vuelve a cero.
+        if reintentosTrasError != 0 { reintentosTrasError = 0 }
         guard tipo == .audio, CMSampleBufferIsValid(muestra) else { return }
         recibir(muestra)
     }
@@ -273,9 +278,29 @@ extension ContinuoAudioSistema: SCStreamOutput, SCStreamDelegate {
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         Log.log(.sistema, "bitácora: el audio del sistema se detuvo — \(error.localizedDescription)")
         cola.async { [weak self] in
-            self?.activo = false
-            self?.flujo = nil
-            self?.cerrarTrozo()
+            guard let self else { return }
+            self.activo = false
+            self.flujo = nil
+            self.cerrarTrozo()
+            // Y SE VUELVE A MONTAR. Antes se quedaba muerto hasta que alguien
+            // tocara los ajustes: el usuario no se entera de que dejó de grabar
+            // el audio del sistema, porque nada se lo dice. Lo que lo tumba
+            // suele ser pasajero —cambiar de salida de audio, una pantalla que
+            // se desconecta—, así que reintentar es lo razonable.
+            //
+            // Con espera creciente y tope, para no insistir en balde si el
+            // motivo es permanente.
+            self.reintentosTrasError += 1
+            guard self.reintentosTrasError <= 5 else {
+                Log.log(.sistema, "bitácora: el audio del sistema no se recupera tras 5 intentos — queda apagado hasta reconfigurar")
+                return
+            }
+            let espera = Double(self.reintentosTrasError) * 3
+            Log.log(.sistema, "bitácora: reintento el audio del sistema en \(Int(espera)) s (intento \(self.reintentosTrasError) de 5)")
+            self.cola.asyncAfter(deadline: .now() + espera) { [weak self] in
+                guard let self, Config.continuoActivo() else { return }
+                self.arrancar()
+            }
         }
     }
 }

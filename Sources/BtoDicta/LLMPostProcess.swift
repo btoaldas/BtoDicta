@@ -150,8 +150,31 @@ struct ChatIA {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         switch formato {
         case .openai:
-            return (json["choices"] as? [[String: Any]])?.first
-                .flatMap { $0["message"] as? [String: Any] }?["content"] as? String
+            guard let mensaje = (json["choices"] as? [[String: Any]])?.first
+                .flatMap({ $0["message"] as? [String: Any] }) else { return nil }
+            if let texto = mensaje["content"] as? String, !texto.isEmpty { return texto }
+
+            // Los modelos que razonan devuelven a veces un 200 correcto con
+            // `content` vacío y todo el texto en otro campo: `reasoning`,
+            // `reasoning_content` o un bloque `thinking`. Pasó de verdad con los
+            // `gpt-oss` de Groq, y el registro lo contaba como «falló» con un
+            // HTTP 200 al lado, que no hay forma de entender.
+            //
+            // Se usa lo que haya en vez de tirar la respuesta: un texto pensado
+            // en voz alta sigue siendo mejor que perder el pulido, y quien lea
+            // el registro ve que vino por esa vía.
+            for campo in ["reasoning_content", "reasoning"] {
+                if let texto = mensaje[campo] as? String, !texto.isEmpty {
+                    Log.debug("pulido: la respuesta traía el texto en «\(campo)», no en «content»")
+                    return texto
+                }
+            }
+            if let bloques = mensaje["thinking"] as? [[String: Any]],
+               let texto = bloques.compactMap({ $0["text"] as? String }).first, !texto.isEmpty {
+                Log.debug("pulido: la respuesta traía el texto en «thinking», no en «content»")
+                return texto
+            }
+            return mensaje["content"] as? String
         case .anthropic:
             return (json["content"] as? [[String: Any]])?.first?["text"] as? String
         }

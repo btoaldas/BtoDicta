@@ -405,9 +405,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         // La bitácora cierra y registra el fragmento abierto en vez de dejarlo
-        // huérfano. El rescate del arranque es la red por si el proceso muere
-        // sin llegar hasta aquí.
-        ContinuoBitacora.detener()
+        // huérfano, y aquí se ESPERA a que termine: encolar el cierre y seguir
+        // dejaba morir el proceso antes de que la cola llegara, con un archivo
+        // huérfano por cada cierre. El rescate del arranque sigue siendo la red
+        // por si el proceso muere sin llegar hasta aquí.
+        ContinuoBitacora.detener(esperandoElCierre: true)
         AutoAyudaControles.shared.detener()
         iconoTimer?.invalidate(); iconoVigilante?.invalidate()
         activacionVozTimer?.invalidate()
@@ -2117,6 +2119,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ciclo(1)
             RunLoop.main.run(); return
         }
+        // Respuestas 200 sin `content`: BTODICTA_EXTRAERTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_EXTRAERTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("EXTRAER \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            guard let api = ChatIA.seleccionada() else {
+                print("EXTRAER FALLA — no hay ninguna IA seleccionada"); exit(1)
+            }
+            func respuesta(_ mensaje: String) -> Data { Data(mensaje.utf8) }
+
+            chk(api.extraerContenido(respuesta(#"{"choices":[{"message":{"content":"texto normal"}}]}"#)) == "texto normal",
+                "la respuesta de siempre se lee igual")
+            chk(api.extraerContenido(respuesta(#"{"choices":[{"message":{"content":"","reasoning":"lo pensado"}}]}"#)) == "lo pensado",
+                "con `content` vacío se usa `reasoning` en vez de perder el pulido")
+            chk(api.extraerContenido(respuesta(#"{"choices":[{"message":{"reasoning_content":"lo otro"}}]}"#)) == "lo otro",
+                "y también `reasoning_content`")
+            chk(api.extraerContenido(respuesta(#"{"choices":[{"message":{"content":"","thinking":[{"text":"pensado"}]}}]}"#)) == "pensado",
+                "y el bloque `thinking`")
+            chk(api.extraerContenido(respuesta(#"{"choices":[{"message":{"content":"bueno","reasoning":"ruido"}}]}"#)) == "bueno",
+                "si vienen los dos, manda `content` (prueba negativa)")
+            chk(api.extraerContenido(respuesta(#"{"choices":[]}"#)) == nil,
+                "una respuesta sin nada sigue siendo nada, no una cadena vacía")
+            chk(api.extraerContenido(respuesta("esto no es json")) == nil,
+                "y una respuesta rota no revienta")
+
+            print("EXTRAER \(mal == 0 ? "TODO OK — un 200 con el texto en otro campo ya no se pierde" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+
         // Que lo leído en pantalla no pueda dar órdenes: BTODICTA_INYECCIONTEST=1
         if ProcessInfo.processInfo.environment["BTODICTA_INYECCIONTEST"] == "1" {
             var mal = 0

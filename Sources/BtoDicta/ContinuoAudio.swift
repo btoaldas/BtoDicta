@@ -55,7 +55,16 @@ final class ContinuoAudio {
     /// reinicios cada 8 s (visto el 2026-09-13, 15 vueltas seguidas).
     private var arranquesMudos = 0
     /// Solo para diagnóstico: cuántos buffers ha entregado el tap.
-    private var buffersVistos = 0
+    /// Lo mutan el hilo de audio (en el tap) y lo lee el vigía de arranque
+    /// desde otra cola, así que va bajo candado. La carrera era benigna
+    /// —un entero—, pero benigna no es lo mismo que correcta, y el vigía
+    /// decide con ese número si el micrófono está mudo.
+    private let candadoBuffers = NSLock()
+    private var _buffersVistos = 0
+    private var buffersVistos: Int {
+        get { candadoBuffers.lock(); defer { candadoBuffers.unlock() }; return _buffersVistos }
+        set { candadoBuffers.lock(); _buffersVistos = newValue; candadoBuffers.unlock() }
+    }
     private(set) var activo = false
 
     /// Modo `voz`: colchón previo para no cortar la primera sílaba.
@@ -75,6 +84,40 @@ final class ContinuoAudio {
 
     func detener() {
         cola.async { [weak self] in self?.detenerEnCola(cerrandoTrozo: true) }
+    }
+
+    /// Igual, pero ESPERA a que el trozo quede cerrado.
+    ///
+    /// Para el cierre de la aplicación. `detener()` encola el cierre y vuelve al
+    /// instante, así que al salir el proceso moría antes de que la cola llegara
+    /// a cerrar el trozo abierto: uno huérfano por cada cierre, treinta y ocho
+    /// en dos semanas. El rescate del arranque los recuperaba, pero recuperar es
+    /// peor que no romper.
+    ///
+    /// El tope existe porque macOS no espera indefinidamente a que una
+    /// aplicación termine: más vale cerrar lo que se pueda en dos segundos que
+    /// arriesgarse a que el sistema mate el proceso a mitad.
+    ///
+    /// **Solo se espera al cierre del TROZO, no al desmontaje del motor.** El
+    /// desmontaje tiene que ocurrir en el hilo principal —el nodo de entrada no
+    /// se toca desde otra cola—, y esta función se llama justamente desde el
+    /// hilo principal al salir: esperar al desmontaje era un interbloqueo, el
+    /// principal aguardando a la cola y la cola aguardando al principal. Se veía
+    /// como «el cierre no terminó en 2 s» en cada salida.
+    ///
+    /// Y no hace falta esperarlo: lo que importa al salir es que el audio quede
+    /// escrito e indexado. El motor lo desmonta el sistema al morir el proceso.
+    func detenerYEsperar(tope: TimeInterval = 2) {
+        let listo = DispatchSemaphore(value: 0)
+        cola.async { [weak self] in
+            self?.cerrarTrozo()
+            listo.signal()
+        }
+        if listo.wait(timeout: .now() + tope) == .timedOut {
+            Log.log(.sistema, "bitácora: el cierre del trozo no terminó en \(Int(tope)) s — lo recupera el rescate del próximo arranque")
+        }
+        // El resto del apagado, sin esperarlo.
+        detener()
     }
 
     /// El dictado pide el micrófono. Suelta TODO y avisa cuando esté libre —
@@ -493,7 +536,32 @@ final class ContinuoAudio {
 enum EnergiaMac {
     /// `true` si el equipo está enchufado. Con batería, la bitácora puede
     /// pausarse si el usuario lo pidió.
+    private static let candadoEnergia = NSLock()
+    private static var ultimaLectura = Date.distantPast
+    private static var ultimoValor = true
+
+    /// Con caché de 30 segundos.
+    ///
+    /// Lanzar un proceso para preguntarlo es caro, y se preguntaba en cada tic
+    /// del reloj de la bitácora. Enchufar o desenchufar el equipo no es algo que
+    /// pase varias veces por minuto: media hora tarde de más no cambia nada, y
+    /// treinta segundos de retraso tampoco.
     static func conCorriente() -> Bool {
+        candadoEnergia.lock()
+        if Date().timeIntervalSince(ultimaLectura) < 30 {
+            defer { candadoEnergia.unlock() }
+            return ultimoValor
+        }
+        candadoEnergia.unlock()
+        let valor = medirCorriente()
+        candadoEnergia.lock()
+        ultimoValor = valor
+        ultimaLectura = Date()
+        candadoEnergia.unlock()
+        return valor
+    }
+
+    private static func medirCorriente() -> Bool {
         let salida = Process()
         salida.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
         salida.arguments = ["-g", "batt"]

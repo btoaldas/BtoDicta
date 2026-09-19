@@ -29,8 +29,9 @@ enum ContinuoBitacora {
         Log.log(.sistema, "bitácora: encendida")
     }
 
-    static func detener() {
-        ContinuoAudio.shared.detener()
+    static func detener(esperandoElCierre: Bool = false) {
+        if esperandoElCierre { ContinuoAudio.shared.detenerYEsperar() }
+        else { ContinuoAudio.shared.detener() }
         if #available(macOS 14.0, *) { ContinuoPantalla.shared.detener() }
         if #available(macOS 13.0, *) { ContinuoAudioSistema.shared.detener() }
         ContinuoPlanificador.detener()
@@ -76,6 +77,32 @@ enum ContinuoBitacora {
 
     static func documentosRecientes(limite: Int = 60) -> [URL] {
         buscarMd(limite: limite) { !$0.hasPrefix("transcripcion-") }
+    }
+
+    /// Las dos listas en UN solo recorrido.
+    ///
+    /// La pestaña las pedía por separado y cada llamada recorría el árbol
+    /// entero de la bitácora. Con meses de historial son decenas de miles de
+    /// archivos, recorridos dos veces en cada refresco para repartirlos luego
+    /// por el prefijo del nombre — que es algo que se puede decidir sobre la
+    /// marcha.
+    static func documentosYTranscripciones(limite: Int = 60) -> (documentos: [URL], transcripciones: [URL]) {
+        let raiz = Config.continuoCarpeta()
+        guard let e = FileManager.default.enumerator(at: raiz,
+                                                     includingPropertiesForKeys: [.contentModificationDateKey],
+                                                     options: [.skipsHiddenFiles]) else { return ([], []) }
+        var docs: [(URL, Date)] = []
+        var trans: [(URL, Date)] = []
+        for caso in e {
+            guard let url = caso as? URL, url.pathExtension == "md" else { continue }
+            let fecha = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            if url.lastPathComponent.hasPrefix("transcripcion-") { trans.append((url, fecha)) }
+            else { docs.append((url, fecha)) }
+        }
+        func ordenar(_ l: [(URL, Date)]) -> [URL] {
+            l.sorted { $0.1 > $1.1 }.prefix(limite).map(\.0)
+        }
+        return (ordenar(docs), ordenar(trans))
     }
 
     private static func buscarMd(limite: Int, filtro: (String) -> Bool) -> [URL] {
