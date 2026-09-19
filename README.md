@@ -34,6 +34,15 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.69.0
+
+- **Casi 5 GB de memoria menos al arrancar**: la comprobación de huella de los
+  modelos leía por trozos pero no soltaba lo leído. Ahora ocupa 1 MB.
+- **Dictado largo verificado con micrófono real**: 63 minutos, 37 796 trozos,
+  cero huecos, memoria plana en 28 MB.
+- Las pruebas de memoria medían el RSS, que cuenta páginas ya liberadas (5 564 MB
+  frente a 56 MB reales). Ahora miden `phys_footprint`. El QA pasa de 17 a 18.
+
 ### Novedades 0.68.0
 
 - **Las tareas automáticas dejan de repetirse al reabrir la app**: hasta tres

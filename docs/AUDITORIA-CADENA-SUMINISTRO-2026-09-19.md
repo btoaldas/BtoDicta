@@ -39,6 +39,38 @@ sin que nadie lo haya vuelto a descargar, se puede ver.
 `BTODICTA_MODELOTEST` lo comprueba con diez casos: cuatro cosas que deben
 rechazarse, tres formatos legítimos que deben pasar, y tres sobre la huella.
 
+### Lo que esta corrección rompió, y cómo se supo (añadido el 2026-09-19)
+
+Comprobar la huella al arrancar dejaba una huella de memoria de **4 907 MB**.
+
+El código leía el modelo «por trozos» de 1 MB, que es justamente lo que hay que
+hacer y lo que hacía parecer que el asunto estaba resuelto. El problema era otro:
+`FileHandle.read` devuelve un `Data` respaldado por un objeto **autoliberado**, y
+sin drenar el depósito en cada vuelta los trozos no se sueltan — se acumulan
+hasta que termina el bucle. Leer 4,8 GB de modelos de a un mega da exactamente
+4,8 GB retenidos. **Leer de a poco no sirve de nada si no se suelta lo leído.**
+
+Corregido envolviendo cada vuelta en `autoreleasepool`. Medido con el mismo
+modelo de 2,83 GB: de +2 830 MB a **+1 MB**, y el pico del proceso pasó de
+5 425 MB a 24 MB.
+
+Dos cosas que deja esta corrección, más allá del arreglo:
+
+- **`BTODICTA_HUELLAMEMTEST`**, que comprueba la huella de un modelo real ya
+  instalado y verifica que la memoria no se mueve. Contra un archivo de juguete
+  el fallo no aparece: hacen falta gigas de verdad.
+- **Ninguna prueba de las que existían podía ver esto.** Todas medían
+  `resident_size` (el RSS de `ps`), que en macOS incluye páginas ya liberadas y
+  llegó a marcar 5 564 MB con 56 MB reales. La métrica que decide la presión de
+  memoria es `phys_footprint`; ahora se mide esa, y `MemoriaProceso` es el único
+  sitio donde se lee. Una prueba con la métrica equivocada no es una prueba.
+
+Se descubrió al montar el dictado largo con micrófono real
+(`BTODICTA_MICLARGOTEST`), que era una verificación pendiente de otra cosa: el
+salto de memoria aparecía siempre entre el segundo 30 y el 60 de cada arranque,
+y el registro de la aplicación puso la hora exacta al lado de la línea «modelos:
+los del catálogo coinciden con su huella».
+
 ## Hallazgo 2 (MEDIO) — un paquete podía salir sin motores
 
 Los ocho motores locales se copian al paquete desde carpetas de compilación del

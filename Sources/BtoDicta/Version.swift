@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.68.0"
+    static let numero = "0.69.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.69.0", "2026-09-19", [
+            "LA APP YA NO SE COME CASI 5 GB AL ABRIRSE. Al arrancar comprueba que tus modelos siguen siendo los que descargaste; esa comprobación leía los archivos de a un mega, pero no soltaba lo leído, así que retenía los 4,8 GB de modelos enteros. Ahora ocupa 1 MB. Si tu Mac se ponía lenta durante el primer minuto tras abrir BtoDicta, era esto",
+            "Dictado largo comprobado con el micrófono de verdad durante 63 minutos seguidos: 37 796 trozos de audio, ni un hueco, y la memoria plana en 28 MB de principio a fin",
+            "Ninguna prueba anterior podía ver el problema: todas miraban el número que informa el Monitor de Actividad, que cuenta memoria ya liberada y llegó a marcar 5 564 MB cuando lo real eran 56 MB. Ahora se mide lo que de verdad presiona la memoria del Mac",
+        ]),
         ("0.68.0", "2026-09-19", [
             "LAS TAREAS AUTOMÁTICAS DEJAN DE REPETIRSE AL REABRIR LA APLICACIÓN. Los resúmenes del día y las tandas de transcripción apuntaban en la memoria que ya se habían hecho; al cerrar la aplicación se les olvidaba, y al volver a abrirla después de su hora se hacían otra vez. En los últimos días eso produjo hasta tres resúmenes de la misma jornada, cada uno con su llamada a la IA",
             "Y el fallo contrario en las que van por intervalo: la cuenta empezaba de cero en cada apertura, así que una rutina de «cada 3 horas» podía no llegar nunca si cerrabas la aplicación antes. Ahora la cuenta sigue donde se quedó",

@@ -224,6 +224,13 @@ audio —el orden que requiere el servidor multimodal— para evitar respuestas 
 rechazo en lugar de la transcripción. Los modelos descargados no cambian ni se
 vuelven a bajar.
 
+**La comprobación de arranque ya no pesa** (0.69.0). Al abrirse, la aplicación
+comprueba que tus modelos siguen siendo los que descargaste, contrastando su
+huella. Esa comprobación llegó a ocupar **casi 5 GB de memoria** en cada arranque
+—leía los modelos de a un mega, pero no soltaba lo leído—. Corregido: ahora ocupa
+**1 MB**. Si tu Mac se ponía lenta durante el primer minuto tras abrir BtoDicta,
+era esto.
+
 **Descargar modelos locales**
 - Cada familia tiene su sección: Whisper / Voxtral / Nemotron / Canary.
 - Clic en el botón de descarga (⬇) → verás la barra de progreso.

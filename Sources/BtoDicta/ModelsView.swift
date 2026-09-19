@@ -753,8 +753,20 @@ enum ModeloDescargado {
         defer { try? h.close() }
         var sha = SHA256()
         // Por trozos: un modelo puede pesar varios gigas y no cabe de golpe.
-        while let trozo = try? h.read(upToCount: 1_048_576), !trozo.isEmpty {
-            sha.update(data: trozo)
+        //
+        // El `autoreleasepool` NO sobra. `read(upToCount:)` devuelve un `Data`
+        // respaldado por un objeto autoliberado, y sin drenar el depósito en
+        // cada vuelta los trozos se acumulan hasta el final del bucle: leer los
+        // modelos instalados llegó a dejar una huella de **4 907 MB** medida el
+        // 2026-09-19, con el archivo leído «por trozos» exactamente como aquí.
+        // Leer de a 1 MB no sirve de nada si no se sueltan los megas leídos.
+        while true {
+            let fin = autoreleasepool { () -> Bool in
+                guard let trozo = try? h.read(upToCount: 1_048_576), !trozo.isEmpty else { return true }
+                sha.update(data: trozo)
+                return false
+            }
+            if fin { break }
         }
         return sha.finalize().map { String(format: "%02x", $0) }.joined()
     }

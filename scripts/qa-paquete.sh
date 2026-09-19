@@ -160,6 +160,10 @@ else
   ejecutar "almacen_tareas_notas" "BTODICTA_NOTATEST" "1" 90
   ejecutar "autoayuda" "BTODICTA_HELPTEST" "1" 90
   ejecutar "permisos" "BTODICTA_PERMISSIONSTEST" "1" 90
+  # Comprobar la huella de un modelo no puede cargar el modelo: leía de a 1 MB
+  # pero sin soltar lo leído, y dejaba ~5 GB de huella en cada arranque.
+  # Se omite sola si no hay ningún modelo grande instalado.
+  ejecutar "huella_modelos_memoria" "BTODICTA_HUELLAMEMTEST" "1" 180
   estatica "memoria_en_disco" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-memoria-en-disco.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "conexion_compartida" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-conexion-compartida.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
 fi

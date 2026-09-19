@@ -427,17 +427,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         CapturaMac.cancelar()
     }
 
-    /// Memoria residente del proceso, en MB. La usan varias pruebas.
-    func rssMBGlobal() -> Double {
-        var info = mach_task_basic_info()
-        var n = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
-        let r = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(n)) {
-                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &n)
-            }
-        }
-        return r == KERN_SUCCESS ? Double(info.resident_size) / 1_048_576 : -1
-    }
+    /// Huella de memoria del proceso, en MB. La usan varias pruebas.
+    /// Es `phys_footprint`, no el RSS: ver `MemoriaProceso` para por qué el RSS
+    /// no sirve como criterio (llegó a marcar 5 564 MB con 56 MB reales).
+    func rssMBGlobal() -> Double { MemoriaProceso.huellaMB() }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Cuerpos de subida que quedaran de una sesión anterior: un cierre
@@ -1672,16 +1665,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             var mal = 0
             func chk(_ ok: Bool, _ q: String) { print("MEM \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
             func rrssMB() -> Double { rssMB() }
-            func rssMB() -> Double {
-                var info = mach_task_basic_info()
-                var n = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
-                let r = withUnsafeMutablePointer(to: &info) {
-                    $0.withMemoryRebound(to: integer_t.self, capacity: Int(n)) {
-                        task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &n)
-                    }
-                }
-                return r == KERN_SUCCESS ? Double(info.resident_size) / 1_048_576 : -1
-            }
+            // Huella REAL, no RSS: el RSS cuenta páginas ya liberadas que el
+            // asignador no devolvió y llegó a marcar 5 564 MB con 56 MB reales.
+            func rssMB() -> Double { MemoriaProceso.huellaMB() }
             let horas = Double(h) ?? 6
             let bytes = Int(horas * 3600) * RedSeguridadDictado.bytesPorSegundo
             let base = rssMB()
@@ -2962,6 +2948,171 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 print("MICTEST \(ok ? "TODO OK — entra audio" : "FALLA — el micrófono está MUDO")")
                 exit(ok ? 0 : 1)
             }
+            RunLoop.main.run(); return
+        }
+        // Comprobar la huella de un modelo NO se puede comer la memoria:
+        // BTODICTA_HUELLAMEMTEST=1
+        //
+        // La comprobación de huellas entró con la auditoría de cadena de
+        // suministro y leía el archivo «por trozos» de 1 MB, que parecía
+        // suficiente. No lo era: `FileHandle.read` devuelve un `Data`
+        // autoliberado, y sin drenar el depósito en cada vuelta los trozos se
+        // acumulaban. Verificar los modelos instalados dejaba una huella de
+        // 4 907 MB en cada arranque de la aplicación.
+        //
+        // Se prueba contra un modelo REAL ya instalado, no contra un archivo de
+        // juguete: el fallo solo aparece con gigas de verdad.
+        if ProcessInfo.processInfo.environment["BTODICTA_HUELLAMEMTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("HUELLAMEM \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            let dir = Config.dir.appendingPathComponent("models")
+            let archivos = ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey])) ?? [])
+                .compactMap { u -> (URL, Int)? in
+                    guard let s = (try? u.resourceValues(forKeys: [.fileSizeKey]))?.fileSize else { return nil }
+                    return (u, s)
+                }
+                .sorted { $0.1 > $1.1 }
+            guard let (modelo, bytes) = archivos.first, bytes > 500_000_000 else {
+                print("HUELLAMEM OMITIDA — no hay ningún modelo de más de 500 MB instalado con el que probar")
+                exit(0)
+            }
+            let gb = Double(bytes) / 1_073_741_824
+            let antes = MemoriaProceso.huellaMB()
+            let t0 = Date()
+            let h = ModeloDescargado.huella(de: modelo)
+            let seg = Date().timeIntervalSince(t0)
+            let despues = MemoriaProceso.huellaMB()
+            let pico = MemoriaProceso.picoMB()
+            print(String(format: "HUELLAMEM %@ · %.2f GB · %.1f s", modelo.lastPathComponent, gb, seg))
+            print(String(format: "HUELLAMEM huella antes %d MB → después %d MB · pico del proceso %d MB",
+                         Int(antes), Int(despues), Int(pico)))
+            chk(h.count == 64, "la huella se calcula entera (\(h.prefix(12))…)")
+            // El umbral es holgado a propósito: lo que se vigila es el orden de
+            // magnitud. Antes del arreglo esto marcaba +2 830 MB con este mismo
+            // archivo; cualquier regresión vuelve a esa escala, no a 60 MB.
+            chk(despues - antes <= 100,
+                String(format: "leer %.2f GB no deja más de 100 MB de huella (+%d MB)", gb, Int(despues - antes)))
+            chk(pico - antes <= 300,
+                String(format: "y el pico del proceso no llega a 300 MB sobre el inicio (%d MB)", Int(pico)))
+            print("HUELLAMEM \(mal == 0 ? "TODO OK — verificar un modelo no carga el modelo" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
+        // Dictado largo con el MICRÓFONO DE VERDAD: BTODICTA_MICLARGOTEST=<minutos>
+        //
+        // Las dos pruebas que ya existían dejaban un hueco entre ellas: MICTEST
+        // abre el micrófono real pero solo 3 s, y MEMTEST simula seis horas
+        // inyectando trozos sin tocar el micrófono. El fallo que originó todo
+        // esto —el micrófono que se queda mudo al rato, sin error ni aviso— vive
+        // exactamente en ese hueco: hace falta tiempo Y hardware a la vez.
+        //
+        // Por eso el criterio central no es la memoria: es que entren buffers en
+        // CADA ventana. Un micrófono que muere a los veinte minutos deja un
+        // total final perfectamente creíble; solo se delata mirando si el número
+        // siguió subiendo.
+        if let m = ProcessInfo.processInfo.environment["BTODICTA_MICLARGOTEST"] {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("MICLARGO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            // Huella REAL, no RSS: el RSS cuenta páginas ya liberadas que el
+            // asignador no devolvió y llegó a marcar 5 564 MB con 56 MB reales.
+            func rssMB() -> Double { MemoriaProceso.huellaMB() }
+            func bytesDe(_ url: URL?) -> Int {
+                guard let u = url,
+                      let a = try? FileManager.default.attributesOfItem(atPath: u.path),
+                      let n = a[.size] as? NSNumber else { return 0 }
+                return n.intValue
+            }
+
+            let minutos = Double(m) ?? 30
+            let ventana = 30.0                       // cada cuánto se toma nota
+            let pasos = max(1, Int((minutos * 60) / ventana))
+            let base = rssMB()
+            let rec = Recorder()
+            var trozos = 0
+            rec.onChunk = { _ in trozos += 1 }
+
+            print("MICLARGO micrófono: \(Microfono.elegido() != nil ? "el elegido por la app" : "el del sistema")")
+            do { try rec.start() } catch {
+                print("MICLARGO ✗ no pude abrir el micrófono: \(error.localizedDescription)")
+                print("MICLARGO FALLA"); exit(1)
+            }
+            let t0 = Date()
+            print("MICLARGO empieza · \(minutos) min · huella al arrancar: \(Int(base)) MB")
+            print("MICLARGO  min   buffers   nuevos      wav   huella      RSS")
+
+            var previos = 0
+            var ventanasMudas = 0
+            var picoRSS = base
+            var paso = 0
+
+            func medir() {
+                paso += 1
+                let buffers = rec.buffersRecibidos
+                let nuevos = buffers - previos
+                previos = buffers
+                let rss = rssMB()
+                picoRSS = max(picoRSS, rss)
+                let mins = Date().timeIntervalSince(t0) / 60
+                let wavMB = Double(bytesDe(rec.urlQA)) / 1_048_576
+                // Se imprimen las dos: la huella es el criterio, el RSS va al
+                // lado para que un número grande de `ps` no asuste sin contexto.
+                print(String(format: "MICLARGO %5.1f %9d %8d %7.1f MB %5d MB %6d MB",
+                             mins, buffers, nuevos, wavMB, Int(rss), Int(MemoriaProceso.residenteMB())))
+                if nuevos == 0 { ventanasMudas += 1 }
+
+                if paso >= pasos {
+                    // Soltar la tecla: el otro momento donde antes se duplicaba
+                    // el dictado entero en memoria.
+                    let antesParar = rssMB()
+                    let url = rec.stop()
+                    let trasParar = rssMB()
+                    let segundos = Date().timeIntervalSince(t0)
+                    let bytes = bytesDe(url)
+                    let esperados = Double(RedSeguridadDictado.bytesPorSegundo) * segundos
+
+                    print("MICLARGO — resultado —")
+                    print(String(format: "MICLARGO grabados %.1f min · %d buffers · %d trozos · %.1f MB en disco",
+                                 segundos / 60, previos, trozos, Double(bytes) / 1_048_576))
+
+                    chk(ventanasMudas == 0,
+                        "el micrófono entregó audio en las \(pasos) ventanas (mudas: \(ventanasMudas))")
+                    chk(trozos > 0, "los trozos llegaron al escritor (\(trozos))")
+                    chk(url != nil, "el grabador devuelve la ruta de su .wav")
+                    chk(abs(Double(bytes) - esperados) / max(esperados, 1) < 0.05,
+                        String(format: "el .wav pesa lo que dura (%.1f MB, esperado %.1f MB)",
+                               Double(bytes) / 1_048_576, esperados / 1_048_576))
+                    // La memoria aquí es CONTEXTO, no criterio fino: esta prueba
+                    // corre la aplicación entera, con su bitácora grabando audio,
+                    // sistema y pantalla en paralelo. Atribuirle al grabador lo
+                    // que sube el proceso completo sería medir otra cosa — el
+                    // error que ya costó tres versiones creyendo resuelto algo
+                    // que no lo estaba.
+                    //
+                    // Quien aísla el grabador es MEMTEST, y quien aísla la
+                    // comprobación de modelos es HUELLAMEMTEST. Lo que SOLO se
+                    // puede ver aquí es si el micrófono sigue vivo al cabo de una
+                    // hora, y ese es el criterio duro de arriba.
+                    let picoReal = MemoriaProceso.picoMB()
+                    print(String(format: "MICLARGO huella: empezó en %d MB, terminó en %d MB · pico del proceso %d MB · RSS final %d MB",
+                                 Int(base), Int(trasParar), Int(picoReal), Int(MemoriaProceso.residenteMB())))
+                    print("MICLARGO (la aplicación entera, con la bitácora grabando en paralelo — no es la memoria del grabador)")
+                    // Umbrales ESTRECHOS a propósito. Se dudó de si eran
+                    // alcanzables corriendo la aplicación entera; la corrida de
+                    // 63 min del 2026-09-19 los dejó en +19 MB vistos y 35 MB de
+                    // pico. Aflojarlos «por si acaso» solo serviría para no ver
+                    // la próxima regresión.
+                    chk(picoRSS - base <= 200,
+                        "la huella nunca subió más de 200 MB entre medidas (pico visto +\(Int(picoRSS - base)) MB)")
+                    chk(picoReal - base <= 500,
+                        "y el pico que registra el sistema se queda por debajo de 500 MB sobre el inicio (\(Int(picoReal)) MB)")
+                    chk(trasParar - antesParar <= 200,
+                        "soltar la tecla no duplica el dictado en memoria (\(Int(trasParar - antesParar)) MB)")
+
+                    print("MICLARGO \(mal == 0 ? "TODO OK — dictado largo con micrófono real" : "FALLA (\(mal))")")
+                    exit(mal == 0 ? 0 : 1)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + ventana) { medir() }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + ventana) { medir() }
             RunLoop.main.run(); return
         }
         // Regresión de ROBUSTEZ: BTODICTA_ROBUSTEZTEST=1 [BTODICTA_STTWAV=<wav>]
