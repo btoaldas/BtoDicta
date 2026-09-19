@@ -34,6 +34,22 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.63.4
+
+- **El dictado deja de vivir en la memoria.** El grabador retenía todo lo hablado
+  en RAM y al terminar hacía una segunda copia completa: **1 388 MB** en un
+  dictado de seis horas. Ahora el audio va al archivo según entra y terminar no
+  copia nada. Misma prueba: **80 MB**.
+- La aplicación creía tener esto resuelto desde 0.60.0. La medición que lo decía
+  era correcta, pero **probaba otro componente** y nunca pasaba por el grabador.
+- **El audio de trabajo se conserva los días que fijes** (siete de fábrica, 0 =
+  nunca), en *Ajustes → Audio de trabajo*.
+- **Reabrir la app ya no reenvía el resumen por correo.** El registro de lo
+  enviado vivía en memoria; una tarde de reinicios mandó diecisiete correos
+  cuando tocaban dos.
+- La bitácora vuelve a decir cuándo empieza a escuchar tras cederle el micrófono
+  al dictado.
+
 ### Novedades 0.63.3
 
 - **El mismo fallo de 0.63.2 estaba en la bitácora**, y ahí era peor: si la

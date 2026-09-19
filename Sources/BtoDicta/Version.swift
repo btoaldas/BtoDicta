@@ -8,11 +8,19 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.63.3"
+    static let numero = "0.63.4"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.63.4", "2026-09-18", [
+            "EL DICTADO DEJA DE VIVIR EN LA MEMORIA. El grabador retenía en RAM todo lo hablado, y al soltar la tecla armaba encima una segunda copia completa para enviarla. Medido en un dictado de seis horas: 1 388 MB. Ahora el audio se escribe al archivo según entra y en memoria solo queda una ventana de tres minutos —lo máximo que la vista previa en vivo puede pedir—, así que soltar la tecla ya no copia nada: devuelve la ruta del archivo que ya estaba escrito. Misma prueba: 80 MB",
+            "Lo curioso es que la aplicación creía tener esto resuelto desde 0.60.0, y la medición que lo decía era correcta pero medía otro componente: probaba el escritor de la bitácora, que sí escribe sin acumular, y nunca pasaba por el grabador del dictado. La prueba ahora recorre el camino real, que es de lo que sirve una prueba",
+            "El audio de trabajo de cada dictado se conserva los días que tú fijes —siete de fábrica, 0 para no borrar nunca— en Configuración → Ajustes → Audio de trabajo. Ronda los 115 MB por hora dictada. Es la copia de trabajo del grabador: el audio del historial se guarda aparte y no se toca",
+            "REABRIR LA APLICACIÓN YA NO VUELVE A MANDAR EL RESUMEN POR CORREO. El registro de qué se había enviado y qué día vivía solo en memoria, de modo que cada arranque posterior a la hora fijada creía que no había mandado nada y mandaba otra vez. Una tarde de reinicios produjo diecisiete correos al mismo destinatario cuando tocaban dos. Ahora se guarda en disco, y si un envío falla se reintenta en la vuelta siguiente en vez de perder el día",
+            "La bitácora vuelve a decir en el registro cuándo empieza a escuchar. El contador no se reiniciaba, así que ese aviso solo salía la primera vez de la sesión y las recuperaciones tras cederle el micrófono al dictado quedaban mudas: parecía rota una bitácora que estaba grabando bien",
+            "Por dentro, el cuerpo de cada envío a los motores se arma en disco en vez de en memoria, copiando el audio por ventanas. Comprobado byte a byte contra el camino anterior con audios de un segundo, un minuto y una hora antes de cambiar ningún motor",
+        ]),
         ("0.63.3", "2026-09-18", [
             "El fallo corregido en 0.63.2 —«el micrófono no aceptó la escucha»— estaba también en la BITÁCORA y en la activación por voz, con el mismo patrón línea por línea. En la bitácora era peor que en el grabador, porque ahí nadie está mirando: si la escucha no entraba, dejaba de grabar EN SILENCIO y no había ninguna señal hasta buscar audio que no existía",
             "Los dos pasan a resolver el formato en el momento de instalar la escucha y a armar el conversor con el primer audio real, rearmándolo si el micrófono cambia de frecuencia a mitad de la grabación",

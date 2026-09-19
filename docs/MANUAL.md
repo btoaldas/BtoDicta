@@ -1016,6 +1016,31 @@ periodo, no se envía un correo vacío. Cada intento queda en el registro con su
 causa; para ver el diálogo completo con el servidor, `BTODICTA_SMTPDEBUG=1` (la
 clave nunca aparece).
 
+### Me llegaron varios correos iguales con el resumen
+
+Arreglado en 0.63.4. El registro de qué se había enviado y qué día vivía solo en
+memoria: al cerrar la aplicación se perdía, y el siguiente arranque —si era
+posterior a la hora que tienes fijada— creía que no había mandado nada y volvía a
+mandar. Una tarde con muchos reinicios produjo diecisiete correos donde tocaban
+dos.
+
+Ahora se guarda en disco (`~/.btodicta/correo-ultimos.json`) y se lee al arrancar.
+La marca se pone antes de enviar, para que dos vueltas del reloj no produzcan dos
+correos, y si el envío falla se retira para reintentarlo en la vuelta siguiente en
+vez de perder el día.
+
+Comprobación sin mandar ningún correo: `BTODICTA_CORREOHORARIO=1`.
+
+### Cuánto ocupa el audio de trabajo, y cómo se limpia
+
+Desde 0.63.4 el audio de cada dictado se escribe a disco mientras hablas, en vez
+de acumularse en memoria. Ese archivo de trabajo ronda los **115 MB por hora
+dictada** y se barre pasados los días que fijes en *Configuración → Ajustes →
+Audio de trabajo*: siete de fábrica, **0 para no borrar nunca**.
+
+No es el audio del historial. El del historial se guarda aparte, no lo toca este
+barrido, y se recupera desde la pestaña Transcribir como siempre.
+
 ### La bitácora dejó de grabar sin decir nada
 
 Arreglado en 0.63.3. Era el mismo fallo de abajo, en otro sitio: la bitácora leía
