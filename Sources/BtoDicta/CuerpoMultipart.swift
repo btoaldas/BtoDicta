@@ -29,6 +29,34 @@ enum CuerpoMultipart {
         case archivo(URL)
         case datos(Data)
 
+        /// El audio en memoria. **Solo para quien no pueda evitarlo**: leerlo
+        /// es justamente lo que esta spec quita. Cada llamada que quede es una
+        /// copia completa del dictado.
+        func leer() -> Data {
+            switch self {
+            case .archivo(let u): return (try? Data(contentsOf: u)) ?? Data()
+            case .datos(let d): return d
+            }
+        }
+
+        /// Los primeros `n` bytes, sin cargar el resto. Sirve para mirar una
+        /// cabecera —si es un WAV, por ejemplo— sin pagar una copia completa.
+        func primerosBytes(_ n: Int) -> Data {
+            switch self {
+            case .datos(let d): return d.prefix(n)
+            case .archivo(let u):
+                guard let h = try? FileHandle(forReadingFrom: u) else { return Data() }
+                defer { try? h.close() }
+                return (try? h.read(upToCount: n)) ?? Data()
+            }
+        }
+
+        /// La ruta, si la hay. Permite subir con `fromFile:` sin pasar por RAM.
+        var archivoURL: URL? {
+            if case .archivo(let u) = self { return u }
+            return nil
+        }
+
         var bytes: Int {
             switch self {
             case .archivo(let u):
@@ -119,7 +147,8 @@ enum CuerpoMultipart {
                           nombreCampo: String = "file",
                           nombreArchivo: String,
                           tipo: String,
-                          audio: Origen) throws -> Preparado {
+                          audio: Origen,
+                          camposDespues: [(String, String, String?)] = []) throws -> Preparado {
         let fm = FileManager.default
         Config.asegurarDirSeguro()
         try? fm.createDirectory(at: carpeta, withIntermediateDirectories: true,
@@ -171,12 +200,52 @@ enum CuerpoMultipart {
                 try salida.write(contentsOf: trozo)
             }
         }
-        try escribir("\r\n--\(boundary)--\r\n")
+        // Algunas API ponen campos DESPUÉS del archivo (Azure manda ahí su
+        // `definition`), y el orden de las partes no es indiferente para ellas.
+        if camposDespues.isEmpty {
+            try escribir("\r\n--\(boundary)--\r\n")
+        } else {
+            for (nombre, valor, tipoCampo) in camposDespues {
+                let cabeceraTipo = tipoCampo.map { "Content-Type: \($0)\r\n" } ?? ""
+                try escribir("\r\n--\(boundary)\r\nContent-Disposition: form-data; name=\"\(nombre)\"\r\n\(cabeceraTipo)\r\n\(valor)")
+            }
+            try escribir("\r\n--\(boundary)--\r\n")
+        }
         try? salida.synchronize()
 
         let bytes = ((try? fm.attributesOfItem(atPath: destino.path))?[.size] as? Int) ?? 0
         completado = true
         return Preparado(url: destino, boundary: boundary, bytes: bytes)
+    }
+
+    // MARK: Subida
+
+    /// Sube un cuerpo ya preparado y **limpia el temporal pase lo que pase**.
+    /// Es el único sitio donde se llama a `uploadTask(with:fromFile:)`, para que
+    /// no se pueda olvidar la limpieza en ningún motor.
+    static func subir(_ req: URLRequest, cuerpo: Preparado,
+                      sesion: URLSession? = nil,
+                      completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        (sesion ?? RedDictado.sesion()).uploadTask(with: req, fromFile: cuerpo.url) { d, r, e in
+            cuerpo.limpiar()
+            completion(d, r, e)
+        }.resume()
+    }
+
+    /// Sube el audio TAL CUAL, sin envolverlo en multipart: lo piden las APIs
+    /// que reciben los bytes del WAV en el cuerpo. Si viene de un archivo se
+    /// transmite desde disco; si ya está en memoria, se manda como estaba.
+    static func subirCrudo(_ req: URLRequest, audio: Origen,
+                           completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        if let url = audio.archivoURL {
+            RedDictado.sesion().uploadTask(with: req, fromFile: url) { d, r, e in
+                completion(d, r, e)
+            }.resume()
+        } else {
+            RedDictado.sesion().uploadTask(with: req, from: audio.leer()) { d, r, e in
+                completion(d, r, e)
+            }.resume()
+        }
     }
 
     /// El mismo cuerpo, pero en memoria. Es el camino ANTERIOR, conservado solo

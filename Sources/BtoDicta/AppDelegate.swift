@@ -1638,6 +1638,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let h = ProcessInfo.processInfo.environment["BTODICTA_MEMTEST"] {
             var mal = 0
             func chk(_ ok: Bool, _ q: String) { print("MEM \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            func rrssMB() -> Double { rssMB() }
             func rssMB() -> Double {
                 var info = mach_task_basic_info()
                 var n = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
@@ -1674,6 +1675,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let trasParar = rssMB()
             print("MEM al terminar el dictado: \(Int(trasParar)) MB (soltar la tecla sumó \(Int(trasParar - antesParar)) MB)")
             chk(trasParar - base <= 200, "terminar el dictado no deja más de 200 MB por encima del inicio")
+
+            // Y el tercer momento: PREPARAR EL ENVÍO al motor. Antes de la fase B
+            // aquí se armaba el cuerpo multipart entero en memoria con el audio
+            // dentro, que era la segunda mitad de los 1 388 MB. Ahora se escribe
+            // a disco copiando por ventanas.
+            if let wavURL = rec.urlQA {
+                let antesEnvio = rrssMB()
+                let cuerpo = try? CuerpoMultipart.construir(
+                    boundary: "MEMTEST", campos: [("model", "whisper-1")],
+                    nombreArchivo: "audio.wav", tipo: "audio/wav",
+                    audio: .archivo(wavURL))
+                let trasEnvio = rrssMB()
+                print("MEM al preparar el envío al motor: \(Int(trasEnvio)) MB (subió \(Int(trasEnvio - antesEnvio)) MB)")
+                chk(cuerpo != nil, "el cuerpo del envío se prepara desde el archivo")
+                chk(trasEnvio - antesEnvio <= 200, "preparar el envío de \(horas) h no añade más de 200 MB")
+                if let c = cuerpo {
+                    chk(c.bytes > bytes, "y el cuerpo contiene el audio completo (\(c.bytes / 1_048_576) MB)")
+                    c.limpiar()
+                }
+                let bal = CuerpoMultipart.balance()
+                chk(bal.creados == bal.borrados, "sin cuerpos temporales huérfanos (\(bal.creados) creados, \(bal.borrados) borrados)")
+            } else {
+                chk(false, "el grabador debería haber dejado su .wav en disco")
+            }
 
             chk(w.bytesEscritos == bytes, "el archivo tiene los \(bytes / 1_048_576) MB completos")
             // Leer tramos sueltos no carga el dictado entero.
@@ -1819,7 +1844,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let cortada = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut,
                                   userInfo: [NSLocalizedDescriptionKey: "The request timed out."])
             var intentos = 0
-            Troceo.enviarPartiendo(grandote, motor: red,
+            Troceo.enviarPartiendo(CuerpoMultipart.Origen.datos(grandote), motor: red,
                                    enviar: { _, cb in intentos += 1; cb(.failure(cortada)) }) { r in
                 if case .success = r { chk(false, "sin red no puede haber éxito") }
             }
@@ -1828,9 +1853,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "y NO aprende ningún techo de una caída de internet")
             // El mismo tamaño, pero rechazado por el SERVIDOR, sí enseña.
             let serv = "prueba-serv-\(UUID().uuidString.prefix(8))"
-            Troceo.enviarPartiendo(grandote, motor: serv,
+            Troceo.enviarPartiendo(CuerpoMultipart.Origen.datos(grandote), motor: serv,
                                    enviar: { d, cb in
-                                       d.count > 200 * RedSeguridadDictado.bytesPorSegundo
+                                       d.bytes > 200 * RedSeguridadDictado.bytesPorSegundo
                                            ? cb(.failure(ScribeError.http(400, "format not recognised")))
                                            : cb(.success("tramo"))
                                    }) { _ in }
@@ -1892,11 +1917,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         }
                         // Por el MISMO camino que el dictado real: Troceo decide
                         // si cabe entero o si hay que partirlo.
-                        let enviar: (Data, @escaping (Result<String, Error>) -> Void) -> Void = { datos, cb in
-                            if motor == "fish" { FishTranscribe.run(wav: datos, model: "transcribe-1", completion: cb) }
-                            else { GroqTranscribe.run(wav: datos, completion: cb) }
+                        let enviar: (CuerpoMultipart.Origen, @escaping (Result<String, Error>) -> Void) -> Void = { fuente, cb in
+                            if motor == "fish" { FishTranscribe.run(wav: fuente, model: "transcribe-1", completion: cb) }
+                            else { GroqTranscribe.run(wav: fuente, completion: cb) }
                         }
-                        Troceo.enviarPartiendo(wav, motor: motor, enviar: enviar, completion: listo)
+                        Troceo.enviarPartiendo(CuerpoMultipart.Origen.datos(wav), motor: motor, enviar: enviar, completion: listo)
                     }
                 }
             }
@@ -1928,7 +1953,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     chk(ok, "y es un mp3 de verdad, no un JSON de error")
 
                     // 2) Transcripción: se le devuelve ESE MISMO audio.
-                    FishTranscribe.run(wav: audio ?? Data(), model: "asr") { r in
+                    FishTranscribe.run(wav: CuerpoMultipart.Origen.datos(audio ?? Data()), model: "asr") { r in
                         DispatchQueue.main.async {
                             switch r {
                             case .success(let texto):
@@ -2234,7 +2259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     // como universal-3-pro, no solo la rama vacía).
                     let mGuardado = Providers.cadena().first(where: { $0.id == "assemblyai" })?.modelo ?? "universal-3-pro"
                     print("ROBUSTEZTEST AssemblyAI modelo guardado='\(mGuardado)'")
-                    AssemblyAITranscribe.run(wav: d, model: mGuardado) { r in
+                    AssemblyAITranscribe.run(wav: CuerpoMultipart.Origen.datos(d), model: mGuardado) { r in
                         switch r {
                         case .success(let t): chk(!t.isEmpty, "AssemblyAI speech_models OK → '\(t.prefix(70))'")
                         case .failure(let e): chk(false, "AssemblyAI falló: \(e.localizedDescription.prefix(160))")
@@ -5291,11 +5316,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.detenerCronometro()
         // Del tamaño del archivo, sin abrirlo.
         let seconds = Double(Recorder.bytes(de: wavURL) - 44) / 32000.0
-        // Paso intermedio de la spec 001: el grabador ya no retiene el dictado
-        // —esa copia ha desaparecido—, pero los motores todavía reciben datos y
-        // no la ruta, así que aquí se lee una vez. Las tareas T06 a T10 quitan
-        // también esta lectura pasándoles `wavURL`.
-        let wav = Recorder.datos(de: wavURL)
+        // El audio NO se carga aquí. Viaja como ruta hasta el motor, que sube
+        // desde disco; solo lo leen los pocos sitios que de verdad necesitan los
+        // bytes —guardarlo en el historial y el cotejo con el audio—, y cada uno
+        // cuando le toca.
+        let fuenteAudio: CuerpoMultipart.Origen = wavURL.map { .archivo($0) } ?? .datos(Data())
         // La duración del audio grabado, para decirla mientras se transcribe:
         // se mide del propio PCM, no del reloj, así que no la falsea una pausa.
         let duracionDictado = DictationPanel.reloj(seconds)
@@ -5335,10 +5360,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ])
 
         func rescatarConCascada(_ etiquetaFallo: String) {
-            Failover.transcribe(wav: wav) { [weak self] r in
+            Failover.transcribe(wav: fuenteAudio) { [weak self] r in
                 switch r {
                 case .success(let (raw, proveedor, modelo)):
-                    self?.deliver(raw: raw, wav: wav, via: proveedor, modelo: modelo,
+                    self?.deliver(raw: raw, wavURL: wavURL, via: proveedor, modelo: modelo,
                                   history: historyActual, modo: modoDictado,
                                   contexto: contextoDictado, vivo: vivoDictado,
                                   activacion: activacionDictado,
@@ -5347,13 +5372,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     Log.log(.ia, "failover agotado: \(error.localizedDescription)")
                     if !ultimoParcial.isEmpty {
                         // Último recurso: el parcial que alcanzó a llegar.
-                        self?.deliver(raw: ultimoParcial, wav: wav,
+                        self?.deliver(raw: ultimoParcial, wavURL: wavURL,
                                       via: "\(etiquetaFallo) (parcial)", history: historyActual,
                                       modo: modoDictado, contexto: contextoDictado, vivo: vivoDictado,
                                       activacion: activacionDictado,
                                       continuacionDictadoAsistido: continuacionDictadoAsistido)
                     } else {
-                        historyActual?.finish(wav: wav, finalText: "")
+                        historyActual?.finish(wav: Recorder.datos(de: wavURL), finalText: "")
                         self?.avisarSiLibre("⚠️ \(etiquetaFallo) — audio guardado")
                     }
                 }
@@ -5391,7 +5416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                                         congelado: self?.vivoCongelado ?? false,
                                                         vozAlFinal: vozAlFinal)
                 guard let motivo else {
-                    self?.deliver(raw: mejorVivo, wav: wav, via: "\(motor) (en vivo)", modelo: mod,
+                    self?.deliver(raw: mejorVivo, wavURL: wavURL, via: "\(motor) (en vivo)", modelo: mod,
                                   history: historyActual, modo: modoDictado,
                                   contexto: contextoDictado, vivo: vivoDictado,
                                   activacion: activacionDictado,
@@ -5413,7 +5438,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 RedSeguridadDictado.repararTodo(vivo: mejorVivo, pcm: pcm, huecos: huecos,
                                                 colaDesdeByte: desde) { texto, extra in
                     let via = extra.map { "\(motor) (en vivo) \($0)" } ?? "\(motor) (en vivo)"
-                    self?.deliver(raw: texto, wav: wav, via: via, modelo: mod,
+                    self?.deliver(raw: texto, wavURL: wavURL, via: via, modelo: mod,
                                   history: historyActual, modo: modoDictado,
                                   contexto: contextoDictado, vivo: vivoDictado,
                                   activacion: activacionDictado,
@@ -5461,7 +5486,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                                             congelado: self?.vivoCongelado ?? false,
                                                             vozAlFinal: vozAlFinal)
                     guard let motivo else {
-                        self?.deliver(raw: mejor, wav: wav, via: "\(nombreVivo) (en vivo)", modelo: mod,
+                        self?.deliver(raw: mejor, wavURL: wavURL, via: "\(nombreVivo) (en vivo)", modelo: mod,
                                       history: historyActual, modo: modoDictado,
                                       contexto: contextoDictado, vivo: vivoDictado,
                                       activacion: activacionDictado,
@@ -5478,7 +5503,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     RedSeguridadDictado.repararTodo(vivo: mejor, pcm: pcmN, huecos: huecosN,
                                                     colaDesdeByte: self?.vivoBytesAlCrecer ?? 0) { texto, extra in
                         let via = extra.map { "\(nombreVivo) (en vivo) \($0)" } ?? "\(nombreVivo) (en vivo)"
-                        self?.deliver(raw: texto, wav: wav, via: via, modelo: mod,
+                        self?.deliver(raw: texto, wavURL: wavURL, via: via, modelo: mod,
                                       history: historyActual, modo: modoDictado,
                                       contexto: contextoDictado, vivo: vivoDictado,
                                       activacion: activacionDictado,
@@ -5512,7 +5537,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if full.isEmpty {
                     rescatarConCascada("Sin texto")
                 } else {
-                    self?.deliver(raw: full, wav: wav, via: "ElevenLabs (en vivo)", modelo: "scribe_v2_realtime",
+                    self?.deliver(raw: full, wavURL: wavURL, via: "ElevenLabs (en vivo)", modelo: "scribe_v2_realtime",
                                   history: historyActual, modo: modoDictado,
                                   contexto: contextoDictado, vivo: vivoDictado,
                                   activacion: activacionDictado,
@@ -5543,17 +5568,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             panel.update("⏳ Transcribiendo \(duracionDictado)…")
             // Failover: recorre los proveedores activos en orden.
-            Failover.transcribe(wav: wav) { [weak self] result in
+            Failover.transcribe(wav: fuenteAudio) { [weak self] result in
                 switch result {
                 case .success(let (raw, proveedor, modelo)):
-                    self?.deliver(raw: raw, wav: wav, via: proveedor, modelo: modelo,
+                    self?.deliver(raw: raw, wavURL: wavURL, via: proveedor, modelo: modelo,
                                   history: historyActual, modo: modoDictado,
                                   contexto: contextoDictado, vivo: vivoDictado,
                                   activacion: activacionDictado,
                                   continuacionDictadoAsistido: continuacionDictadoAsistido)
                 case .failure(let error):
                     Log.log(.ia, "failover agotado: \(error.localizedDescription)")
-                    historyActual?.finish(wav: wav, finalText: "")
+                    historyActual?.finish(wav: Recorder.datos(de: wavURL), finalText: "")
                     self?.avisarSiLibre("⚠️ Todos los proveedores fallaron — audio guardado")
                 }
             }
@@ -5572,7 +5597,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         panel.hide(after: 3)
     }
 
-    private func deliver(raw: String, wav: Data, via proveedor: String, modelo: String = "",
+    private func deliver(raw: String, wavURL: URL?, via proveedor: String, modelo: String = "",
                          history: HistoryWriter?, modo modoSnapshot: Modo? = nil,
                          contexto: ModoContexto? = nil, vivo: ModoMatch? = nil,
                          activacion: ActivacionVoz.Despertar? = nil,
@@ -5581,14 +5606,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // llega desde un Task). Todo deliver toca AppKit (panel, ícono) → SIEMPRE en main.
         guard Thread.isMainThread else {
             DispatchQueue.main.async {
-                self.deliver(raw: raw, wav: wav, via: proveedor, modelo: modelo,
+                self.deliver(raw: raw, wavURL: wavURL, via: proveedor, modelo: modelo,
                              history: history, modo: modoSnapshot, contexto: contexto, vivo: vivo,
                              activacion: activacion,
                              continuacionDictadoAsistido: continuacionDictadoAsistido)
             }
             return
         }
-        let segundos = Double(wav.count - 44) / 32000.0
+        // Del tamaño del archivo: para decir la duración no hace falta el audio.
+        let segundos = Double(Recorder.bytes(de: wavURL) - 44) / 32000.0
+        // A partir de aquí el dictado YA está transcrito. Guardarlo en el
+        // historial y cotejarlo con el texto sí necesitan los bytes, así que se
+        // leen UNA vez. El ahorro de la spec 001 es el tramo anterior —grabar y
+        // transcribir—, que es donde convivían las copias.
+        let wav = Recorder.datos(de: wavURL)
         UsageLog.record(provider: proveedor, modelo: modelo, seconds: segundos)
 
         let crudo = TextoTranscrito.limpiar(raw)

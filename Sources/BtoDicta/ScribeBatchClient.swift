@@ -4,25 +4,27 @@ import Carbon.HIToolbox
 
 // MARK: - Cliente batch (scribe_v1 / scribe_v2 + keyterms)
 
-func transcribeBatch(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+func transcribeBatch(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
     guard let key = Config.apiKey() else {
         completion(.failure(ScribeError.sinApiKey))
         return
     }
     let boundary = "BtoDicta-\(UUID().uuidString)"
-    var body = Data()
-    func field(_ name: String, _ value: String) {
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".data(using: .utf8)!)
-    }
-    field("model_id", model)
-    field("language_code", "es")
-    field("tag_audio_events", "false")
-    for term in Config.keyterms().prefix(1000) { field("keyterms", term) }
-    body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"dictado.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-    body.append(wav)
-    body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+    var campos: [(String, String)] = [("model_id", model), ("language_code", "es"),
+                                      ("tag_audio_events", "false")]
+    for term in Config.keyterms().prefix(1000) { campos.append(("keyterms", term)) }
+    let cuerpo: CuerpoMultipart.Preparado
+    do {
+        cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: campos,
+                                               nombreArchivo: "dictado.wav",
+                                               tipo: "audio/wav", audio: wav)
+    } catch { completion(.failure(error)); return }
 
-    var request = URLRequest(url: URL(string: "https://api.elevenlabs.io/v1/speech-to-text")!); request.setValue("close", forHTTPHeaderField: "Connection")
+    // SIN `Connection: close`, y por la sesión compartida del dictado. Este
+    // motor se quedó fuera del arreglo de 0.59.0: seguía pidiendo el cierre de
+    // la conexión sobre `URLSession.shared`, así que el envío siguiente heredaba
+    // un socket ya cerrado y esperaba en balde hasta agotar el plazo.
+    var request = URLRequest(url: URL(string: "https://api.elevenlabs.io/v1/speech-to-text")!)
     request.httpMethod = "POST"
     // Corto a propósito: con red mala es mejor saltar rápido al siguiente
     // proveedor de la cascada (Whisper local responde en <1 s) que esperar.
@@ -30,7 +32,7 @@ func transcribeBatch(wav: Data, model: String, completion: @escaping (Result<Str
     request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
     request.setValue(key, forHTTPHeaderField: "xi-api-key")
 
-    URLSession.shared.uploadTask(with: request, from: body) { data, response, error in
+    CuerpoMultipart.subir(request, cuerpo: cuerpo) { data, response, error in
         DispatchQueue.main.async {
             if let error { completion(.failure(error)); return }
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -46,7 +48,7 @@ func transcribeBatch(wav: Data, model: String, completion: @escaping (Result<Str
             }
             completion(.success(text.trimmingCharacters(in: .whitespacesAndNewlines)))
         }
-    }.resume()
+    }
 }
 
 /// Transcribe un archivo de disco (audio o video). ElevenLabs acepta muchos

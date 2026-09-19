@@ -84,6 +84,9 @@ final class Recorder {
         }
     }
 
+    /// El `.wav` en curso. Solo para `BTODICTA_MEMTEST`.
+    var urlQA: URL? { urlSalida }
+
     /// Abre el archivo sin tocar el micrófono. Solo para `BTODICTA_MEMTEST`.
     func abrirSalidaQA() { abrirSalida() }
 

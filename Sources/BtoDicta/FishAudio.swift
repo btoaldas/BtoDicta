@@ -54,11 +54,11 @@ enum FishTranscribe {
                 NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost].contains(n.code)
     }
 
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         intentar(wav: wav, reintentos: 1, completion: completion)
     }
 
-    private static func intentar(wav: Data, reintentos: Int,
+    private static func intentar(wav: CuerpoMultipart.Origen, reintentos: Int,
                                  completion: @escaping (Result<String, Error>) -> Void) {
         let key = FishAudio.clave()
         guard !key.isEmpty else {
@@ -75,17 +75,27 @@ enum FishTranscribe {
         // mp3 que acaba de generar el TTS. Se rotula por el contenido real:
         // mentir en el tipo es la forma más tonta de que el servidor rechace un
         // audio que está perfectamente bien.
-        let esWav = wav.count > 4 && wav.prefix(4) == Data("RIFF".utf8)
+        // Los primeros bytes bastan para saber si es WAV: no hace falta leerlo entero.
+        let cabecera = wav.primerosBytes(4)
+        let esWav = cabecera == Data("RIFF".utf8)
         let nombreArchivo = esWav ? "audio.wav" : "audio.mp3"
         let tipo = esWav ? "audio/wav" : "audio/mpeg"
-        var body = Data()
-        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"\(nombreArchivo)\"\r\nContent-Type: \(tipo)\r\n\r\n".utf8))
-        body.append(wav)
-        body.append(Data("\r\n".utf8))
-        body.append(campo("language", "es"))
-        // Sin tiempos: la app solo quiere el texto y así la respuesta es menor.
-        body.append(campo("ignore_timestamps", "true"))
-        body.append(Data("--\(boundary)--\r\n".utf8))
+        // Los campos van DESPUÉS del audio, como estaban: el orden de las
+        // partes no es indiferente para esta API.
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(
+                boundary: boundary, campos: [],
+                nombreCampo: "audio", nombreArchivo: nombreArchivo, tipo: tipo,
+                audio: wav,
+                camposDespues: [("language", "es", nil),
+                                // Sin tiempos: la app solo quiere el texto y así
+                                // la respuesta es menor.
+                                ("ignore_timestamps", "true", nil)])
+        } catch {
+            DispatchQueue.main.async { completion(.failure(error)) }
+            return
+        }
 
         // Plazo proporcional al audio, no un número fijo y grande. Medido sobre
         // esta API: 72 s de audio se transcriben en 2,8-3,1 s, y 12 s en ~1 s.
@@ -93,7 +103,7 @@ enum FishTranscribe {
         // se quedó colgada hizo esperar un minuto entero antes de pasar al
         // siguiente motor. Con esto el failover llega en 20-45 s según el
         // tamaño —diez veces lo medido— y aun así se reintenta antes de rendirse.
-        let segundos = Double(max(0, wav.count - 44)) / Double(RedSeguridadDictado.bytesPorSegundo)
+        let segundos = Double(max(0, wav.bytes - 44)) / Double(RedSeguridadDictado.bytesPorSegundo)
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.timeoutInterval = max(15, min(30, segundos * 0.4))
@@ -110,7 +120,7 @@ enum FishTranscribe {
         // respuesta llega en menos de 3 s; dentro de la app, en cambio, algunos
         // dictados largos agotan el plazo. Sin estos números el diagnóstico es
         // adivinanza, así que cada llamada deja su tamaño y su tiempo.
-        let kb = body.count / 1024
+        let kb = cuerpo.bytes / 1024
         let t0 = Date()
         // El primer envío aprovecha el banco compartido (conexión ya caliente);
         // el reintento estrena la suya, porque si el primero se colgó lo más
@@ -118,7 +128,7 @@ enum FishTranscribe {
         // Primer envío: la conexión compartida del dictado, que se renueva
         // sola si lleva rato parada. Reintento: siempre una nueva.
         let sesion = reintentos > 0 ? RedDictado.sesion() : RedDictado.sesionNueva()
-        sesion.uploadTask(with: req, from: body) { data, resp, err in
+        CuerpoMultipart.subir(req, cuerpo: cuerpo, sesion: sesion) { data, resp, err in
             let ms = Int(Date().timeIntervalSince(t0) * 1000)
             // La sesión de un solo uso se cierra en cuanto contesta; la
             // compartida es de toda la aplicación y no se toca.
@@ -161,6 +171,6 @@ enum FishTranscribe {
                 }
                 completion(.success(texto))
             }
-        }.resume()
+        }
     }
 }

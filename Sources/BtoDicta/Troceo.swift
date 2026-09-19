@@ -254,14 +254,15 @@ enum Troceo {
     ///
     /// `profundidad` limita la recursión: cada nivel duplica el número de
     /// llamadas, y más allá de cuatro (dieciséis tramos) el fallo es otro.
-    static func enviarPartiendo(_ wav: Data, motor: String, profundidad: Int = 0,
-                                enviar: @escaping (Data, @escaping (Result<String, Error>) -> Void) -> Void,
+    static func enviarPartiendo(_ wav: CuerpoMultipart.Origen, motor: String, profundidad: Int = 0,
+                                enviar: @escaping (CuerpoMultipart.Origen, @escaping (Result<String, Error>) -> Void) -> Void,
                                 completion: @escaping (Result<String, Error>) -> Void) {
         // Si ya se sabe que este motor no traga tanto, se parte de entrada.
-        if profundidad == 0, let seguro = tamanoSeguro(motor), wav.count > seguro + 44 {
-            let partes = tramos(wav, bytesPorTramo: seguro)
+        if profundidad == 0, let seguro = tamanoSeguro(motor), wav.bytes > seguro + 44 {
+            // Partir es lo excepcional, y solo aquí hace falta el audio en memoria.
+            let partes = tramos(wav.leer(), bytesPorTramo: seguro)
             if partes.count > 1 {
-                Log.log(.ia, "\(motor): \(wav.count / 1024) kB pasan de lo que admite — lo mando en \(partes.count) tramos")
+                Log.log(.ia, "\(motor): \(wav.bytes / 1024) kB pasan de lo que admite — lo mando en \(partes.count) tramos")
                 encadenar(partes, motor: motor, profundidad: profundidad + 1,
                           enviar: enviar, completion: completion)
                 return
@@ -270,20 +271,20 @@ enum Troceo {
         enviar(wav) { r in
             switch r {
             case .success(let texto):
-                anotarExito(motor, bytes: wav.count)
+                anotarExito(motor, bytes: wav.bytes)
                 completion(.success(texto))
             case .failure(let e):
-                guard profundidad < 4, pareceDeTamano(e, bytes: wav.count) else {
+                guard profundidad < 4, pareceDeTamano(e, bytes: wav.bytes) else {
                     completion(.failure(e)); return
                 }
                 // Partir SÍ se intenta siempre que el fallo encaje; APRENDER
                 // solo cuando contestó el servidor. Un cuelgue de red merece un
                 // reintento en trozos —por si acaso—, pero jamás una medida.
-                if case ScribeError.http = e { anotarRechazo(motor, bytes: wav.count) }
-                let mitad = RedSeguridadDictado.par((wav.count - 44) / 2)
-                let partes = tramos(wav, bytesPorTramo: mitad)
+                if case ScribeError.http = e { anotarRechazo(motor, bytes: wav.bytes) }
+                let mitad = RedSeguridadDictado.par((wav.bytes - 44) / 2)
+                let partes = tramos(wav.leer(), bytesPorTramo: mitad)
                 guard partes.count > 1 else { completion(.failure(e)); return }
-                Log.log(.ia, "\(motor) no admitió \(wav.count / 1024) kB — lo parto en \(partes.count) y sigo con el mismo motor")
+                Log.log(.ia, "\(motor) no admitió \(wav.bytes / 1024) kB — lo parto en \(partes.count) y sigo con el mismo motor")
                 encadenar(partes, motor: motor, profundidad: profundidad + 1,
                           enviar: enviar, completion: completion)
             }
@@ -294,7 +295,7 @@ enum Troceo {
     /// limitan las peticiones simultáneas y adelantar dos segundos no compensa
     /// que te corten— y los cose quitando el solape.
     private static func encadenar(_ partes: [Data], motor: String, profundidad: Int,
-                                  enviar: @escaping (Data, @escaping (Result<String, Error>) -> Void) -> Void,
+                                  enviar: @escaping (CuerpoMultipart.Origen, @escaping (Result<String, Error>) -> Void) -> Void,
                                   completion: @escaping (Result<String, Error>) -> Void) {
         var texto = ""
         var fallos = 0
@@ -312,7 +313,8 @@ enum Troceo {
                 }
                 return
             }
-            enviarPartiendo(partes[i], motor: motor, profundidad: profundidad,
+            // Los tramos ya están partidos y son pequeños: van en memoria.
+            enviarPartiendo(.datos(partes[i]), motor: motor, profundidad: profundidad,
                             enviar: enviar) { r in
                 switch r {
                 case .success(let t): texto = texto.isEmpty ? t : RedSeguridadDictado.unir(texto, t)

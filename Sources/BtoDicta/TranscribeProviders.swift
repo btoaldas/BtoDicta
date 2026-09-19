@@ -5,24 +5,22 @@ import Foundation
 /// Transcripción vía cualquier API compatible con OpenAI (multipart + JSON).
 /// La usan Groq, OpenAI y Mistral — solo cambian endpoint, key y modelo.
 enum OpenAICompatible {
-    static func transcribir(endpoint: String, key: String, model: String, wav: Data,
+    static func transcribir(endpoint: String, key: String, model: String,
+                            wav: CuerpoMultipart.Origen,
                             conPrompt: Bool = true,
                             completion: @escaping (Result<String, Error>) -> Void) {
         let boundary = "BtoDicta-\(UUID().uuidString)"
-        var body = Data()
-        func field(_ n: String, _ v: String) {
-            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(n)\"\r\n\r\n\(v)\r\n".data(using: .utf8)!)
-        }
-        field("model", model)
-        field("language", "es")
-        field("response_format", "json")
+        var campos: [(String, String)] = [("model", model), ("language", "es"), ("response_format", "json")]
         if conPrompt {
             let glosario = Config.glosarioPrompt()
-            if !glosario.isEmpty { field("prompt", glosario) }
+            if !glosario.isEmpty { campos.append(("prompt", glosario)) }
         }
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(wav)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: campos,
+                                                   nombreArchivo: "audio.wav",
+                                                   tipo: "audio/wav", audio: wav)
+        } catch { completion(.failure(error)); return }
 
         var req = URLRequest(url: URL(string: endpoint)!); req.httpMethod = "POST"
         // Corto a propósito: mejor saltar al siguiente de la cascada que colgar.
@@ -30,7 +28,7 @@ enum OpenAICompatible {
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         if !key.isEmpty { req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }  // locales sin auth
 
-        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
+        CuerpoMultipart.subir(req, cuerpo: cuerpo) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -45,13 +43,13 @@ enum OpenAICompatible {
                 }
                 completion(.success(text.trimmingCharacters(in: .whitespacesAndNewlines)))
             }
-        }.resume()
+        }
     }
 }
 
 /// Transcribe con OpenAI (whisper-1, gpt-4o-transcribe…).
 enum OpenAITranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("OPENAI_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de OpenAI — ponla en Configuración → Modelos")))
@@ -64,7 +62,7 @@ enum OpenAITranscribe {
 
 /// Transcribe con Mistral (Voxtral en la nube).
 enum MistralTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("MISTRAL_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de Mistral — ponla en Configuración → Modelos")))
@@ -79,33 +77,31 @@ enum MistralTranscribe {
 
 /// Transcribe con Groq (whisper-large-v3, nube). API compatible OpenAI.
 enum GroqTranscribe {
-    static func run(wav: Data, model: String = "whisper-large-v3", completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String = "whisper-large-v3",
+                    completion: @escaping (Result<String, Error>) -> Void) {
         guard let key = Config.groqKey() else { completion(.failure(ScribeError.sinApiKey)); return }
         let boundary = "BtoDicta-\(UUID().uuidString)"
-        var body = Data()
-        func field(_ n: String, _ v: String) {
-            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(n)\"\r\n\r\n\(v)\r\n".data(using: .utf8)!)
-        }
-        field("model", model)
-        field("language", "es")
-        field("response_format", "json")
+        var campos: [(String, String)] = [("model", model), ("language", "es"), ("response_format", "json")]
         // Glosario: Whisper acepta un "prompt" que sesga el vocabulario (igual que keyterms en ElevenLabs)
         let glosario = Config.glosarioPrompt()
-        if !glosario.isEmpty { field("prompt", glosario) }
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(wav)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        if !glosario.isEmpty { campos.append(("prompt", glosario)) }
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: campos,
+                                                   nombreArchivo: "audio.wav",
+                                                   tipo: "audio/wav", audio: wav)
+        } catch { completion(.failure(error)); return }
 
         var req = URLRequest(url: URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!); req.httpMethod = "POST"; req.timeoutInterval = 60
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
 
-        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
+        CuerpoMultipart.subir(req, cuerpo: cuerpo) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
                 guard let data, (200..<300).contains(code) else {
-                    completion(.failure(ScribeError.http((resp as? HTTPURLResponse)?.statusCode ?? 0,
+                    completion(.failure(ScribeError.http(code,
                                                           data.flatMap { String(data: $0, encoding: .utf8) } ?? "")))
                     return
                 }
@@ -113,13 +109,13 @@ enum GroqTranscribe {
                       let text = json["text"] as? String else { completion(.failure(ScribeError.sinTexto)); return }
                 completion(.success(text.trimmingCharacters(in: .whitespacesAndNewlines)))
             }
-        }.resume()
+        }
     }
 }
 
 /// Transcribe con Fireworks (Whisper en la nube). API compatible OpenAI.
 enum FireworksTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("FIREWORKS_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de Fireworks — ponla en Configuración → Modelos"))); return
@@ -141,14 +137,15 @@ enum FireworksTranscribe {
 /// Un POST de audio crudo (los bytes del WAV) a una API STT propia; extrae el
 /// texto con un closure. La usan HF y Deepgram (endpoints de un solo tiro).
 enum RawAudioSTT {
-    static func run(url: String, headers: [String: String], contentType: String, wav: Data,
+    static func run(url: String, headers: [String: String], contentType: String,
+                    wav: CuerpoMultipart.Origen,
                     timeout: TimeInterval = 30,
                     extraer: @escaping ([String: Any]) -> String?,
                     completion: @escaping (Result<String, Error>) -> Void) {
         guard let u = URL(string: url) else { completion(.failure(ScribeError.ws("URL inválida"))); return }
         var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = timeout; req.setValue(contentType, forHTTPHeaderField: "Content-Type")
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
-        RedDictado.sesion().uploadTask(with: req, from: wav) { data, resp, err in
+        CuerpoMultipart.subirCrudo(req, audio: wav) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -162,7 +159,7 @@ enum RawAudioSTT {
                 }
                 completion(.success(text.trimmingCharacters(in: .whitespacesAndNewlines)))
             }
-        }.resume()
+        }
     }
 }
 
@@ -201,7 +198,7 @@ enum STTPoll {
                             transcurrido: transcurrido + intervalo, evaluar: evaluar, completion: completion)
                 }
             }
-        }.resume()
+        }
     }
 }
 
@@ -229,7 +226,7 @@ private func postJSON(url: String, headers: [String: String], cuerpo: [String: A
 /// Hugging Face Inference (Whisper ASR) — free tier ⭐ (accesibilidad). Un POST
 /// con el audio crudo al router; responde {"text": …}.
 enum HFTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("HF_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de Hugging Face — ponla en Configuración → Modelos"))); return
@@ -245,7 +242,7 @@ enum HFTranscribe {
 /// Deepgram (Nova) — free $200 de crédito. Un POST con el audio crudo;
 /// el texto vive en results.channels[0].alternatives[0].transcript.
 enum DeepgramTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("DEEPGRAM_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de Deepgram — ponla en Configuración → Modelos"))); return
@@ -267,7 +264,7 @@ enum DeepgramTranscribe {
 /// Account ID en la URL (igual que el chat). Un POST del audio crudo →
 /// result.text. El token va como Bearer; el Account ID lo pone el usuario.
 enum CloudflareTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("CLOUDFLARE_API_KEY")
         let acct = Config.cloudflareAccountId()
         guard !key.isEmpty else {
@@ -289,7 +286,7 @@ enum CloudflareTranscribe {
 /// es/en), el más barato del tier de pago ($0.10/h async), capa gratis. Por
 /// lotes: subir archivo → crear transcripción → sondear → bajar el texto.
 enum SonioxTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("SONIOX_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de Soniox — ponla en Configuración → Modelos"))); return
@@ -298,14 +295,16 @@ enum SonioxTranscribe {
         let modelo = model.isEmpty ? "stt-async-v5" : model
         // 1) subir el audio (multipart, campo "file")
         let boundary = "BtoDicta-\(UUID().uuidString)"
-        var body = Data()
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(wav)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: [],
+                                                   nombreArchivo: "audio.wav",
+                                                   tipo: "audio/wav", audio: wav)
+        } catch { completion(.failure(error)); return }
         var up = URLRequest(url: URL(string: "https://api.soniox.com/v1/files")!); up.httpMethod = "POST"; up.timeoutInterval = 30
         up.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         up.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        RedDictado.sesion().uploadTask(with: up, from: body) { data, resp, err in
+        CuerpoMultipart.subir(up, cuerpo: cuerpo) { data, resp, err in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard err == nil, let data, (200..<300).contains(code),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -349,12 +348,12 @@ enum SonioxTranscribe {
                                     }
                                     completion(.success(texto.trimmingCharacters(in: .whitespacesAndNewlines)))
                                 }
-                            }.resume()
+                            }
                         }
                     }
                 }
             }
-        }.resume()
+        }
     }
 }
 
@@ -362,7 +361,7 @@ enum SonioxTranscribe {
 /// con locale es-EC (Ecuador) nativo. Necesita la key y la REGIÓN (va en la URL,
 /// como el Account ID de Cloudflare). Respuesta: combinedPhrases[].text.
 enum AzureTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("AZURE_SPEECH_KEY")
         let region = Config.azureSpeechRegion()
         guard !key.isEmpty else {
@@ -375,14 +374,18 @@ enum AzureTranscribe {
         let boundary = "BtoDicta-\(UUID().uuidString)"
         // Prioriza español de Ecuador y variantes LATAM (deja que Azure elija).
         let definition = "{\"locales\":[\"es-EC\",\"es-MX\",\"es-CO\",\"es-ES\"],\"profanityFilterMode\":\"None\"}"
-        var body = Data()
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(wav)
-        body.append("\r\n--\(boundary)\r\nContent-Disposition: form-data; name=\"definition\"\r\nContent-Type: application/json\r\n\r\n\(definition)\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: [],
+                                                   nombreCampo: "audio",
+                                                   nombreArchivo: "audio.wav",
+                                                   tipo: "audio/wav", audio: wav,
+                                                   camposDespues: [("definition", definition, "application/json")])
+        } catch { completion(.failure(error)); return }
         var req = URLRequest(url: URL(string: url)!); req.httpMethod = "POST"; req.timeoutInterval = 20
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.setValue(key, forHTTPHeaderField: "Ocp-Apim-Subscription-Key")
-        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
+        CuerpoMultipart.subir(req, cuerpo: cuerpo) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -398,14 +401,14 @@ enum AzureTranscribe {
                 texto.isEmpty ? completion(.failure(ScribeError.sinTexto))
                               : completion(.success(texto.trimmingCharacters(in: .whitespacesAndNewlines)))
             }
-        }.resume()
+        }
     }
 }
 
 /// AssemblyAI — free credits. Por lotes: subir bytes → crear transcript →
 /// sondear /transcript/{id} hasta status=completed.
 enum AssemblyAITranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("ASSEMBLYAI_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de AssemblyAI — ponla en Configuración → Modelos"))); return
@@ -462,7 +465,7 @@ enum AssemblyAITranscribe {
 /// Gladia — 10 h/mes gratis. Por lotes: subir (multipart) → pre-recorded →
 /// sondear result_url hasta status=done.
 enum GladiaTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("GLADIA_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de Gladia — ponla en Configuración → Modelos"))); return
@@ -470,14 +473,17 @@ enum GladiaTranscribe {
         let auth = ["x-gladia-key": key]
         // 1) subir el audio (multipart)
         let boundary = "BtoDicta-\(UUID().uuidString)"
-        var body = Data()
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(wav)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: [],
+                                                   nombreCampo: "audio",
+                                                   nombreArchivo: "audio.wav",
+                                                   tipo: "audio/wav", audio: wav)
+        } catch { completion(.failure(error)); return }
         var up = URLRequest(url: URL(string: "https://api.gladia.io/v2/upload")!); up.httpMethod = "POST"; up.timeoutInterval = 30
         up.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         up.setValue(key, forHTTPHeaderField: "x-gladia-key")
-        RedDictado.sesion().uploadTask(with: up, from: body) { data, resp, err in
+        CuerpoMultipart.subir(up, cuerpo: cuerpo) { data, resp, err in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard err == nil, let data, (200..<300).contains(code),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -509,14 +515,14 @@ enum GladiaTranscribe {
                     }, completion: completion)
                 }
             }
-        }.resume()
+        }
     }
 }
 
 /// Speechmatics — 480 min/mes gratis. Por lotes: crear job (multipart config +
 /// audio) → sondear /jobs/{id} hasta done → bajar el transcript en texto.
 enum SpeechmaticsTranscribe {
-    static func run(wav: Data, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, model: String, completion: @escaping (Result<String, Error>) -> Void) {
         let key = ApiKeys.get("SPEECHMATICS_API_KEY")
         guard !key.isEmpty else {
             completion(.failure(ScribeError.ws("Falta la API key de Speechmatics — ponla en Configuración → Modelos"))); return
@@ -524,15 +530,18 @@ enum SpeechmaticsTranscribe {
         let punto = model.isEmpty ? "standard" : model   // "standard" | "enhanced"
         let config = "{\"type\":\"transcription\",\"transcription_config\":{\"language\":\"es\",\"operating_point\":\"\(punto)\"}}"
         let boundary = "BtoDicta-\(UUID().uuidString)"
-        var body = Data()
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"config\"\r\n\r\n\(config)\r\n".data(using: .utf8)!)
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"data_file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(wav)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(boundary: boundary,
+                                                   campos: [("config", config)],
+                                                   nombreCampo: "data_file",
+                                                   nombreArchivo: "audio.wav",
+                                                   tipo: "audio/wav", audio: wav)
+        } catch { completion(.failure(error)); return }
         var req = URLRequest(url: URL(string: "https://asr.api.speechmatics.com/v2/jobs")!); req.httpMethod = "POST"; req.timeoutInterval = 30
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
+        CuerpoMultipart.subir(req, cuerpo: cuerpo) { data, resp, err in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard err == nil, let data, (200..<300).contains(code),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -568,10 +577,10 @@ enum SpeechmaticsTranscribe {
                             }
                             completion(.success(texto.trimmingCharacters(in: .whitespacesAndNewlines)))
                         }
-                    }.resume()
+                    }
                 }
             }
-        }.resume()
+        }
     }
 }
 
@@ -580,22 +589,22 @@ enum SpeechmaticsTranscribe {
 /// (Authorization / x-api-key / encabezado propio + headers extra) y es
 /// FAIL-CLOSED: no manda la key ni los headers por http sin cifrar.
 enum GatewayTranscribe {
-    static func run(gw: IAPersonalizada, wav: Data, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(gw: IAPersonalizada, wav: CuerpoMultipart.Origen, completion: @escaping (Result<String, Error>) -> Void) {
         guard !gw.base.isEmpty else { completion(.failure(ScribeError.ws("Gateway sin URL base"))); return }
         let endpoint = (gw.base.hasSuffix("/") ? gw.base : gw.base + "/") + "audio/transcriptions"
         guard let u = URL(string: endpoint) else { completion(.failure(ScribeError.ws("URL inválida"))); return }
         // Fail-closed: solo mandar secretos por https o a localhost.
         let segura = (u.scheme == "https") || ["localhost", "127.0.0.1", "::1"].contains(u.host ?? "")
         let boundary = "BtoDicta-\(UUID().uuidString)"
-        var body = Data()
-        func field(_ n: String, _ v: String) {
-            body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(n)\"\r\n\r\n\(v)\r\n".data(using: .utf8)!)
-        }
-        if !gw.modelo.isEmpty { field("model", gw.modelo) }
-        field("language", "es"); field("response_format", "json")
-        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-        body.append(wav)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        var campos: [(String, String)] = []
+        if !gw.modelo.isEmpty { campos.append(("model", gw.modelo)) }
+        campos.append(("language", "es")); campos.append(("response_format", "json"))
+        let cuerpo: CuerpoMultipart.Preparado
+        do {
+            cuerpo = try CuerpoMultipart.construir(boundary: boundary, campos: campos,
+                                                   nombreArchivo: "audio.wav",
+                                                   tipo: "audio/wav", audio: wav)
+        } catch { completion(.failure(error)); return }
         var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = 20; req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         if segura {
             if !gw.apiKey.isEmpty {
@@ -603,7 +612,7 @@ enum GatewayTranscribe {
             }
             for (h, v) in gw.headers { req.setValue(v, forHTTPHeaderField: h) }
         }
-        RedDictado.sesion().uploadTask(with: req, from: body) { data, resp, err in
+        CuerpoMultipart.subir(req, cuerpo: cuerpo) { data, resp, err in
             DispatchQueue.main.async {
                 if let err { completion(.failure(err)); return }
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -615,7 +624,7 @@ enum GatewayTranscribe {
                       let t = j["text"] as? String else { completion(.failure(ScribeError.sinTexto)); return }
                 completion(.success(t.trimmingCharacters(in: .whitespacesAndNewlines)))
             }
-        }.resume()
+        }
     }
 }
 
@@ -625,7 +634,7 @@ enum GatewayTranscribe {
 /// tiene un modelo que escuche, este motor NO transcribe (y no debe ofrecerse).
 enum LocalTranscribe {
     /// base ej. http://localhost:11434/v1 (ollama) o :1234/v1 (lm studio).
-    static func run(base: String, model: String, wav: Data, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(base: String, model: String, wav: CuerpoMultipart.Origen, completion: @escaping (Result<String, Error>) -> Void) {
         OpenAICompatible.transcribir(endpoint: "\(base)/audio/transcriptions",
                                      key: "", model: model, wav: wav, conPrompt: false, completion: completion)
     }
@@ -657,20 +666,25 @@ enum WhisperLocal {
         cliURL != nil && FileManager.default.fileExists(atPath: modelURL.path)
     }
 
-    static func run(wav: Data, completion: @escaping (Result<String, Error>) -> Void) {
+    static func run(wav: CuerpoMultipart.Origen, completion: @escaping (Result<String, Error>) -> Void) {
         // Vía rápida: server residente ya precalentado (modelo en memoria).
         if WhisperServer.corriendo {
-            WhisperServer.transcribe(wav: wav) { r in
+            // Si el audio está en disco, el servidor local lo sube desde ahí.
+            let enviar: (@escaping (Result<String, Error>) -> Void) -> Void = { cb in
+                if let url = wav.archivoURL { WhisperServer.transcribe(wavURL: url, completion: cb) }
+                else { WhisperServer.transcribe(wav: wav.leer(), completion: cb) }
+            }
+            enviar { r in
                 switch r {
                 case .success(let texto): completion(.success(texto))
                 case .failure:
                     Log.log(.ia, "server local falló → whisper-cli de respaldo")
-                    runCLI(wav: wav, completion: completion)
+                    runCLI(wav: wav.leer(), completion: completion)
                 }
             }
             return
         }
-        runCLI(wav: wav, completion: completion)
+        runCLI(wav: wav.leer(), completion: completion)
     }
 
     /// Vía clásica: proceso whisper-cli efímero (carga modelo, transcribe, muere).
@@ -716,6 +730,13 @@ enum Failover {
     /// Devuelve el primer éxito, o el último error si todos fallan.
     /// completion: (texto, nombre del proveedor, modelo usado).
     static func transcribe(wav: Data, completion: @escaping (Result<(String, String, String), Error>) -> Void) {
+        transcribe(wav: .datos(wav), completion: completion)
+    }
+
+    /// La misma cascada partiendo de un ARCHIVO. Es el camino que evita cargar
+    /// el dictado en memoria: cada motor sube desde disco.
+    static func transcribe(wav: CuerpoMultipart.Origen,
+                           completion: @escaping (Result<(String, String, String), Error>) -> Void) {
         let cadena = Providers.cadena()
         intentar(wav: wav, cadena: cadena, idx: 0, ultimoError: nil, completion: completion)
     }
@@ -724,10 +745,15 @@ enum Failover {
     /// sin perder su configuración de modelo y credenciales.
     static func transcribe(wav: Data, cadena: [Provider],
                            completion: @escaping (Result<(String, String, String), Error>) -> Void) {
+        intentar(wav: .datos(wav), cadena: cadena, idx: 0, ultimoError: nil, completion: completion)
+    }
+
+    static func transcribe(wav: CuerpoMultipart.Origen, cadena: [Provider],
+                           completion: @escaping (Result<(String, String, String), Error>) -> Void) {
         intentar(wav: wav, cadena: cadena, idx: 0, ultimoError: nil, completion: completion)
     }
 
-    private static func intentar(wav: Data, cadena: [Provider], idx: Int,
+    private static func intentar(wav: CuerpoMultipart.Origen, cadena: [Provider], idx: Int,
                                  ultimoError: Error?, completion: @escaping (Result<(String, String, String), Error>) -> Void) {
         guard idx < cadena.count else {
             completion(.failure(ultimoError ?? ScribeError.sinTexto)); return
@@ -789,67 +815,67 @@ enum Failover {
         // Un SOLO punto de envío por motor. Troceo lo usa para reintentar el
         // mismo motor con el audio partido cuando el techo del proveedor —que
         // nadie declara igual— rechaza el envío entero.
-        let enviarAlMotor: (Data, @escaping (Result<String, Error>) -> Void) -> Void = { datos, cb in
+        let enviarAlMotor: (CuerpoMultipart.Origen, @escaping (Result<String, Error>) -> Void) -> Void = { fuente, cb in
             switch p.id {
 
-            case "elevenlabs": transcribeBatch(wav: datos, model: elevenModel(p)) { cb($0) }
-            case "groq": GroqTranscribe.run(wav: datos, model: p.modelo ?? "whisper-large-v3") { cb($0) }
-            case "apple_speech": AppleSpeechSTT.run(wav: datos, idioma: p.modelo) { cb($0) }
-            case "whisper_local": WhisperLocal.run(wav: datos) { cb($0) }
+            case "elevenlabs": transcribeBatch(wav: fuente, model: elevenModel(p)) { cb($0) }
+            case "groq": GroqTranscribe.run(wav: fuente, model: p.modelo ?? "whisper-large-v3") { cb($0) }
+            case "apple_speech": AppleSpeechSTT.run(wav: fuente.leer(), idioma: p.modelo) { cb($0) }
+            case "whisper_local": WhisperLocal.run(wav: fuente) { cb($0) }
             case "voxtral_local":
                 // La familia Voxtral tiene dos motores: el Mini 3B corre en
                 // llama.cpp (server residente); el Realtime 4B en transcribe.cpp.
                 if TcppStreamClient.esModeloStreaming(p.modelo ?? "") {
-                    TranscribeCpp.run(wav: datos, modelo: p.modelo ?? "") { cb($0) }
+                    TranscribeCpp.run(wav: fuente.leer(), modelo: p.modelo ?? "") { cb($0) }
                 } else if VoxtralServer.corriendo {
-                    VoxtralServer.transcribe(wav: datos) { cb($0) }
+                    VoxtralServer.transcribe(wav: fuente.leer()) { cb($0) }
                 } else if VoxtralServer.diagnostico == nil {
                     // No precalentó (p.ej. se activó recién): arrancar y transcribir.
                     VoxtralServer.precalentar()
-                    VoxtralServer.transcribe(wav: datos) { cb($0) }
+                    VoxtralServer.transcribe(wav: fuente.leer()) { cb($0) }
                 } else {
                     cb(.failure(ScribeError.ws(VoxtralServer.diagnostico ?? "voxtral no disponible")))
                 }
             case "nemotron_local", "canary_local":
-                TranscribeCpp.run(wav: datos, modelo: p.modelo ?? "") { cb($0) }
+                TranscribeCpp.run(wav: fuente.leer(), modelo: p.modelo ?? "") { cb($0) }
             case "openai":
-                OpenAITranscribe.run(wav: datos, model: p.modelo ?? "gpt-4o-mini-transcribe") { cb($0) }
+                OpenAITranscribe.run(wav: fuente, model: p.modelo ?? "gpt-4o-mini-transcribe") { cb($0) }
             case "mistral":
-                MistralTranscribe.run(wav: datos, model: p.modelo ?? "voxtral-mini-latest") { cb($0) }
+                MistralTranscribe.run(wav: fuente, model: p.modelo ?? "voxtral-mini-latest") { cb($0) }
             case "fireworks":
-                FireworksTranscribe.run(wav: datos, model: p.modelo ?? "whisper-v3") { cb($0) }
+                FireworksTranscribe.run(wav: fuente, model: p.modelo ?? "whisper-v3") { cb($0) }
             case "hf":
-                HFTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                HFTranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "deepgram":
-                DeepgramTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                DeepgramTranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "assemblyai":
-                AssemblyAITranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                AssemblyAITranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "fish":
-                FishTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                FishTranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "gladia":
-                GladiaTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                GladiaTranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "speechmatics":
-                SpeechmaticsTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                SpeechmaticsTranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "cloudflare_stt":
-                CloudflareTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                CloudflareTranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "soniox":
-                SonioxTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                SonioxTranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "azure":
-                AzureTranscribe.run(wav: datos, model: p.modelo ?? "") { cb($0) }
+                AzureTranscribe.run(wav: fuente, model: p.modelo ?? "") { cb($0) }
             case "ollama_stt":
                 // Detección inteligente: solo si Ollama tiene un modelo que escuche.
                 if let m = ChatIA.sttLocalModelo["ollama"] {
-                    LocalTranscribe.run(base: "http://localhost:11434/v1", model: m, wav: datos) { cb($0) }
+                    LocalTranscribe.run(base: "http://localhost:11434/v1", model: m, wav: fuente) { cb($0) }
                 } else { cb(.failure(ScribeError.ws("Ollama no tiene un modelo whisper (haz: ollama pull whisper)"))) }
             case "lmstudio_stt":
                 if let m = ChatIA.sttLocalModelo["lmstudio"] {
-                    LocalTranscribe.run(base: "http://localhost:1234/v1", model: m, wav: datos) { cb($0) }
+                    LocalTranscribe.run(base: "http://localhost:1234/v1", model: m, wav: fuente) { cb($0) }
                 } else { cb(.failure(ScribeError.ws("LM Studio no tiene un modelo whisper cargado"))) }
             case let g where g.hasPrefix("gw:"):
                 // Gateway personalizado marcado "para voz": busca su config y transcribe.
                 let uuid = String(g.dropFirst(3))
                 if let gw = PersonalizadaStore.cargar().first(where: { $0.id == uuid }) {
-                    GatewayTranscribe.run(gw: gw, wav: datos) { cb($0) }
+                    GatewayTranscribe.run(gw: gw, wav: fuente) { cb($0) }
                 } else { cb(.failure(ScribeError.ws("El gateway de voz ya no existe"))) }
             default: cb(.failure(ScribeError.sinTexto))
             }
