@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.65.0
+
+- **Otros programas de tu Mac pueden transcribir con BtoDicta.** Le mandan la
+  ruta de un audio y reciben el texto, con los mismos motores y el mismo
+  vocabulario que tu dictado. También pueden pedirle pulir un texto.
+- **Viene cerrada.** Se enciende en Ajustes y usa un token. Escucha solo en tu
+  propia máquina y solo lee audios de Descargas, Documentos y la temporal.
+
 ### Novedades 0.64.3
 
 - **El registro dice qué hacer, no un número**: «se quedó sin saldo», «no acepta

@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.64.3"
+    static let numero = "0.65.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.65.0", "2026-09-19", [
+            "OTROS PROGRAMAS DE TU MAC PUEDEN TRANSCRIBIR CON BtoDicta. Hasta ahora, cualquier proyecto tuyo que necesitara convertir audio en texto tenía que instalar sus propios modelos de varios gigabytes o contratar otro servicio. Ahora te lo pide a ti: le mandas la ruta de un audio y te devuelve el texto, usando los mismos motores, la misma cascada y el mismo vocabulario que tu dictado. También puede pedirte pulir un texto",
+            "Se enciende en Configuración → Ajustes, y VIENE CERRADA. Al abrirla aparece un token: trátalo como una contraseña, porque quien lo tenga puede transcribir con tus motores y gastar tu saldo",
+            "Lo que NO puede hacer, por diseño: atender desde otro equipo —escucha solo en tu propia máquina—, leer cualquier archivo del disco —solo audios de Descargas, Documentos y la carpeta temporal— ni entrar sin token, ni con uno antiguo si lo cambias",
+            "Puedes elegir motor en cada petición: «local» para que no salga nada de tu equipo, «nube», o que decida la cascada. Y pasarle tus siglas para esa petición concreta, sin tocar tu glosario",
+        ]),
         ("0.64.3", "2026-09-19", [
             "EL REGISTRO YA TE DICE QUÉ HACER, no un número. Cuando un proveedor se aparta, en vez de «en cuarentena 30 min por HTTP 402» leerás «se quedó sin saldo o sin cuota», «no acepta la clave (¿caducó o se copió mal?)» o «demasiadas peticiones seguidas». El código sigue apareciendo detrás, para diagnosticar",
             "Dos resúmenes generados en el mismo segundo ya no comparten archivo. El nombre escalaba a la hora y al segundo, pero dos rutinas que caen a la vez —o una manual justo encima de una automática— todavía se pisaban",
