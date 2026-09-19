@@ -15,6 +15,8 @@ otra spec con `Modifica: NNN`.
 |---|---|---|---|---|---|---|---|---|
 | 001 | Memoria del dictado largo | Aprobada | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «acepto, como te digo, la recomendación de X, pero bajo esos términos y cuidados que te digo» | ninguna | Lista para plan |
 | 002 | Corrección: Cancelar un dictado no puede borrar el audio | Implementada (0.59.1 y 0.59.2) | X | correccion | 2026-09-14 | Alberto — 2026-09-14 — «vamos de los tres [pendientes] el que sea más rápido»; RF-01 era «de ley» | ninguna | Especificando |
-| 003 | Resumen de la bitácora por correo | Implementada (0.61.0) | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «hagámoslas todas bajo goal, una por una… puedes utilizar un correo de eztic.ec para probarlo» | ninguna | Especificando |
+| 003 | Resumen de la bitácora por correo | Implementada (0.61.0 y 0.62.0) | X | funcionalidad | 2026-09-14 | Alberto — 2026-09-14 — «hagámoslas todas bajo goal, una por una… puedes utilizar un correo de eztic.ec para probarlo» | ninguna | Especificando |
+| 004 | Panel de salud y aviso de saldo | Implementada (0.63.0) | X | funcionalidad | 2026-09-15 | Alberto — 2026-09-15 — «estas ideas me gustan: aviso cuando un proveedor se queda sin saldo… un panel de salud» | ninguna | Especificando |
+| 005 | API de transcripción para servicios externos | Borrador | X | funcionalidad | 2026-09-18 | [PENDIENTE DE DECISIÓN: puerta 1 sin abrir] | ninguna | Especificando |
 
 <!-- sdd:indice:fin -->
