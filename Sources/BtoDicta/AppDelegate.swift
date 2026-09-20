@@ -3093,6 +3093,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("HUELLAMEM \(mal == 0 ? "TODO OK — verificar un modelo no carga el modelo" : "FALLA (\(mal))")")
             exit(mal == 0 ? 0 : 1)
         }
+        // El punto de entrada del navegador: BTODICTA_NAVEGADORTEST=1  (spec 006)
+        //
+        // Se prueba ANTES de que exista la extensión que va a usarlo. El riesgo
+        // de esta funcionalidad no es que falle: es que deje entrar algo que no
+        // debía, y eso se comprueba con rechazos, no con éxitos.
+        if ProcessInfo.processInfo.environment["BTODICTA_NAVEGADORTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("NAVEGADOR \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+
+            // T03 — el modelo: de JSON a estado y de vuelta, sin perder nada.
+            let crudo: [String: Any] = [
+                "navegador": "Google Chrome",
+                "instante": Date().timeIntervalSince1970,
+                "pestanas": [
+                    ["url": "https://ejemplo.test/correo", "titulo": "Bandeja", "activa": true,  "audible": false],
+                    ["url": "https://ejemplo.test/video",  "titulo": "Un vídeo", "activa": false, "audible": true],
+                ],
+            ]
+            guard let estado = EstadoNavegador(json: crudo) else {
+                print("NAVEGADOR ✗ no se pudo leer un informe correcto"); print("NAVEGADOR FALLA"); exit(1)
+            }
+            chk(estado.pestañas.count == 2, "se leen las dos pestañas")
+            chk(estado.activa?.url.contains("correo") == true, "la activa es la del correo")
+            chk(estado.audibles.count == 1 && estado.audibles[0].url.contains("video"),
+                "y la que suena es la del vídeo — que es LO QUE EL SISTEMA NO PUEDE SABER SOLO")
+
+            // Informes incompletos: mejor nada que un estado a medias, porque un
+            // informe parcial puede inclinar una decisión sobre qué se graba.
+            chk(EstadoNavegador(json: ["pestanas": []]) == nil, "sin nombre de navegador se rechaza")
+            chk(EstadoNavegador(json: ["navegador": "X"]) == nil, "sin pestañas se rechaza")
+            chk(EstadoNavegador(json: ["navegador": "", "pestanas": []]) == nil, "con nombre vacío se rechaza")
+
+            // Vigencia: un informe viejo no debe decidir nada. Si el navegador
+            // dejó de hablar, vale más volver a mirar el sistema que creerle a
+            // un dato de hace media hora.
+            EstadoNavegadores.olvidarTodo()
+            EstadoNavegadores.anotar(estado)
+            chk(EstadoNavegadores.vigentes().count == 1, "un informe recién llegado vale")
+            let viejo = EstadoNavegador(navegador: "Viejo", pestañas: [],
+                                        instante: Date().addingTimeInterval(-3600))
+            EstadoNavegadores.anotar(viejo)
+            chk(!EstadoNavegadores.vigentes().contains { $0.navegador == "Viejo" },
+                "y uno de hace una hora ya no")
+            EstadoNavegadores.olvidarTodo()
+            chk(EstadoNavegadores.vigentes().isEmpty, "olvidar deja el estado limpio")
+
+            print("NAVEGADOR \(mal == 0 ? "TODO OK — el informe del navegador se lee y caduca" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
         // Qué entra en la bitácora y qué no: BTODICTA_FILTROTEST=1
         //
         // Los casos son REALES, sacados de la bitácora del 2026-09-19: a las

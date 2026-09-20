@@ -328,6 +328,7 @@ enum ApiLocal {
         switch (metodo, ruta) {
         case ("POST", "/transcribir"): transcribir(conexion, json)
         case ("POST", "/pulir"):       pulir(conexion, json)
+        case ("POST", "/navegador"):   navegador(conexion, json)
         default:
             responder(conexion, 404, ["error": "no existe \(metodo) \(ruta)"])
         }
@@ -395,6 +396,22 @@ enum ApiLocal {
                 responder(conexion, 502, ["error": e.localizedDescription])
             }
         }
+    }
+
+    /// Lo que cuenta un navegador de sí mismo (spec 006, RF-01).
+    ///
+    /// Es un SENSOR, no un cliente que pida trabajo: informa y se va. Por eso la
+    /// respuesta es inmediata y no arrastra nada — si BtoDicta tardara en
+    /// contestar, la extensión acabaría acumulando informes viejos, y un informe
+    /// viejo del navegador es peor que ninguno.
+    private static func navegador(_ conexion: NWConnection, _ json: [String: Any]) {
+        guard let estado = EstadoNavegador(json: json) else {
+            responder(conexion, 400, ["error": "falta «navegador» o «pestanas», o vienen vacíos"])
+            return
+        }
+        EstadoNavegadores.anotar(estado)
+        responder(conexion, 200, ["recibido": estado.pestañas.count,
+                                  "audibles": estado.audibles.count])
     }
 
     private static func pulir(_ conexion: NWConnection, _ json: [String: Any]) {
