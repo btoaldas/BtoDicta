@@ -3093,6 +3093,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("HUELLAMEM \(mal == 0 ? "TODO OK — verificar un modelo no carga el modelo" : "FALLA (\(mal))")")
             exit(mal == 0 ? 0 : 1)
         }
+        // Qué entra en la bitácora y qué no: BTODICTA_FILTROTEST=1
+        //
+        // Los casos son REALES, sacados de la bitácora del 2026-09-19: a las
+        // 22:38 el audio del sistema recogía «Double kill!» mientras al frente
+        // estaba Dota 2, y todo eso acababa en el resumen del día como si fuera
+        // trabajo.
+        if ProcessInfo.processInfo.environment["BTODICTA_FILTROTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("FILTRO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            func entra(_ app: String?, _ v: String?) -> Bool {
+                if case .entra = FiltroBitacora.decidir(app: app, ventana: v) { return true }
+                return false
+            }
+            let previas = (Config.json0("bitacora_excluir_apps") as? [String],
+                           Config.json0("bitacora_excluir_titulos") as? [String],
+                           Config.json0("bitacora_incluir_apps") as? [String],
+                           Config.json0("bitacora_incluir_titulos") as? [String])
+
+            // 1) Sin reglas escritas, TODO entra. Es el estado de fábrica y el
+            //    más importante: nadie debe perder bitácora por instalar.
+            Config.set("bitacora_excluir_apps", to: [String]())
+            Config.set("bitacora_excluir_titulos", to: [String]())
+            Config.set("bitacora_incluir_apps", to: [String]())
+            Config.set("bitacora_incluir_titulos", to: [String]())
+            chk(entra("Dota 2", "partida"), "de fábrica no se filtra nada, ni un juego")
+            chk(!FiltroBitacora.hayReglas, "y sin reglas ni se consulta el filtro")
+
+            // 2) Lista negra por aplicación.
+            Config.set("bitacora_excluir_apps", to: ["Dota 2", "VLC"])
+            chk(!entra("Dota 2", "cualquier cosa"), "excluida la aplicación, el juego queda fuera")
+            chk(entra("Claude", "Quipux"), "y el trabajo sigue entrando")
+
+            // 3) Lista negra por título: el caso del navegador, donde YouTube y
+            //    el trabajo son la MISMA aplicación.
+            Config.set("bitacora_excluir_titulos", to: ["youtube", "instagram", "tiktok"])
+            chk(!entra("Microsoft Edge", "Cómo hacer pan — YouTube"), "YouTube en el navegador queda fuera")
+            chk(entra("Microsoft Edge", "Quipux — Bandeja de entrada"), "y la misma aplicación con trabajo entra")
+
+            // 4) La lista blanca GANA. Es lo que permite bloquear ancho y
+            //    rescatar lo que importa: una reunión dentro del navegador.
+            Config.set("bitacora_excluir_apps", to: ["Microsoft Edge"])
+            Config.set("bitacora_incluir_titulos", to: ["meet.google", "teams", "zoom"])
+            chk(!entra("Microsoft Edge", "Facebook"), "el navegador excluido queda fuera")
+            chk(entra("Microsoft Edge", "Reunión — meet.google.com"), "pero la reunión se rescata: la lista blanca gana")
+            Config.set("bitacora_incluir_apps", to: ["Dota 2"])
+            Config.set("bitacora_excluir_apps", to: ["Dota 2"])
+            chk(entra("Dota 2", "x"), "y ante la contradicción, gana permitir — nunca se pierde por error")
+
+            // 5) Ni tildes ni mayúsculas deben importar al escribir una regla.
+            Config.set("bitacora_excluir_apps", to: [String]())
+            Config.set("bitacora_incluir_apps", to: [String]())
+            Config.set("bitacora_incluir_titulos", to: [String]())
+            Config.set("bitacora_excluir_titulos", to: ["musica"])
+            chk(!entra("Música", "Música — Mi lista"), "«musica» casa con «Música»: ni tildes ni mayúsculas estorban")
+
+            // 6) Sin saber quién tiene el foco, se guarda.
+            Config.set("bitacora_excluir_titulos", to: ["youtube"])
+            chk(entra(nil, nil), "sin dato de foco, el trozo se conserva")
+
+            for (k, v) in [("bitacora_excluir_apps", previas.0), ("bitacora_excluir_titulos", previas.1),
+                           ("bitacora_incluir_apps", previas.2), ("bitacora_incluir_titulos", previas.3)] {
+                Config.set(k, to: v ?? [String]())
+            }
+            print("FILTRO \(mal == 0 ? "TODO OK — entra el trabajo, se aparta el ocio" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
         // El motor de embeddings se apaga solo: BTODICTA_EMBIDLETEST=1
         //
         // Retiene ~400 MB con el modelo cargado y se queda a cero de CPU entre

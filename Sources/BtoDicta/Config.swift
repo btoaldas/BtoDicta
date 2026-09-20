@@ -1167,6 +1167,19 @@ struct Config {
     /// Apagado de fábrica: borrar audio del usuario no es algo que una
     /// aplicación deba empezar a hacer sola. Al encenderlo, los trozos sin voz
     /// van a la papelera propia —recuperables—, nunca al vacío.
+    /// Qué NO interesa que entre en la bitácora, por aplicación o por título de
+    /// ventana. Vacías de fábrica: nada se filtra hasta que el usuario lo diga.
+    ///
+    /// - `bitacora_excluir_apps`    — p. ej. ["Dota 2", "VLC", "Steam"]
+    /// - `bitacora_excluir_titulos` — p. ej. ["youtube", "netflix", "instagram"]
+    /// - `bitacora_incluir_apps`    — excepciones que GANAN a lo anterior
+    /// - `bitacora_incluir_titulos` — p. ej. ["meet.google", "teams", "zoom"]
+    ///
+    /// Gobiernan las dos pistas a la vez, la de pantalla y la de audio del
+    /// sistema: excluir el sonido de un juego y seguir guardando sus capturas no
+    /// tendría sentido.
+    static func bitacoraFiltroConfigurado() -> Bool { FiltroBitacora.hayReglas }
+
     static func bitacoraRetirarSilencios() -> Bool {
         (json()["bitacora_retirar_silencios"] as? Bool) ?? false
     }

@@ -34,6 +34,15 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.74.0
+
+- **Filtro de bitácora por aplicación y título**: el juego, el reproductor o
+  YouTube dejan de entrar. El audio de las apps excluidas **ni se captura**, así
+  que funciona con el juego minimizado o la música en otro monitor.
+- **Lista de excepciones que gana a la de exclusiones**: apartar un navegador
+  entero y rescatar las reuniones de dentro.
+- De fábrica no se filtra nada. Lo apartado va a la papelera, no se borra.
+
 ### Novedades 0.73.1
 
 - **El motor de embeddings se duerme de verdad**: retenía ~400 MB y su vigía era

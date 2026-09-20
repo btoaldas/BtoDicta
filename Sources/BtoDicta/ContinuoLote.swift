@@ -410,6 +410,14 @@ enum ContinuoLote {
         Config.dir.appendingPathComponent("papelera-bitacora", isDirectory: true)
     }
 
+    /// Aparta un trozo que el filtro de la bitácora dejó fuera (un juego, un
+    /// vídeo). Público porque lo usa quien graba el audio del sistema, que
+    /// decide en el momento y no espera a la tanda.
+    static func apartarPorFiltro(_ ruta: URL, motivo: String) {
+        Log.log(.sistema, "bitácora: aparto un trozo — \(motivo)")
+        aPapelera(ruta)
+    }
+
     private static func aPapelera(_ ruta: URL) {
         let fm = FileManager.default
         guard fm.fileExists(atPath: ruta.path) else { return }

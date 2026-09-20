@@ -1039,6 +1039,41 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### Que la bitácora no anote tu ocio (0.74.0)
+
+La bitácora graba la jornada entera, y en una jornada cabe una partida, un vídeo
+o una serie de fondo. El audio del sistema recoge **todo** lo que suena por los
+altavoces, así que el resumen del día llegaba a contar una partida de Dota 2
+como si fuera trabajo.
+
+Cuatro listas, todas vacías de fábrica — hasta que tú escribas una, no se filtra
+nada:
+
+| Ajuste | Ejemplo |
+|---|---|
+| `bitacora_excluir_apps` | `["Dota 2", "VLC", "Música"]` |
+| `bitacora_excluir_titulos` | `["youtube", "instagram", "tiktok", "netflix"]` |
+| `bitacora_incluir_apps` | excepciones que **ganan** a lo anterior |
+| `bitacora_incluir_titulos` | `["meet.google", "teams", "zoom"]` |
+
+**Las excepciones ganan siempre.** Eso permite apartar un navegador entero y
+rescatar las reuniones que ocurren dentro de él.
+
+**El sonido de una aplicación excluida ni se captura.** No es un filtro posterior
+que mire quién tiene el foco: se le dice al sistema que deje fuera esa
+aplicación. Por eso funciona con el juego minimizado, con la música sonando en
+otro monitor o con el foco puesto en otra cosa.
+
+**Lo que queda fuera no se borra**: va a la papelera de la bitácora
+(`~/.btodicta/papelera-bitacora/`), recuperable unos días.
+
+**Un límite que conviene conocer.** Dentro de un navegador, YouTube y una reunión
+son la misma aplicación, y el sistema no puede separar su sonido. Ahí el filtro
+se apoya en el título de la ventana activa, que acierta cuando el vídeo está
+delante y falla cuando suena en una ventana de atrás. Si quieres separación
+total, lo fiable es usar dos navegadores —uno para ocio y otro para trabajo— y
+excluir el primero por aplicación.
+
 ### El motor de reconocimiento inteligente y la memoria (0.73.1)
 
 El motor interno de embeddings carga un modelo y retiene unos **400 MB** mientras

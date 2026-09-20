@@ -166,6 +166,8 @@ else
   ejecutar "huella_modelos_memoria" "BTODICTA_HUELLAMEMTEST" "1" 180
   # Leer por trozos no sirve de nada si no se suelta cada trozo: llegó a
   # retener 4,9 GB en cada arranque por comprobar la huella de los modelos.
+  # Qué entra en la bitácora y qué no: de fábrica entra todo.
+  ejecutar "filtro_bitacora" "BTODICTA_FILTROTEST" "1" 90
   # El motor de embeddings retiene ~400 MB: tiene que dormirse solo y revivir.
   ejecutar "embeddings_se_duermen" "BTODICTA_EMBIDLETEST" "1" 200
   # Una petición de red sin `.resume()` no sale nunca: dejó mudos a cuatro

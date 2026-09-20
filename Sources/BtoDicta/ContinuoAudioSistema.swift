@@ -30,6 +30,10 @@ final class ContinuoAudioSistema: NSObject {
 
     private var mano: FileHandle?
     private var rutaTrozo: URL?
+    /// Quién tenía el foco al empezar el trozo. Se compara con quién lo tiene al
+    /// cerrarlo: solo se descarta si coinciden, porque un cambio de aplicación a
+    /// mitad significa que en esos 30 s pasó algo más que el juego.
+    private var focoAlAbrir: (app: String?, ventana: String?) = (nil, nil)
     private var inicioTrozo = Date()
     private var bytesTrozo = 0
 
@@ -107,7 +111,32 @@ final class ContinuoAudioSistema: NSObject {
             conf.minimumFrameInterval = CMTime(value: 1, timescale: 1)
             conf.showsCursor = false
 
-            let filtro = SCContentFilter(display: pantalla, excludingWindows: [])
+            // El audio de las aplicaciones excluidas NI SIQUIERA SE CAPTURA.
+            //
+            // Esto es lo que hace que el filtro funcione de verdad, y no solo
+            // cuando la aplicación tiene el foco. Mirar quién tiene el foco es
+            // un mal sustituto de saber quién está sonando, y se rompe en los
+            // casos normales: música en un monitor mientras se trabaja en otro,
+            // un juego minimizado que sigue sonando, un vídeo en una ventana de
+            // atrás. El sistema sabe qué aplicación produce cada sonido; aquí se
+            // le pide que deje fuera las que no interesan.
+            //
+            // La lista admite el nombre («Dota 2») o el identificador del
+            // paquete: quien la escribe no tiene por qué saber cuál es cuál.
+            let excluidas = FiltroBitacora.appsExcluidas()
+            let apps = excluidas.isEmpty ? [] : contenido.applications.filter { a in
+                excluidas.contains { e in
+                    let ee = e.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+                    let nombre = a.applicationName.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+                    return nombre.contains(ee) || a.bundleIdentifier.lowercased().contains(e.lowercased())
+                }
+            }
+            if !apps.isEmpty {
+                Log.log(.sistema, "bitácora: no grabo el sonido de \(apps.map { $0.applicationName }.joined(separator: ", "))")
+            }
+            let filtro = SCContentFilter(display: pantalla,
+                                         excludingApplications: apps,
+                                         exceptingWindows: [])
             let s = SCStream(filter: filtro, configuration: conf, delegate: self)
             try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: cola)
             try await s.startCapture()
@@ -243,6 +272,8 @@ final class ContinuoAudioSistema: NSObject {
         mano = try? FileHandle(forWritingTo: url)
         rutaTrozo = url
         inicioTrozo = ahora
+        focoAlAbrir = (NSWorkspace.shared.frontmostApplication?.localizedName,
+                       ContinuoPantalla.tituloVentanaAlFrente())
         bytesTrozo = 0
     }
 
@@ -255,6 +286,31 @@ final class ContinuoAudioSistema: NSObject {
         let bytes = bytesTrozo
         guard bytes > 16_000 else { try? FileManager.default.removeItem(at: url); return }
         let duracion = Double(bytes) / 32_000.0
+
+        // ¿Esto es trabajo o es una partida?
+        //
+        // El audio del sistema es TODO lo que suena por los altavoces, y ahí cabe
+        // el anunciador de un juego o el diálogo de una película, que luego
+        // aparecen en el resumen del día como si fueran actividad laboral.
+        //
+        // Quien lo distingue es el foco: se mira al abrir y al cerrar el trozo, y
+        // solo se aparta si AMBAS coinciden en una aplicación o título excluido.
+        // Si cambiaste de aplicación a mitad, en esos treinta segundos pasó algo
+        // más y el trozo se conserva — ante la duda, se guarda.
+        if FiltroBitacora.hayReglas {
+            let ahoraFoco = (NSWorkspace.shared.frontmostApplication?.localizedName,
+                             ContinuoPantalla.tituloVentanaAlFrente())
+            let alAbrir = FiltroBitacora.decidir(app: focoAlAbrir.app, ventana: focoAlAbrir.ventana)
+            let alCerrar = FiltroBitacora.decidir(app: ahoraFoco.0, ventana: ahoraFoco.1)
+            if case .fuera(let motivo) = alAbrir, case .fuera = alCerrar {
+                // No se borra: se aparta a la papelera de la bitácora, donde se
+                // puede recuperar unos días. Lo que hoy no interesa puede
+                // interesar mañana, y el coste de guardarlo unos días es bajo.
+                ContinuoLote.apartarPorFiltro(url, motivo: motivo)
+                return
+            }
+        }
+
         // `origen: "sistema"` es lo que hace que en la línea de tiempo aparezca
         // como «audio del sistema» y no se confunda con lo que dijo la persona.
         ContinuoIndice.shared.registrarAudio(ruta: url, instante: inicio,

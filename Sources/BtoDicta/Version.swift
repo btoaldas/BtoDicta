@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.73.1"
+    static let numero = "0.74.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.74.0", "2026-09-20", [
+            "LA BITÁCORA YA NO ANOTA TU OCIO. Puedes decirle qué aplicaciones y qué títulos de ventana no te interesan —un juego, un reproductor, YouTube, Instagram— y deja de grabar su sonido y sus capturas. El sonido de esas aplicaciones NI SE CAPTURA: da igual que el juego esté minimizado, que la música suene en otro monitor o que tengas el foco en otra cosa",
+            "Una lista de excepciones GANA siempre a la de exclusiones: puedes apartar un navegador entero y rescatar las reuniones que ocurren dentro de él",
+            "De fábrica no se filtra nada: la bitácora sigue grabando todo hasta que tú decidas lo contrario. Y lo apartado no se borra — va a la papelera de la bitácora, recuperable unos días",
+            "El motivo: el resumen del día contaba una partida de Dota 2 como si fuera trabajo, porque el audio del sistema recoge todo lo que suena por los altavoces",
+        ]),
         ("0.73.1", "2026-09-20", [
             "EL MOTOR DE RECONOCIMIENTO INTELIGENTE SE DUERME DE VERDAD CUANDO NO LO USAS. Retiene unos 400 MB con su modelo cargado y ya estaba previsto que se apagara tras diez minutos sin uso, pero el temporizador que lo vigilaba se registraba desde cualquier hilo y no siempre quedaba puesto: el apagado funcionaba a ratos. Ahora no depende de eso, y hay una comprobación que lo arranca, espera a que se duerma y comprueba que revive",
             "El tiempo de gracia es ajustable (`embeddings_apagar_tras_minutos`, 10 por omisión). Arrancar en frío cuesta alrededor de un segundo, así que equivocarse por corto sale barato",

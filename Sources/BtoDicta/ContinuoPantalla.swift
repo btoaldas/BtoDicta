@@ -255,12 +255,20 @@ final class ContinuoPantalla {
     /// (`SCContentFilter`), así que aquí solo se mira el título de la ventana,
     /// que es lo que el sistema no puede filtrar.
     static func motivoParaNoCapturar(app: String?, ventana: String?) -> String? {
+        // Lo que ya había: títulos que el usuario protege (banca, contraseñas).
         let titulo = (ventana ?? "").lowercased()
         if !titulo.isEmpty {
             for palabra in Config.continuoPantallaTitulosExcluidos()
             where !palabra.isEmpty && titulo.contains(palabra.lowercased()) {
                 return "título excluido"
             }
+        }
+        // Y lo que no interesa para la bitácora: un juego, un vídeo, una red
+        // social. Mismo filtro que gobierna el audio del sistema, para que una
+        // regla escrita una vez valga para las dos pistas — no tiene sentido
+        // excluir el sonido de un juego y seguir guardando sus capturas.
+        if case .fuera(let motivo) = FiltroBitacora.decidir(app: app, ventana: ventana) {
+            return motivo
         }
         return nil
     }
@@ -344,7 +352,7 @@ final class ContinuoPantalla {
 
     /// Título de la ventana al frente, si el permiso de accesibilidad lo permite.
     /// Es contexto útil para buscar después; su ausencia no es un fallo.
-    private static func tituloVentanaAlFrente() -> String? {
+    static func tituloVentanaAlFrente() -> String? {
         guard let lista = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
                                                      kCGNullWindowID) as? [[String: Any]] else { return nil }
         let pidFrente = NSWorkspace.shared.frontmostApplication?.processIdentifier
