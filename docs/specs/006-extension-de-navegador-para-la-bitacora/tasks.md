@@ -32,10 +32,14 @@ algo va primero, con su prueba negativa, antes de que exista quien lo envíe.
 
 ## Fase C — Que sirva
 
-- [ ] T09 (RF-01) Reporte de pestaña activa y audibles con `chrome.tabs.query` — `extension/src/fondo.js` — Evidencia esperada: con un vídeo sonando y el correo al frente, el estado dice activa=correo y audible=vídeo
-- [ ] T10 (RF-01, RNF-04) Envío a la API con el token en cabecera, sin acumular nada si la aplicación no responde — `extension/src/enviar.js` — Evidencia esperada: 10 min con BtoDicta cerrada → ≤ 10 intentos y almacenamiento de la extensión en 0
-- [ ] T11 (RF-01) BtoDicta usa el estado del navegador en el filtro de la bitácora, por delante de lo que hoy adivina por foco — `Sources/BtoDicta/FiltroBitacora.swift` — Evidencia esperada: con el vídeo sonando detrás y el correo delante, el trozo se conserva; con el vídeo delante, se aparta
-- [ ] T12 (RF-02) El texto de la página entra al índice con su texto ya puesto — `Sources/BtoDicta/ApiLocal.swift`, `Sources/BtoDicta/ContinuoIndice.swift` — Evidencia esperada: el elemento queda en el índice con texto y el OCR no lo procesa
+- [x] T09 (RF-01) Reporte de pestaña activa y audibles con `chrome.tabs.query` — `extension/src/fondo.js` — Evidencia esperada: con un vídeo sonando y el correo al frente, el estado dice activa=correo y audible=vídeo
+  - Evidencia (2026-09-20): así sale en la prueba. De un dominio excluido se calla la dirección y el título pero SÍ se dice que suena: es un dato sin contenido, y es el que evita anotar una película como trabajo
+- [x] T10 (RF-01, RNF-04) Envío a la API con el token en cabecera, sin acumular nada si la aplicación no responde — `extension/src/enviar.js` — Evidencia esperada: 10 min con BtoDicta cerrada → ≤ 10 intentos y almacenamiento de la extensión en 0
+  - Evidencia (2026-09-20): un fallo espera 60 s antes de reintentar, y no se guarda nada pendiente. La prueba encontró un fallo REAL: `leerToken()` quedaba fuera del `try` y lanzaba sin almacén, o sea que la extensión podía tumbar a quien la aloja. Corregido y verde
+- [x] T11 (RF-01) BtoDicta usa el estado del navegador en el filtro de la bitácora, por delante de lo que hoy adivina por foco — `Sources/BtoDicta/FiltroBitacora.swift` — Evidencia esperada: con el vídeo sonando detrás y el correo delante, el trozo se conserva; con el vídeo delante, se aparta
+  - Evidencia (2026-09-20): las dos direcciones comprobadas, más tres casos de degradación: sin extensión se juzga por el sistema, un informe de hace una hora no decide, y el informe de OTRO navegador no decide por el que está al frente
+- [x] T12 (RF-02) El texto de la página entra al índice con su texto ya puesto — `Sources/BtoDicta/ApiLocal.swift`, `Sources/BtoDicta/ContinuoIndice.swift` — Evidencia esperada: el elemento queda en el índice con texto y el OCR no lo procesa
+  - Evidencia (2026-09-20): `{"texto_guardado":true}` y en el índice queda con su texto y `procesado=1`. Pendientes de OCR para esa página: **0**, mientras 5 capturas normales sí esperan. No hizo falta desactivar el OCR (ADR-005)
 - [ ] T13 (RF-02) Medida contra el OCR: el texto recibido cubre ≥ 90 % de las palabras que da el OCR de esa misma pantalla — `scripts/qa-texto-vs-ocr.py` — Evidencia esperada: porcentaje medido sobre 3 artículos reales
 - [ ] T14 (RF-03) Captura de la pestaña con `captureVisibleTab` y su guardado en la bitácora — `extension/src/captura.js`, `Sources/BtoDicta/ApiLocal.swift` — Evidencia esperada: con otra ventana encima, la imagen muestra la página entera y nada de la ventana superpuesta
 

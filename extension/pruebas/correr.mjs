@@ -126,6 +126,45 @@ await guardarExcluidos(["  ", "", "b.test", "a.test"], almacen);
 const orden = await leerExcluidos(almacen);
 chk(orden.join(",") === "a.test,b.test", "las entradas vacías se descartan y la lista queda ordenada");
 
+// ---------- T09: qué se cuenta de cada pestaña ----------
+//
+// El caso que da sentido a toda la extensión: un vídeo sonando en una pestaña
+// mientras se trabaja en otra. Eso es lo que macOS no puede ver.
+
+const { fotografiar } = await import("../src/fondo.js");
+
+const abiertas = [
+  { url: "https://correo.test/bandeja", title: "Bandeja", active: true,  audible: false },
+  { url: "https://videos.test/watch?v=1", title: "Un vídeo", active: false, audible: true },
+  { url: "https://banco.test/cuenta",    title: "Mi cuenta", active: false, audible: false },
+];
+
+const foto = await fotografiar({ pestañas: abiertas, excluidos: [] });
+chk(foto.pestanas.length === 3, "se cuentan las tres pestañas");
+chk(foto.pestanas.find((p) => p.activa)?.url.includes("correo"), "la activa es la del correo");
+chk(foto.pestanas.find((p) => p.audible)?.url.includes("videos"),
+    "y la que suena es la del vídeo, con el correo delante");
+
+// Con un dominio excluido: se sigue sabiendo que ALGO suena, pero no qué es.
+const conExcluido = await fotografiar({ pestañas: abiertas, excluidos: ["banco.test", "videos.test"] });
+const vid = conExcluido.pestanas[1];
+chk(vid.url === "" && vid.titulo === "", "de un dominio excluido no se dice ni la dirección ni el título");
+chk(vid.audible === true,
+    "pero SÍ que suena: es un dato sin contenido, y es el que evita anotar una película como trabajo");
+chk(conExcluido.pestanas[2].url === "", "y la pestaña del banco queda muda del todo");
+chk(conExcluido.pestanas[0].url.includes("correo"), "mientras lo no excluido se sigue contando entero");
+
+// ---------- T10: el envío no acumula ----------
+
+const { reiniciarEspera, esperaRestante, enviar: enviarDeVerdad } = await import("../src/enviar.js");
+
+// Sin navegador no hay almacén ni token: el envío no debe lanzar, solo fallar.
+reiniciarEspera();
+let lanzo = false;
+try { await enviarDeVerdad("/navegador", { x: 1 }); } catch { lanzo = true; }
+chk(!lanzo, "un envío imposible no lanza: un sensor no puede tumbar el navegador");
+chk(esperaRestante() >= 0, "y queda un tiempo de espera medible antes del siguiente intento");
+
 console.log(mal === 0
   ? "EXTENSION TODO OK — no se lee lo que el usuario escribe, y lo excluido no se reporta"
   : `EXTENSION FALLA (${mal})`);

@@ -194,6 +194,40 @@ final class ContinuoIndice {
     // MARK: Marcado de procesado
 
     /// Guarda el texto extraído y marca la fila como procesada.
+    /// Guarda el texto de una página que envió la extensión (spec 006, RF-02).
+    ///
+    /// Se registra como material de pantalla —es lo que se estaba viendo— pero
+    /// **con su texto ya escrito**, sin archivo de imagen. Eso lo deja fuera del
+    /// alcance del OCR, que solo recoge lo que llega sin texto, y ahorra el
+    /// reconocimiento de imagen entero: leer una página deja de costar lo que
+    /// cuesta mirar una foto de ella.
+    ///
+    /// Devuelve `true` si quedó anotado.
+    @discardableResult
+    func anotarTextoDeNavegador(texto: String, url: String, titulo: String,
+                                app: String, instante: Date) -> Bool {
+        cola.sync {
+            guard let d = db else { return false }
+            var st: OpaquePointer?
+            // `ruta` lleva la dirección en vez de un archivo: no hay imagen que
+            // guardar, y así la línea de tiempo sigue pudiendo decir de dónde
+            // salió cada cosa.
+            let sql = """
+            INSERT INTO pantalla (instante, ruta, bytes, app, ventana, monitor, visibles, texto, procesado)
+            VALUES (?, ?, 0, ?, ?, 0, '', ?, 1);
+            """
+            guard sqlite3_prepare_v2(d, sql, -1, &st, nil) == SQLITE_OK else { return false }
+            defer { sqlite3_finalize(st) }
+            let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            sqlite3_bind_double(st, 1, instante.timeIntervalSince1970)
+            sqlite3_bind_text(st, 2, url, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(st, 3, app, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(st, 4, titulo, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(st, 5, texto, -1, SQLITE_TRANSIENT)
+            return sqlite3_step(st) == SQLITE_DONE
+        }
+    }
+
     func anotarTexto(_ texto: String, material: MaterialContinuo, id: Int64) {
         cola.sync {
             guard let d = db else { return }

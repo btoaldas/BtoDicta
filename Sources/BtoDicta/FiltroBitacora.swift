@@ -81,6 +81,39 @@ enum FiltroBitacora {
     /// Firefox queda fuera de esto: no expone sus pestañas por AppleScript. Ahí
     /// se sigue mirando el título de la ventana, que también refleja la pestaña
     /// activa aunque sea menos preciso.
+    /// Lo que dice el navegador de sí mismo, si es que lo dijo hace poco.
+    ///
+    /// Tiene PRIORIDAD sobre lo que se adivina por el foco, y no por capricho:
+    /// mirar el foco es un sustituto pobre de saber qué suena, y falla en los
+    /// casos normales —música en un monitor mientras se trabaja en otro, un
+    /// vídeo en una ventana de atrás—. El navegador sí lo sabe.
+    ///
+    /// Si el informe caducó o no hay extensión, se vuelve a adivinar. Degradar
+    /// es correcto: la bitácora funcionaba antes de existir la extensión y debe
+    /// seguir funcionando si alguien la desinstala.
+    static func decidirConNavegador(app: String?, pista: String?) -> Veredicto {
+        guard hayReglas else { return .entra }
+
+        // ¿Hay un navegador al frente que esté informando?
+        let informes = EstadoNavegadores.vigentes()
+        if let informe = informes.first(where: { coincide(app: app, con: $0.navegador) }),
+           let activa = informe.activa {
+            // Lo que se mira es LA PESTAÑA QUE SE ESTÁ MIRANDO, no la que suena.
+            // Con un vídeo sonando detrás mientras se escribe un correo, lo que
+            // se está haciendo es escribir el correo.
+            let pistaReal = activa.url.isEmpty ? activa.titulo : activa.url
+            return decidir(app: app, ventana: pistaReal.isEmpty ? pista : pistaReal)
+        }
+        return decidir(app: app, ventana: pista)
+    }
+
+    /// ¿El nombre de la aplicación al frente corresponde a este navegador?
+    private static func coincide(app: String?, con navegador: String) -> Bool {
+        guard let a = app, !a.isEmpty else { return false }
+        let x = normalizar(a), y = normalizar(navegador)
+        return x.contains(y) || y.contains(x)
+    }
+
     static func contextoDelFrente() -> (app: String?, pista: String?) {
         let frente = ContextoApp.alFrente()
         let app = frente.nombre.isEmpty ? nil : frente.nombre

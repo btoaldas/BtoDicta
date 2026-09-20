@@ -410,8 +410,34 @@ enum ApiLocal {
             return
         }
         EstadoNavegadores.anotar(estado)
+
+        // El texto de la página, si viene (RF-02).
+        //
+        // Entra al índice CON SU TEXTO YA PUESTO, y por eso el OCR no lo tocará:
+        // `ContinuoOCR.procesarPendientes` solo trabaja sobre lo que llega sin
+        // texto. No hace falta desactivar nada (ADR-005) — basta con no darle
+        // trabajo, que además ahorra el reconocimiento de imagen entero.
+        var textoGuardado = false
+        if Config.continuoActivo(),
+           let texto = json["texto"] as? String,
+           let url = json["url"] as? String,
+           !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Las mismas reglas que gobiernan el resto de la bitácora. Que el
+            // texto llegue por otra puerta no lo exime del filtro.
+            let veredicto = FiltroBitacora.decidir(app: estado.navegador, ventana: url)
+            if case .fuera(let motivo) = veredicto {
+                Log.log(.ia, "navegador: no anoto esta página — \(motivo)")
+            } else {
+                textoGuardado = ContinuoIndice.shared.anotarTextoDeNavegador(
+                    texto: texto, url: url,
+                    titulo: (json["titulo"] as? String) ?? "",
+                    app: estado.navegador, instante: estado.instante)
+            }
+        }
+
         responder(conexion, 200, ["recibido": estado.pestañas.count,
-                                  "audibles": estado.audibles.count])
+                                  "audibles": estado.audibles.count,
+                                  "texto_guardado": textoGuardado])
     }
 
     private static func pulir(_ conexion: NWConnection, _ json: [String: Any]) {

@@ -3139,7 +3139,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             EstadoNavegadores.olvidarTodo()
             chk(EstadoNavegadores.vigentes().isEmpty, "olvidar deja el estado limpio")
 
-            print("NAVEGADOR \(mal == 0 ? "TODO OK — el informe del navegador se lee y caduca" : "FALLA (\(mal))")")
+            // T11 — el informe del navegador MANDA sobre lo que se adivina.
+            //
+            // El caso real: un vídeo sonando en una pestaña mientras se escribe
+            // un correo en otra. Mirando solo el foco, la aplicación al frente
+            // es «el navegador» y no hay forma de distinguir una cosa de la otra.
+            let previas = (Config.json0("bitacora_excluir_titulos") as? [String],
+                           Config.json0("bitacora_incluir_titulos") as? [String])
+            Config.set("bitacora_excluir_titulos", to: ["videos.test"])
+            Config.set("bitacora_incluir_titulos", to: [String]())
+            EstadoNavegadores.olvidarTodo()
+
+            func entra(_ app: String?, _ pista: String?) -> Bool {
+                if case .entra = FiltroBitacora.decidirConNavegador(app: app, pista: pista) { return true }
+                return false
+            }
+
+            // Sin informe del navegador: solo se puede juzgar por la pista del
+            // sistema, que con el correo delante dice «correo».
+            chk(entra("Google Chrome", "https://correo.test/bandeja"),
+                "sin extensión, se juzga por lo que ve el sistema")
+
+            // Con informe: la activa es el correo aunque el vídeo suene.
+            EstadoNavegadores.anotar(EstadoNavegador(navegador: "Google Chrome", pestañas: [
+                .init(url: "https://correo.test/bandeja", titulo: "Bandeja", audible: false, activa: true),
+                .init(url: "https://videos.test/watch", titulo: "Vídeo", audible: true, activa: false),
+            ]))
+            chk(entra("Google Chrome", "lo que sea"),
+                "con el vídeo sonando DETRÁS y el correo delante, el trozo se conserva")
+
+            // Y al revés: el vídeo delante, aunque el sistema diga otra cosa.
+            EstadoNavegadores.olvidarTodo()
+            EstadoNavegadores.anotar(EstadoNavegador(navegador: "Google Chrome", pestañas: [
+                .init(url: "https://videos.test/watch", titulo: "Vídeo", audible: true, activa: true),
+                .init(url: "https://correo.test/bandeja", titulo: "Bandeja", audible: false, activa: false),
+            ]))
+            chk(!entra("Google Chrome", "https://correo.test/bandeja"),
+                "con el vídeo DELANTE se aparta, aunque el sistema aún vea el correo")
+
+            // Informe caducado: se vuelve a adivinar, no se cree un dato viejo.
+            EstadoNavegadores.olvidarTodo()
+            EstadoNavegadores.anotar(EstadoNavegador(navegador: "Google Chrome", pestañas: [
+                .init(url: "https://videos.test/watch", titulo: "Vídeo", audible: true, activa: true),
+            ], instante: Date().addingTimeInterval(-3600)))
+            chk(entra("Google Chrome", "https://correo.test/bandeja"),
+                "un informe de hace una hora no decide: se vuelve a mirar el sistema")
+
+            // Otro navegador informando no contamina al que está al frente.
+            EstadoNavegadores.olvidarTodo()
+            EstadoNavegadores.anotar(EstadoNavegador(navegador: "Firefox", pestañas: [
+                .init(url: "https://videos.test/watch", titulo: "Vídeo", audible: true, activa: true),
+            ]))
+            chk(entra("Google Chrome", "https://correo.test/bandeja"),
+                "y el informe de OTRO navegador no decide por el que está delante")
+
+            EstadoNavegadores.olvidarTodo()
+            Config.set("bitacora_excluir_titulos", to: previas.0 ?? [String]())
+            Config.set("bitacora_incluir_titulos", to: previas.1 ?? [String]())
+
+            print("NAVEGADOR \(mal == 0 ? "TODO OK — el informe del navegador se lee, manda y caduca" : "FALLA (\(mal))")")
             exit(mal == 0 ? 0 : 1)
         }
         // Qué entra en la bitácora y qué no: BTODICTA_FILTROTEST=1

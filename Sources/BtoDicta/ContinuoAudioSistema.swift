@@ -298,8 +298,8 @@ final class ContinuoAudioSistema: NSObject {
         // más y el trozo se conserva — ante la duda, se guarda.
         if FiltroBitacora.hayReglas {
             let ahoraFoco = FiltroBitacora.contextoDelFrente()
-            let alAbrir = FiltroBitacora.decidir(app: focoAlAbrir.app, ventana: focoAlAbrir.pista)
-            let alCerrar = FiltroBitacora.decidir(app: ahoraFoco.app, ventana: ahoraFoco.pista)
+            let alAbrir = FiltroBitacora.decidirConNavegador(app: focoAlAbrir.app, pista: focoAlAbrir.pista)
+            let alCerrar = FiltroBitacora.decidirConNavegador(app: ahoraFoco.app, pista: ahoraFoco.pista)
             if case .fuera(let motivo) = alAbrir, case .fuera = alCerrar {
                 // No se borra: se aparta a la papelera de la bitácora, donde se
                 // puede recuperar unos días. Lo que hoy no interesa puede
