@@ -166,6 +166,8 @@ else
   ejecutar "huella_modelos_memoria" "BTODICTA_HUELLAMEMTEST" "1" 180
   # Leer por trozos no sirve de nada si no se suelta cada trozo: llegó a
   # retener 4,9 GB en cada arranque por comprobar la huella de los modelos.
+  # La extensión no lee lo que el usuario escribe, y lo excluido no se reporta.
+  estatica "extension_no_ve_de_mas" /usr/bin/env node "${REPO:-$QA_DIR/../..}/extension/pruebas/correr.mjs"
   # El informe del navegador (spec 006): se lee, se rechaza lo incompleto y caduca.
   ejecutar "navegador_informe" "BTODICTA_NAVEGADORTEST" "1" 90
   # Qué entra en la bitácora y qué no: de fábrica entra todo.

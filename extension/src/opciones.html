@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>BtoDicta — qué no mirar</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.5 -apple-system, system-ui, sans-serif; margin: 0; padding: 22px;
+         max-width: 560px; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 18px; opacity: .75; }
+  .fila { display: flex; gap: 8px; margin-bottom: 14px; }
+  input[type=text] { flex: 1; padding: 7px 9px; font-size: 14px;
+                     border: 1px solid rgba(128,128,128,.45); border-radius: 7px; }
+  button { padding: 7px 13px; font-size: 14px; border-radius: 7px; cursor: pointer;
+           border: 1px solid rgba(128,128,128,.45); background: transparent; }
+  button.principal { background: #5b46a2; color: #fff; border-color: #5b46a2; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { display: flex; justify-content: space-between; align-items: center;
+       padding: 7px 10px; border: 1px solid rgba(128,128,128,.25); border-radius: 7px;
+       margin-bottom: 6px; }
+  li button { padding: 3px 9px; font-size: 12px; }
+  .vacio { opacity: .6; padding: 14px 0; }
+  .nota { margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(128,128,128,.25);
+          opacity: .75; font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1>Qué no debe mirar la bitácora</h1>
+  <p class="sub">De fábrica esta lista está vacía: se mira todo hasta que tú digas lo contrario.</p>
+
+  <div class="fila">
+    <input type="text" id="dominio" placeholder="banco.ejemplo.com" autofocus>
+    <button class="principal" id="anadir">Excluir</button>
+  </div>
+
+  <ul id="lista"></ul>
+  <p class="vacio" id="vacio">Ahora mismo no hay ningún dominio excluido.</p>
+
+  <p class="nota">
+    Excluir un dominio excluye también sus subdominios.
+    <br>
+    Lo que escribes en un formulario —contraseñas incluidas— no se lee nunca,
+    esté el dominio en esta lista o no.
+  </p>
+
+  <script type="module" src="opciones.js"></script>
+</body>
+</html>

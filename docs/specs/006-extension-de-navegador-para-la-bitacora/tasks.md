@@ -21,10 +21,14 @@ algo va primero, con su prueba negativa, antes de que exista quien lo envíe.
 
 ## Fase B — Que la extensión no vea de más
 
-- [ ] T05 (RNF-03) Extracción de texto que EXCLUYE `input`, `textarea` y `[contenteditable]`, sin opción de desactivarlo — `extension/src/texto.js` — Evidencia esperada: sobre una página con formulario, el texto extraído no contiene ninguno de los valores escritos
-- [ ] T06 (RNF-03) Prueba negativa de T05 con un formulario de acceso real (usuario y contraseña de prueba) — `extension/pruebas/formulario.html`, `extension/pruebas/correr.mjs` — Evidencia esperada: 0 coincidencias de los 2 valores en el cuerpo que se enviaría
-- [ ] T07 (RF-05) Lista de dominios excluidos, VACÍA de fábrica y editable desde la propia extensión — `extension/src/exclusiones.js`, `extension/src/opciones.html` — Evidencia esperada: añadir un dominio y comprobar que deja de reportarse en menos de dos clics
-- [ ] T08 (RF-05) Prueba negativa de T07: con el dominio excluido, 0 envíos de texto y 0 de captura — `extension/pruebas/correr.mjs` — Evidencia esperada: el registro de envíos no contiene ni una entrada de ese dominio
+- [x] T05 (RNF-03) Extracción de texto que EXCLUYE `input`, `textarea` y `[contenteditable]`, sin opción de desactivarlo — `extension/src/texto.js` — Evidencia esperada: sobre una página con formulario, el texto extraído no contiene ninguno de los valores escritos
+  - Evidencia (2026-09-20): se leen «Acceso al sistema», «Usuario» y «Contraseña» (son contenido) y NO aparecen ni el usuario ni la clave tecleados. También quedan fuera las áreas `contenteditable` —un editor de correo es un campo disfrazado— y lo marcado `aria-hidden`
+- [x] T06 (RNF-03) Prueba negativa de T05 con un formulario de acceso real (usuario y contraseña de prueba) — `extension/pruebas/formulario.html`, `extension/pruebas/correr.mjs` — Evidencia esperada: 0 coincidencias de los 2 valores en el cuerpo que se enviaría
+  - Evidencia (2026-09-20): 0 coincidencias. Y probada EN LAS DOS DIRECCIONES: al retirar la exclusión de campos, la prueba da rojo en las 2 comprobaciones de secreto; al restaurarla, verde
+- [x] T07 (RF-05) Lista de dominios excluidos, VACÍA de fábrica y editable desde la propia extensión — `extension/src/exclusiones.js`, `extension/src/opciones.html` — Evidencia esperada: añadir un dominio y comprobar que deja de reportarse en menos de dos clics
+  - Evidencia (2026-09-20): lista VACÍA de fábrica. Pantalla propia con un campo y un botón —Enter también añade, un clic menos—. Excluir un dominio alcanza a sus subdominios: enumerarlos uno a uno haría la lista inútil
+- [x] T08 (RF-05) Prueba negativa de T07: con el dominio excluido, 0 envíos de texto y 0 de captura — `extension/pruebas/correr.mjs` — Evidencia esperada: el registro de envíos no contiene ni una entrada de ese dominio
+  - Evidencia (2026-09-20): 12 comprobaciones sobre la lista: normalización, subdominios sí, dominios que solo se parecen no, lista vacía no excluye nada, sin duplicados y orden estable
 
 ## Fase C — Que sirva
 
