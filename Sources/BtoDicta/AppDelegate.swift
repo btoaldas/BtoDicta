@@ -3093,6 +3093,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("HUELLAMEM \(mal == 0 ? "TODO OK — verificar un modelo no carga el modelo" : "FALLA (\(mal))")")
             exit(mal == 0 ? 0 : 1)
         }
+        // El motor de embeddings se apaga solo: BTODICTA_EMBIDLETEST=1
+        //
+        // Retiene ~400 MB con el modelo cargado y se queda a cero de CPU entre
+        // usos. Debe dormirse solo — y esto lo comprueba DE VERDAD, arrancándolo
+        // y esperando a que muera, no leyendo que el código lo intenta.
+        //
+        // El fallo que vigila: el vigía era un `Timer` metido en el bucle del
+        // hilo principal desde cualquier hilo, y a veces no quedaba registrado.
+        // El apagado funcionaba a ratos, que es la peor forma de fallar: parece
+        // que va.
+        if ProcessInfo.processInfo.environment["BTODICTA_EMBIDLETEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("EMBIDLE \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+            guard EmbeddingServer.disponible else {
+                print("EMBIDLE OMITIDA — el motor interno no está instalado")
+                exit(0)
+            }
+            // Gracia corta para que la prueba dure segundos y no diez minutos.
+            Config.set("embeddings_apagar_tras_minutos", to: 0.1)   // 6 s
+            let arranque = Date()
+            EmbeddingServer.asegurar { ok in
+                let tardo = Date().timeIntervalSince(arranque)
+                chk(ok, "el motor arranca cuando se le pide (\(String(format: "%.1f", tardo)) s)")
+                guard ok else { print("EMBIDLE FALLA"); exit(1) }
+                chk(EmbeddingServer.corriendo, "y queda corriendo")
+                print("EMBIDLE esperando a que se duerma solo…")
+                // Se espera bastante más que la gracia: si no muere, no muere.
+                DispatchQueue.global().asyncAfter(deadline: .now() + 75) {
+                    let sigue = EmbeddingServer.corriendo
+                    chk(!sigue, sigue ? "NO se durmió tras 75 s con 6 s de gracia"
+                                      : "se durmió solo y soltó su memoria")
+                    // Y revive: dormirse no puede dejarlo inservible.
+                    Config.set("embeddings_apagar_tras_minutos", to: 10)
+                    EmbeddingServer.asegurar { ok2 in
+                        chk(ok2, "y revive al volver a pedirlo")
+                        EmbeddingServer.detener()
+                        print("EMBIDLE \(mal == 0 ? "TODO OK — el motor se duerme y revive" : "FALLA (\(mal))")")
+                        exit(mal == 0 ? 0 : 1)
+                    }
+                }
+            }
+            RunLoop.main.run(); return
+        }
         // Dictado largo con el MICRÓFONO DE VERDAD: BTODICTA_MICLARGOTEST=<minutos>
         //
         // Las dos pruebas que ya existían dejaban un hueco entre ellas: MICTEST

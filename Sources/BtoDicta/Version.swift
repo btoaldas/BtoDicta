@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.73.0"
+    static let numero = "0.73.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.73.1", "2026-09-20", [
+            "EL MOTOR DE RECONOCIMIENTO INTELIGENTE SE DUERME DE VERDAD CUANDO NO LO USAS. Retiene unos 400 MB con su modelo cargado y ya estaba previsto que se apagara tras diez minutos sin uso, pero el temporizador que lo vigilaba se registraba desde cualquier hilo y no siempre quedaba puesto: el apagado funcionaba a ratos. Ahora no depende de eso, y hay una comprobación que lo arranca, espera a que se duerma y comprueba que revive",
+            "El tiempo de gracia es ajustable (`embeddings_apagar_tras_minutos`, 10 por omisión). Arrancar en frío cuesta alrededor de un segundo, así que equivocarse por corto sale barato",
+        ]),
         ("0.73.0", "2026-09-19", [
             "SPEECHMATICS VUELVE A FUNCIONAR, y con él los cuatro motores que estaban mudos. El mismo descuido aparecía TRES veces: una petición de red que se crea y no se arranca. Se arregló el sondeo, el motor llegó un paso más allá y se topó con el segundo; al buscarlos todos apareció el tercero, en Soniox",
             "Ahora hay una comprobación automática que caza ese fallo en cada versión. Es de los peores que existen: lo que está escrito parece completo —la petición, las cabeceras, los errores— y solo falta encenderlo, así que no falla: se cuelga para siempre, sin error y sin rastro",

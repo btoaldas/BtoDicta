@@ -1039,6 +1039,19 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### El motor de reconocimiento inteligente y la memoria (0.73.1)
+
+El motor interno de embeddings carga un modelo y retiene unos **400 MB** mientras
+está encendido, aunque no reciba ni una consulta. No arranca con la aplicación:
+se enciende la primera vez que hace falta.
+
+Desde 0.73.1 **se duerme solo** tras diez minutos sin uso y libera esa memoria;
+revive en cuanto se le vuelve a pedir algo, en torno a un segundo. Ya estaba
+previsto antes, pero el temporizador que lo vigilaba se registraba desde
+cualquier hilo y no siempre quedaba puesto, así que el apagado ocurría a ratos.
+
+Ajustable con `embeddings_apagar_tras_minutos` (10 por omisión).
+
 ### Qué motor conviene, medido (0.73.0)
 
 Con 275 palabras de voz sintética en español, todos con el mismo audio:

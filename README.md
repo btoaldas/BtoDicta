@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.73.1
+
+- **El motor de embeddings se duerme de verdad**: retenía ~400 MB y su vigía era
+  un `Timer` registrado desde cualquier hilo, así que el apagado iba a ratos.
+  Ahora no depende del hilo, y una prueba lo verifica de punta a punta.
+
 ### Novedades 0.73.0
 
 - **Los cuatro motores mudos, recuperados**: el `.resume()` que faltaba aparecía

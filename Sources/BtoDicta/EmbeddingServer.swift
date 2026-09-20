@@ -19,7 +19,9 @@ enum EmbeddingServer {
     private static var proceso: Process?
     private static var adoptado = false
     private static var ultimoUso = Date()
-    private static var vigia: Timer?
+    private static var vigia: DispatchSourceTimer?
+    private static let colaVigia = DispatchQueue(label: "btodicta.embeddings.vigia")
+    private static let candadoVigia = NSLock()
 
     static var instalado: Bool { FileManager.default.fileExists(atPath: modeloURL.path) }
     static var corriendo: Bool { proceso?.isRunning == true || adoptado }
@@ -96,19 +98,51 @@ enum EmbeddingServer {
             try? p.run(); p.waitUntilExit()
         }
         proceso = nil; adoptado = false
+        // Y se retira el vigía: si no, cada arranque dejaría uno más detrás,
+        // todos mirando el mismo reloj.
+        candadoVigia.lock()
+        vigia?.cancel(); vigia = nil
+        candadoVigia.unlock()
     }
 
     static func tocar() { ultimoUso = Date() }
 
-    /// Idle-sleep: sin uso por 10 min → se apaga (libera RAM). Revive on-demand.
+    /// Cuánto aguanta encendido sin que nadie le pida nada.
+    ///
+    /// Diez minutos: bastante para no reencenderlo entre dos usos seguidos, poco
+    /// para no retener 400 MB toda la tarde. Arrancar en frío cuesta ~1 s, así
+    /// que equivocarse por corto es barato.
+    static func minutosDeGracia() -> Double {
+        max(1, (Config.json0("embeddings_apagar_tras_minutos") as? Double) ?? 10)
+    }
+
+    /// Se duerme solo cuando nadie lo usa, y libera la memoria del modelo.
+    /// Revive en el siguiente uso.
+    ///
+    /// Antes esto era un `Timer` añadido con `RunLoop.main.add(...)`. El problema
+    /// es que `asegurar()` se llama desde donde toque —colas de transcripción, de
+    /// pulido, del agente—, y meter un temporizador en el bucle del hilo
+    /// principal DESDE OTRO HILO no está garantizado: unas veces quedaba
+    /// registrado y otras no. Por eso el apagado funcionaba a ratos: medido el
+    /// 2026-09-20, el motor llevaba 24 minutos vivo y 22 sin uso, reteniendo
+    /// 399 MB, mientras que el día anterior sí se había dormido dos veces.
+    ///
+    /// Un `DispatchSourceTimer` sobre una cola propia no depende del bucle de
+    /// eventos ni de quién lo cree.
     private static func iniciarVigilancia() {
+        candadoVigia.lock(); defer { candadoVigia.unlock() }
         guard vigia == nil else { return }
-        let t = Timer(timeInterval: 60, repeats: true) { _ in
-            guard corriendo, Date().timeIntervalSince(ultimoUso) > 600 else { return }
-            Log.log(.ia, "motor de embeddings interno dormido por inactividad")
+        let t = DispatchSource.makeTimerSource(queue: colaVigia)
+        t.schedule(deadline: .now() + 60, repeating: 60)
+        t.setEventHandler {
+            guard corriendo else { return }
+            let ocioso = Date().timeIntervalSince(ultimoUso)
+            guard ocioso > minutosDeGracia() * 60 else { return }
+            Log.log(.ia, "motor de embeddings: \(Int(ocioso / 60)) min sin uso — lo apago y libero su memoria")
             detener()
         }
-        RunLoop.main.add(t, forMode: .common); vigia = t
+        t.resume()
+        vigia = t
     }
 
     private static func ping() -> Bool {
