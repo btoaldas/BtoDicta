@@ -107,19 +107,28 @@ def main():
             continue
         pid, d = raiz
         h_app, pico_app = huella(pid)
-        cpu_total = seg_cpu(d["cpu"])
+        # La CPU se lleva POR PROCESO, no como un total.
+        #
+        # Sumar todo y restar el total anterior parece equivalente y no lo es: un
+        # hijo que muere entre dos muestras se lleva su CPU acumulada del total,
+        # y la resta sale NEGATIVA. Medido: -5,35 s/min justo cuando el motor de
+        # embeddings se apagó. Una cifra imposible que, en una corrida larga,
+        # habría pasado por «la CPU bajó» en vez de «el instrumento resta mal».
+        cpu_por_pid = {pid: seg_cpu(d["cpu"])}
         detalle_hijos = []
         for hp, hd in hijos:
             hh, _ = huella(hp)
-            cpu_total += seg_cpu(hd["cpu"])
+            cpu_por_pid[hp] = seg_cpu(hd["cpu"])
             detalle_hijos.append({"pid": hp, "nombre": os.path.basename(hd["comm"]).split()[0],
                                   "huellaMB": round(hh or 0, 1), "cpu_s": seg_cpu(hd["cpu"])})
-        # CPU consumida DESDE la muestra anterior, normalizada a por minuto.
+        # Solo cuentan los procesos presentes en AMBAS muestras; los que nacen
+        # aportan desde la siguiente, y los que mueren dejan de aportar.
         cpu_min = None
         t = time.time()
         if cpu_previa is not None and t_previo is not None and t > t_previo:
-            cpu_min = (cpu_total - cpu_previa) / (t - t_previo) * 60
-        cpu_previa, t_previo = cpu_total, t
+            delta = sum(max(0.0, v - cpu_previa[k]) for k, v in cpu_por_pid.items() if k in cpu_previa)
+            cpu_min = delta / (t - t_previo) * 60
+        cpu_previa, t_previo = cpu_por_pid, t
 
         total = (h_app or 0) + sum(x["huellaMB"] for x in detalle_hijos)
         resumen_hijos = ", ".join(f"{x['nombre']} {x['huellaMB']:.0f}MB" for x in detalle_hijos) or "—"
