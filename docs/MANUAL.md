@@ -1039,6 +1039,24 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### Qué motor conviene, medido (0.73.0)
+
+Con 275 palabras de voz sintética en español, todos con el mismo audio:
+
+| Motor | Error | Tiempo |
+|---|---|---|
+| Nemotron local | 0,00 % | 1,8 s |
+| Mistral (Voxtral nube) | 0,00 % | 2,8 s |
+| Speechmatics | 0,37 % | 4,3 s |
+| Gladia | 0,37 % | 4,6 s |
+| AssemblyAI | 0,37 % | 5,0 s |
+| Apple Speech | 1,49 % | 0,8 s |
+| Deepgram, Fish Audio | 1,86 % | 1,8 / 7,7 s |
+| Groq Whisper | 4,09 % | 1,6 s |
+| Whisper local | 8,55 % | 28,1 s |
+
+Los tres del medio estuvieron colgándose indefinidamente hasta 0.73.0.
+
 ### El portero: no pagar por grabar silencio (0.72.0)
 
 La bitácora graba la jornada entera y la mayor parte no es nadie hablando. Medido

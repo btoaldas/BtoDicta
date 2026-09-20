@@ -166,6 +166,9 @@ else
   ejecutar "huella_modelos_memoria" "BTODICTA_HUELLAMEMTEST" "1" 180
   # Leer por trozos no sirve de nada si no se suelta cada trozo: llegó a
   # retener 4,9 GB en cada arranque por comprobar la huella de los modelos.
+  # Una petición de red sin `.resume()` no sale nunca: dejó mudos a cuatro
+  # motores y apareció TRES veces el mismo día.
+  estatica "tarea_sin_arrancar" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-tarea-sin-arrancar.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "lectura_por_trozos" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-lectura-por-trozos.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "memoria_en_disco" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-memoria-en-disco.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "conexion_compartida" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-conexion-compartida.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"

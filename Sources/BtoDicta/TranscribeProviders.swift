@@ -360,7 +360,7 @@ enum SonioxTranscribe {
                                     }
                                     completion(.success(texto.trimmingCharacters(in: .whitespacesAndNewlines)))
                                 }
-                            }
+                            }.resume()   // sin esto la descarga no arranca y nadie contesta
                         }
                     }
                 }
@@ -589,7 +589,7 @@ enum SpeechmaticsTranscribe {
                             }
                             completion(.success(texto.trimmingCharacters(in: .whitespacesAndNewlines)))
                         }
-                    }
+                    }.resume()   // sin esto la descarga no arranca y nadie contesta
                 }
             }
         }

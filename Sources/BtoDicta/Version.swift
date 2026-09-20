@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.72.1"
+    static let numero = "0.73.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.73.0", "2026-09-19", [
+            "SPEECHMATICS VUELVE A FUNCIONAR, y con él los cuatro motores que estaban mudos. El mismo descuido aparecía TRES veces: una petición de red que se crea y no se arranca. Se arregló el sondeo, el motor llegó un paso más allá y se topó con el segundo; al buscarlos todos apareció el tercero, en Soniox",
+            "Ahora hay una comprobación automática que caza ese fallo en cada versión. Es de los peores que existen: lo que está escrito parece completo —la petición, las cabeceras, los errores— y solo falta encenderlo, así que no falla: se cuelga para siempre, sin error y sin rastro",
+            "Medido tras el arreglo: Speechmatics 0,37 % de error en 4,3 s, Gladia y AssemblyAI igual de bien. Antes los tres se colgaban indefinidamente",
+        ]),
         ("0.72.1", "2026-09-19", [
             "EL PORTERO ADMITE VARIOS MOTORES, y para cerrar la puerta tienen que coincidir todos: descartar un trozo exige que dos motores se equivoquen a la vez. Para abrirla basta con que uno oiga voz",
             "Medido con ruido real: los dos motores locales que transcriben SIN ningún error no frenan NADA (0 de 12 trozos de ambiente), porque inventan palabras donde solo hay ruido. Apple Speech, que transcribe peor, frena 10 de 12. Transcribir bien y detectar silencio bien no son lo mismo, así que el valor de fábrica es el que mejor detecta",

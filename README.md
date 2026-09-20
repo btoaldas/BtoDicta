@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.73.0
+
+- **Los cuatro motores mudos, recuperados**: el `.resume()` que faltaba aparecía
+  en TRES sitios. Speechmatics 0,37 % en 4,3 s; Gladia y AssemblyAI igual.
+- Comprobación automática que caza tareas de red creadas y nunca arrancadas.
+  El QA pasa de 19 a 20.
+
 ### Novedades 0.72.1
 
 - **Portero con varios motores**: para cerrar la puerta deben coincidir todos;
