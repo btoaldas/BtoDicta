@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.72.0"
+    static let numero = "0.72.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.72.1", "2026-09-19", [
+            "EL PORTERO ADMITE VARIOS MOTORES, y para cerrar la puerta tienen que coincidir todos: descartar un trozo exige que dos motores se equivoquen a la vez. Para abrirla basta con que uno oiga voz",
+            "Medido con ruido real: los dos motores locales que transcriben SIN ningún error no frenan NADA (0 de 12 trozos de ambiente), porque inventan palabras donde solo hay ruido. Apple Speech, que transcribe peor, frena 10 de 12. Transcribir bien y detectar silencio bien no son lo mismo, así que el valor de fábrica es el que mejor detecta",
+        ]),
         ("0.72.0", "2026-09-19", [
             "CUATRO MOTORES ESTABAN MUDOS POR UNA LÍNEA QUE FALTABA. AssemblyAI, Gladia, Soniox y Speechmatics subían el audio, el servicio lo transcribía en segundos y lo dejaba listo… y la aplicación no iba a recogerlo NUNCA: la consulta del resultado se creaba sin arrancarla. Se pagaba la transcripción y se tiraba. Gladia y AssemblyAI ya responden en 7-8 s; Soniox ahora dice claramente que su cuenta no tiene saldo, en vez de quedarse callado",
             "UN PORTERO LOCAL ANTES DE GASTAR: un motor que va en el sistema escucha primero el trozo y solo abre la puerta si alguien habló. Lo que se entrega lo sigue produciendo el motor que tú pongas primero. Medido con el ruido real de una oficina: de 12 trozos de ambiente, antes llegaban los 12 al motor de pago; ahora llega 1, y las voces pasan todas",

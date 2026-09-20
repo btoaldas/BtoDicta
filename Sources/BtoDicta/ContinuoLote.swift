@@ -173,8 +173,9 @@ enum ContinuoLote {
             //
             // Apple Speech va en el sistema, no sale del equipo, no cuesta y
             // tarda 0,8 s con dos minutos de audio.
-            if let portero = Config.bitacoraPortero(), !portero.isEmpty {
-                let veredicto = PorteroVoz.hayVoz(en: p.ruta, motor: portero)
+            let porteros = Config.bitacoraPorteros()
+            if !porteros.isEmpty {
+                let veredicto = PorteroVoz.hayVoz(en: p.ruta, motores: porteros)
                 if veredicto == .silencio {
                     ContinuoIndice.shared.anotarTexto("", material: .audio, id: p.id)
                     silenciosos += 1

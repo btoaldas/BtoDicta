@@ -1131,18 +1131,42 @@ struct Config {
     /// concreto (`apple_speech`, `elevenlabs`, `groq`, `ollama_stt`…) fija ese
     /// y solo ese. No se valida contra una lista cerrada a propósito: el
     /// catálogo de proveedores crece y esto no debe quedarse atrás.
-    /// Qué motor LOCAL hace de portero en la bitácora: decide si un trozo tiene
-    /// voz antes de gastar el motor bueno. Vacío o `off` = sin portero.
+    /// Qué motores LOCALES hacen de portero en la bitácora: escuchan el trozo y
+    /// deciden si alguien habló, antes de gastar el motor bueno. Vacío o `off`
+    /// lo desactiva.
     ///
-    /// Por defecto Apple Speech: va en el sistema, no sale del equipo, no cuesta
-    /// y tarda 0,8 s con dos minutos de audio. Su precisión da igual aquí —solo
-    /// contesta si alguien habló—, y lo que se entrega lo sigue produciendo el
-    /// primero de la cascada, que elige el usuario.
-    /// ¿Retirar los trozos que las DOS puertas dan por mudos?
+    /// Son DOS por seguridad, no por exceso. Para ABRIR la puerta basta con que
+    /// uno oiga voz; para CERRARLA tienen que coincidir los dos. Así, descartar
+    /// un trozo exige que dos motores independientes se equivoquen a la vez, y
+    /// el caso caro —perder algo que el usuario dijo— se vuelve muy improbable.
+    ///
+    /// **Transcribir bien y detectar silencio bien no son lo mismo.** Medido el
+    /// 2026-09-19 con ruido real de oficina, sobre los mismos 12 trozos:
+    ///
+    /// | portero | frena el ambiente | deja pasar la voz |
+    /// |---|---|---|
+    /// | Apple Speech | 10 de 12 | 4 de 4 |
+    /// | Nemotron + Voxtral | **0 de 12** | 4 de 4 |
+    ///
+    /// Los dos locales que transcriben con 0,00 % de error no frenan NADA. El
+    /// motivo es conocido: los modelos de esa familia **alucinan** sobre audio
+    /// sin voz — inventan palabras donde solo hay ruido, y el portero las cuenta
+    /// como habla. Apple Speech es más prudente y por eso distingue mejor.
+    ///
+    /// Y ojo con juntarlos: como para CERRAR hacen falta todos, añadir uno que
+    /// alucina anula al que acierta. Dos porteros solo mejoran si los dos saben
+    /// callarse.
+    static func bitacoraPorteros() -> [String] {
+        let s = (json()["bitacora_portero"] as? String) ?? "apple_speech"
+        if s.isEmpty || s == "off" { return [] }
+        return s.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// ¿Retirar los trozos que TODAS las puertas dan por mudos?
     ///
     /// Apagado de fábrica: borrar audio del usuario no es algo que una
     /// aplicación deba empezar a hacer sola. Al encenderlo, los trozos sin voz
-    /// van a la Papelera —recuperables—, nunca al vacío.
+    /// van a la papelera propia —recuperables—, nunca al vacío.
     static func bitacoraRetirarSilencios() -> Bool {
         (json()["bitacora_retirar_silencios"] as? Bool) ?? false
     }
@@ -1151,11 +1175,6 @@ struct Config {
     /// 0 = no se borra nunca (la papelera solo aparta, no elimina).
     static func bitacoraPapeleraDias() -> Int {
         max(0, (json()["bitacora_papelera_dias"] as? Int) ?? 7)
-    }
-
-    static func bitacoraPortero() -> String? {
-        let s = (json()["bitacora_portero"] as? String) ?? "apple_speech"
-        return (s.isEmpty || s == "off") ? nil : s
     }
 
     static func continuoLoteMotor() -> String {

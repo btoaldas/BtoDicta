@@ -1057,12 +1057,29 @@ elección sigue siendo tuya.
 
 | Ajuste | Por defecto | Qué hace |
 |---|---|---|
-| `bitacora_portero` | `apple_speech` | Motor local que hace de portero; `off` lo desactiva |
+| `bitacora_portero` | `apple_speech` | Motores locales portero, separados por coma; `off` lo desactiva |
 | `bitacora_retirar_silencios` | `false` | Apartar los trozos mudos a la papelera propia |
 | `bitacora_papelera_dias` | `7` | Días que se guardan antes de soltarlos; `0` = para siempre |
 
 Medido con ruido real de oficina: de 12 trozos de ambiente llegaban **12** al
 motor de pago; ahora llega **1**, y las 4 voces pasan todas.
+
+**Puedes poner varios**, separados por coma. Para **abrir** la puerta basta con
+que uno oiga voz; para **cerrarla** tienen que coincidir todos. Así, descartar un
+trozo exige que dos motores se equivoquen a la vez.
+
+**Cuidado al elegirlos**, porque transcribir bien y detectar silencio bien no son
+lo mismo. Medido con ruido real de oficina, sobre los mismos 12 trozos:
+
+| Portero | Frena el ambiente | Deja pasar la voz |
+|---|---|---|
+| Apple Speech | 10 de 12 | 4 de 4 |
+| Nemotron + Voxtral | **0 de 12** | 4 de 4 |
+
+Los dos locales que transcriben con 0,00 % de error no frenan nada: los modelos
+de esa familia **inventan palabras** sobre audio sin voz, y el portero las toma
+por habla. Y como para cerrar hacen falta todos, **juntar uno que alucina con uno
+que acierta anula al que acierta**.
 
 Si el portero falla o tarda, **el trozo se manda igual**. Un portero averiado no
 puede hacerte perder lo que dictaste.

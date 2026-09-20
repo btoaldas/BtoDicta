@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.72.1
+
+- **Portero con varios motores**: para cerrar la puerta deben coincidir todos;
+  para abrirla basta uno.
+- Medido: los locales que transcriben con 0,00 % de error frenan **0 de 12**
+  trozos de ruido (alucinan texto); Apple Speech frena 10 de 12.
+
 ### Novedades 0.72.0
 
 - **Cuatro motores mudos por un `.resume()` que faltaba**: el sondeo del

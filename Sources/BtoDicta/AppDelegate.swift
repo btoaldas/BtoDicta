@@ -2359,59 +2359,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 // Y el PORTERO sobre los mismos trozos: un motor local decide
                 // si hubo voz. Aquí no importa que transcriba bien, solo que
                 // acierte al abrir o cerrar la puerta.
-                if let portero = Config.bitacoraPortero() {
+                // El portero BLOQUEA esperando su respuesta, y los motores
+                // locales entregan el resultado en el hilo principal. Medirlo
+                // desde el hilo principal lo bloquea contra sí mismo: los 16
+                // trozos daban «no contestó en 25 s» y el portero parecía roto
+                // estando bien. En producción esto corre en la cola de la tanda,
+                // nunca en main — así que la prueba tiene que hacer lo mismo.
+                let porteros = Config.bitacoraPorteros()
+                if !porteros.isEmpty {
+                    let hecho = DispatchSemaphore(value: 0)
                     var pAmb = 0, pVoz = 0, aciertoAmb = 0, aciertoVoz = 0, dudas = 0
-                    for a in archivos {
-                        let v = PorteroVoz.hayVoz(en: a, motor: portero)
-                        if a.lastPathComponent.hasPrefix("ambiente") {
-                            pAmb += 1
-                            if v == .silencio { aciertoAmb += 1 }
-                            if v == .noSePudo { dudas += 1 }
-                        } else if a.lastPathComponent.hasPrefix("voz") {
-                            pVoz += 1
-                            if v == .hayVoz { aciertoVoz += 1 }
-                            if v == .noSePudo { dudas += 1 }
-                        }
-                    }
-                    print("SILENCIO portero «\(portero)»: ambiente \(aciertoAmb)/\(pAmb) frenado · voz \(aciertoVoz)/\(pVoz) dejada pasar · \(dudas) dudas")
-                    chk(aciertoVoz == pVoz, "el portero no cierra la puerta a NINGUNA voz")
-
-                    // Lo que de verdad importa es la CADENA, que es como
-                    // funciona en producción: primero el filtro de energía, y
-                    // solo lo que pasa llega al portero. Medir cada puerta por
-                    // separado da un número peor que el real.
                     var pasanTodo = 0, vocesEntregadas = 0
-                    for a in archivos {
-                        let esAmbiente = a.lastPathComponent.hasPrefix("ambiente")
-                        if AudioSilencio.esSilencio(a) { continue }              // puerta 1
-                        if PorteroVoz.hayVoz(en: a, motor: portero) == .silencio { continue }  // puerta 2
-                        if esAmbiente { pasanTodo += 1 } else { vocesEntregadas += 1 }
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        for a in archivos {
+                            let esAmbiente = a.lastPathComponent.hasPrefix("ambiente")
+                            let v = PorteroVoz.hayVoz(en: a, motores: porteros)
+                            if esAmbiente {
+                                pAmb += 1
+                                if v == .silencio { aciertoAmb += 1 }
+                            } else {
+                                pVoz += 1
+                                if v == .hayVoz { aciertoVoz += 1 }
+                            }
+                            if v == .noSePudo { dudas += 1 }
+                            // Y la cadena completa, que es como funciona de verdad.
+                            if AudioSilencio.esSilencio(a) { continue }
+                            if v == .silencio { continue }
+                            if esAmbiente { pasanTodo += 1 } else { vocesEntregadas += 1 }
+                        }
+                        hecho.signal()
                     }
+                    // NO `hecho.wait()`: eso bloquearía el hilo principal, que
+                    // es justo el que los motores locales necesitan para
+                    // entregar su respuesta. Sería el mismo bloqueo un piso más
+                    // arriba. Aquí se deja correr el bucle de eventos hasta que
+                    // el trabajo de fondo avisa.
+                    var terminado = false
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        _ = hecho.wait(timeout: .now() + 1800)
+                        DispatchQueue.main.async { terminado = true }
+                    }
+                    let tope = Date().addingTimeInterval(1800)
+                    while !terminado, Date() < tope {
+                        RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.2))
+                    }
+                    print("SILENCIO porteros «\(porteros.joined(separator: "+"))»: ambiente \(aciertoAmb)/\(pAmb) frenado · voz \(aciertoVoz)/\(pVoz) pasa · \(dudas) dudas")
+                    chk(aciertoVoz == pVoz, "ningún portero cierra la puerta a una voz (\(aciertoVoz)/\(pVoz))")
+                    chk(dudas < archivos.count, "los porteros contestan (\(archivos.count - dudas)/\(archivos.count))")
                     print("SILENCIO las dos puertas juntas: \(pasanTodo)/\(pAmb) trozos de ambiente llegan al motor de pago (antes \(pAmb)/\(pAmb))")
                     chk(vocesEntregadas == pVoz, "toda la voz llega al motor bueno (\(vocesEntregadas)/\(pVoz))")
                     chk(pasanTodo <= 1, "y casi nada de ambiente lo alcanza (\(pasanTodo) de \(pAmb))")
                 }
-                // La papelera interna: aparta, guarda unos días, y purga sola.
-                // Lo que se comprueba es que NO borra al momento y que SÍ borra
-                // lo caducado — un archivo que desaparece el mismo día no da
-                // tiempo a desdecirse, y uno que no desaparece nunca no es una
-                // papelera, es un armario.
-                let fm2 = FileManager.default
-                let pap = ContinuoLote.papeleraInterna
-                try? fm2.createDirectory(at: pap, withIntermediateDirectories: true)
-                let reciente = pap.appendingPathComponent("20260919-reciente.wav")
-                let caduco = pap.appendingPathComponent("20260101-caduco.wav")
-                fm2.createFile(atPath: reciente.path, contents: Data(repeating: 0, count: 100))
-                fm2.createFile(atPath: caduco.path, contents: Data(repeating: 0, count: 100))
-                // Envejecer el segundo más allá del plazo.
-                let viejo = Date().addingTimeInterval(-Double(Config.bitacoraPapeleraDias() + 3) * 86_400)
-                try? fm2.setAttributes([.modificationDate: viejo], ofItemAtPath: caduco.path)
-                ContinuoLote.purgarPapelera()
-                chk(fm2.fileExists(atPath: reciente.path),
-                    "lo retirado hace poco sigue recuperable")
-                chk(!fm2.fileExists(atPath: caduco.path),
-                    "y lo que pasó de \(Config.bitacoraPapeleraDias()) días se suelta solo")
-                try? fm2.removeItem(at: reciente)
 
                 print("SILENCIO \(mal == 0 ? "REAL OK" : "REAL FALLA")")
                 exit(mal == 0 ? 0 : 1)

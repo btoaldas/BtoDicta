@@ -45,6 +45,31 @@ enum PorteroVoz {
         max(2, (Config.json0("bitacora_portero_plazo") as? Double) ?? 25)
     }
 
+    /// Veredicto de VARIOS porteros sobre el mismo trozo.
+    ///
+    /// La asimetría es deliberada y es lo que hace seguro apartar audio:
+    ///
+    /// - Para **abrir** basta uno: si cualquiera oye voz, el trozo se transcribe.
+    /// - Para **cerrar** tienen que coincidir todos. Descartar exige que dos
+    ///   motores independientes se equivoquen a la vez.
+    ///
+    /// Y se pregunta en orden, parando en cuanto uno oye voz: al segundo solo se
+    /// le consulta cuando el primero dijo que no había nada, que es justo el
+    /// caso en el que conviene una segunda opinión.
+    static func hayVoz(en archivo: URL, motores: [String]) -> Veredicto {
+        guard !motores.isEmpty else { return .noSePudo }
+        var algunoRespondio = false
+        for m in motores {
+            switch hayVoz(en: archivo, motor: m) {
+            case .hayVoz:   return .hayVoz          // uno basta para abrir
+            case .silencio: algunoRespondio = true  // sigue preguntando
+            case .noSePudo: continue                // ese juez no cuenta
+            }
+        }
+        // Si ninguno pudo pronunciarse, no hay veredicto: ante la duda, se manda.
+        return algunoRespondio ? .silencio : .noSePudo
+    }
+
     static func hayVoz(en archivo: URL, motor: String) -> Veredicto {
         let datos: Data
         if archivo.pathExtension.lowercased() == "pcm" {
