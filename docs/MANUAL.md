@@ -1039,6 +1039,34 @@ se gastaba una llamada cada media hora para recibir el mismo error. Si recargas
 el saldo y no quieres esperar, entra en *Configuración → Modelos* y toca la clave:
 al cambiarla se olvida lo apartado.
 
+### El portero: no pagar por grabar silencio (0.72.0)
+
+La bitácora graba la jornada entera y la mayor parte no es nadie hablando. Medido
+el 2026-09-19: **764 minutos de audio enviados a un motor de pago en un día**, y
+414 de esas llamadas volvieron sin una sola palabra.
+
+Ahora hay dos puertas antes de gastar:
+
+1. **La energía del audio** — barata, descarta lo que ni suena.
+2. **Un motor local de portero** — escucha y contesta solo si alguien habló.
+
+El portero **no transcribe para entregar**: solo abre o cierra. Por eso puede ser
+el motor local más rápido aunque no sea el más preciso. Lo que se entrega lo
+produce el motor que tengas primero en tu cascada, sea local o de nube: esa
+elección sigue siendo tuya.
+
+| Ajuste | Por defecto | Qué hace |
+|---|---|---|
+| `bitacora_portero` | `apple_speech` | Motor local que hace de portero; `off` lo desactiva |
+| `bitacora_retirar_silencios` | `false` | Apartar los trozos mudos a la papelera propia |
+| `bitacora_papelera_dias` | `7` | Días que se guardan antes de soltarlos; `0` = para siempre |
+
+Medido con ruido real de oficina: de 12 trozos de ambiente llegaban **12** al
+motor de pago; ahora llega **1**, y las 4 voces pasan todas.
+
+Si el portero falla o tarda, **el trozo se manda igual**. Un portero averiado no
+puede hacerte perder lo que dictaste.
+
 ### Pedir un motor concreto desde otro programa (0.71.0)
 
 Además de `local`, `nube` y `automatico`, la API local acepta el identificador de

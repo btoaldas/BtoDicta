@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.72.0
+
+- **Cuatro motores mudos por un `.resume()` que faltaba**: el sondeo del
+  resultado se creaba sin arrancar. El servicio cobraba y la app no recogía.
+- **Portero local** antes de gastar el motor bueno: de 12 trozos de ambiente
+  llegaban 12 al motor de pago, ahora llega 1. Las voces pasan todas.
+- **Papelera propia** para el ruido, recuperable una semana. Apagada de fábrica.
+
 ### Novedades 0.71.0
 
 - **Motor concreto por la API**: `{"motor": "mistral"}` en vez de solo

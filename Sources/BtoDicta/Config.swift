@@ -1131,6 +1131,33 @@ struct Config {
     /// concreto (`apple_speech`, `elevenlabs`, `groq`, `ollama_stt`…) fija ese
     /// y solo ese. No se valida contra una lista cerrada a propósito: el
     /// catálogo de proveedores crece y esto no debe quedarse atrás.
+    /// Qué motor LOCAL hace de portero en la bitácora: decide si un trozo tiene
+    /// voz antes de gastar el motor bueno. Vacío o `off` = sin portero.
+    ///
+    /// Por defecto Apple Speech: va en el sistema, no sale del equipo, no cuesta
+    /// y tarda 0,8 s con dos minutos de audio. Su precisión da igual aquí —solo
+    /// contesta si alguien habló—, y lo que se entrega lo sigue produciendo el
+    /// primero de la cascada, que elige el usuario.
+    /// ¿Retirar los trozos que las DOS puertas dan por mudos?
+    ///
+    /// Apagado de fábrica: borrar audio del usuario no es algo que una
+    /// aplicación deba empezar a hacer sola. Al encenderlo, los trozos sin voz
+    /// van a la Papelera —recuperables—, nunca al vacío.
+    static func bitacoraRetirarSilencios() -> Bool {
+        (json()["bitacora_retirar_silencios"] as? Bool) ?? false
+    }
+
+    /// Cuántos días se guarda en la papelera interna lo retirado por mudo.
+    /// 0 = no se borra nunca (la papelera solo aparta, no elimina).
+    static func bitacoraPapeleraDias() -> Int {
+        max(0, (json()["bitacora_papelera_dias"] as? Int) ?? 7)
+    }
+
+    static func bitacoraPortero() -> String? {
+        let s = (json()["bitacora_portero"] as? String) ?? "apple_speech"
+        return (s.isEmpty || s == "off") ? nil : s
+    }
+
     static func continuoLoteMotor() -> String {
         // Por defecto, Apple en el dispositivo: el audio de una jornada entera
         // NO debe irse a un STT de nube porque sí. «cadena» (los proveedores

@@ -198,7 +198,19 @@ enum STTPoll {
                             transcurrido: transcurrido + intervalo, evaluar: evaluar, completion: completion)
                 }
             }
-        }
+        }.resume()
+        // ^ `.resume()` NO es decorativo. Sin él la tarea se crea y no arranca
+        // nunca: el closure no corre, `completion` no se llama, y quien esperaba
+        // la transcripción se queda esperando para siempre. Ni siquiera salta el
+        // límite de tiempo de arriba, porque solo se comprueba al reentrar.
+        //
+        // Cuatro motores —AssemblyAI, Gladia, Soniox y Speechmatics— quedaron
+        // mudos por esta línea que faltaba. Los cuatro son los únicos que
+        // sondean; los demás no pasan por aquí y por eso funcionaban.
+        //
+        // Lo peor: el servicio SÍ hacía su trabajo. Sus paneles mostraban los
+        // trabajos completados en 2-3 s, cobrados, y la aplicación nunca los
+        // recogía.
     }
 }
 

@@ -88,6 +88,7 @@ enum ContinuoLote {
         }
 
         ContinuoIndice.shared.abrir()
+        purgarPapelera()
         // Pase lo que pase al salir (fin normal, corte por dictado, canal sin
         // pendientes), los diarios quedan al día con lo procesado hasta ese
         // momento. Antes solo se reconstruían al final feliz y una tanda
@@ -150,7 +151,46 @@ enum ContinuoLote {
             if AudioSilencio.esSilencio(p.ruta) {
                 ContinuoIndice.shared.anotarTexto("", material: .audio, id: p.id)
                 silenciosos += 1
+                // Guardar horas de ruido de fondo no sirve a nadie y ocupa. Pero
+                // esta puerta sola mira ENERGÍA, no voz, y equivocarse aquí
+                // cuesta audio perdido: por eso no borra. Solo se retira lo que
+                // las DOS puertas den por mudo, más abajo.
                 continue
+            }
+
+            // SEGUNDA PUERTA: un motor local hace de portero.
+            //
+            // Mirar la energía del audio es barato pero tonto: distingue fuerte
+            // de flojo, no voz de ruido. Un ventilador, una obra en la calle o
+            // una conversación en el pasillo tienen energía de sobra y pasan.
+            //
+            // Un modelo de voz sí sabe distinguirlo, y para esto NO necesita
+            // transcribir bien: solo necesita contestar si alguien habló. Por eso
+            // el portero puede ser el motor local más rápido aunque no sea el más
+            // preciso — su respuesta no se entrega a nadie, solo abre o cierra la
+            // puerta. Lo que se entrega lo produce el motor que el usuario haya
+            // puesto primero en su cascada, sea local o de nube.
+            //
+            // Apple Speech va en el sistema, no sale del equipo, no cuesta y
+            // tarda 0,8 s con dos minutos de audio.
+            if let portero = Config.bitacoraPortero(), !portero.isEmpty {
+                let veredicto = PorteroVoz.hayVoz(en: p.ruta, motor: portero)
+                if veredicto == .silencio {
+                    ContinuoIndice.shared.anotarTexto("", material: .audio, id: p.id)
+                    silenciosos += 1
+                    // Aquí sí: DOS jueces independientes coinciden en que no hay
+                    // voz —la energía del audio y un motor de reconocimiento—, y
+                    // el trozo no vale ni el disco que ocupa.
+                    //
+                    // Va a la PAPELERA, no al vacío. Un detector puede
+                    // equivocarse, y la diferencia entre un archivo recuperable y
+                    // uno perdido es la diferencia entre un susto y un daño.
+                    if Config.bitacoraRetirarSilencios() { aPapelera(p.ruta) }
+                    continue
+                }
+                // `.noSePudo` (el portero falló, no hay modelo, se agotó el
+                // tiempo) NO cierra la puerta: ante la duda se transcribe. Un
+                // portero averiado no puede hacer perder lo dictado.
             }
 
             switch transcribir(p.ruta) {
@@ -296,6 +336,30 @@ enum ContinuoLote {
                 salida = r.map { $0.0 }
                 semaforo.signal()
             }
+        } else if motor == "cadena_local" {
+            // La cascada, con su failover, pero SIN salir del equipo.
+            //
+            // La bitácora graba la jornada entera. Mandarla a un servicio de
+            // nube tiene dos costes: el audio de todo un día de trabajo sale de
+            // la máquina, y se paga por minuto. Medido el 2026-09-19 con la
+            // cascada completa: **764 minutos enviados en un día**, de los que
+            // 414 llamadas volvieron sin una sola palabra.
+            //
+            // Y no hace falta renunciar a nada: medido con el mismo audio y la
+            // misma referencia, Nemotron local acierta el 100 % —igual que el
+            // mejor de nube— en 5,6 s y sin coste.
+            let locales = Providers.cadena().filter { $0.tipo == "local" }
+            if locales.isEmpty {
+                // Sin ningún motor local activo, esto no puede cumplir su
+                // promesa. Se dice y se usa Apple, que va en el sistema.
+                Log.log(.ia, "bitácora: no hay motores locales activos — uso Apple Speech, que no sale del equipo")
+                AppleSpeechSTT.run(wav: CuerpoMultipart.Origen.datos(wav)) { r in salida = r; semaforo.signal() }
+            } else {
+                Failover.transcribe(wav: .datos(wav), cadena: locales) { r in
+                    salida = r.map { $0.0 }
+                    semaforo.signal()
+                }
+            }
         } else if motor == "apple_speech" {
             AppleSpeechSTT.run(wav: CuerpoMultipart.Origen.datos(wav)) { r in salida = r; semaforo.signal() }
         } else if motor == "whisper_local" {
@@ -331,6 +395,65 @@ enum ContinuoLote {
     /// SOLO dentro de la carpeta de la bitácora: un archivo adoptado del
     /// historial de dictado tiene ya su .txt (pulido) y pisarlo con texto
     /// crudo destruiría trabajo del usuario.
+    /// Papelera PROPIA de la aplicación, no la del sistema.
+    ///
+    /// La del sistema tendría dos problemas: se llenaría de cientos de trozos
+    /// de ruido mezclados con lo que el usuario tira a mano, y vaciarla sería
+    /// cosa suya. Esta se limpia sola.
+    ///
+    /// Un archivo retirado aquí se puede recuperar durante unos días —el plazo
+    /// lo fija `bitacoraPapeleraDias`— y después se borra de verdad. Nunca se
+    /// borra nada al momento: entre «esto es ruido» y «esto ya no existe» hay
+    /// una semana para desdecirse.
+    static var papeleraInterna: URL {
+        Config.dir.appendingPathComponent("papelera-bitacora", isDirectory: true)
+    }
+
+    private static func aPapelera(_ ruta: URL) {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: ruta.path) else { return }
+        do {
+            try fm.createDirectory(at: papeleraInterna, withIntermediateDirectories: true)
+            // El nombre lleva el día: así la purga sabe qué caducó sin tener que
+            // fiarse de las fechas del sistema de archivos, que una copia o una
+            // restauración pueden reescribir.
+            let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
+            var destino = papeleraInterna.appendingPathComponent("\(f.string(from: Date()))-\(ruta.lastPathComponent)")
+            var n = 2
+            while fm.fileExists(atPath: destino.path) {
+                destino = papeleraInterna.appendingPathComponent("\(f.string(from: Date()))-\(n)-\(ruta.lastPathComponent)")
+                n += 1
+            }
+            try fm.moveItem(at: ruta, to: destino)
+        } catch {
+            // Si no se puede mover, NO se fuerza el borrado: se deja el archivo
+            // y se dice. Ahorrar disco no vale perder audio.
+            Log.log(.ia, "bitácora: no pude retirar \(ruta.lastPathComponent) (\(error.localizedDescription)) — lo dejo donde está")
+        }
+    }
+
+    /// Vacía de la papelera interna lo que pasó de plazo. Se llama al empezar
+    /// cada tanda: no hace falta un temporizador propio para algo que solo tiene
+    /// que ocurrir de vez en cuando.
+    static func purgarPapelera() {
+        let dias = Config.bitacoraPapeleraDias()
+        guard dias > 0 else { return }               // 0 = guardar para siempre
+        let fm = FileManager.default
+        guard let hijos = try? fm.contentsOfDirectory(at: papeleraInterna,
+                                                      includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+        let limite = Date().addingTimeInterval(-Double(dias) * 86_400)
+        var borrados = 0, bytes: Int64 = 0
+        for h in hijos {
+            let fecha = (try? h.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            guard let fecha, fecha < limite else { continue }
+            let tam = ((try? fm.attributesOfItem(atPath: h.path))?[.size] as? NSNumber)?.int64Value ?? 0
+            if (try? fm.removeItem(at: h)) != nil { borrados += 1; bytes += tam }
+        }
+        if borrados > 0 {
+            Log.log(.sistema, "bitácora: la papelera soltó \(borrados) trozos de ruido de más de \(dias) días (\(bytes / 1_048_576) MB)")
+        }
+    }
+
     private static func guardarTexto(_ texto: String, junto url: URL) {
         guard url.path.hasPrefix(Config.continuoCarpeta().path) else { return }
         guard !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }

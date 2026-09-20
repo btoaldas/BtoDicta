@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.71.0"
+    static let numero = "0.72.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.72.0", "2026-09-19", [
+            "CUATRO MOTORES ESTABAN MUDOS POR UNA LÍNEA QUE FALTABA. AssemblyAI, Gladia, Soniox y Speechmatics subían el audio, el servicio lo transcribía en segundos y lo dejaba listo… y la aplicación no iba a recogerlo NUNCA: la consulta del resultado se creaba sin arrancarla. Se pagaba la transcripción y se tiraba. Gladia y AssemblyAI ya responden en 7-8 s; Soniox ahora dice claramente que su cuenta no tiene saldo, en vez de quedarse callado",
+            "UN PORTERO LOCAL ANTES DE GASTAR: un motor que va en el sistema escucha primero el trozo y solo abre la puerta si alguien habló. Lo que se entrega lo sigue produciendo el motor que tú pongas primero. Medido con el ruido real de una oficina: de 12 trozos de ambiente, antes llegaban los 12 al motor de pago; ahora llega 1, y las voces pasan todas",
+            "El porqué: la bitácora mandaba 764 minutos de audio al día a un servicio de pago, y 414 de esas llamadas volvían sin una sola palabra",
+            "PAPELERA PROPIA para el ruido: lo que dos detectores independientes dan por mudo se aparta en vez de borrarse, se puede recuperar una semana y luego se suelta solo. Apagado de fábrica",
+        ]),
         ("0.71.0", "2026-09-19", [
             "AHORA SE PUEDE PEDIR UN MOTOR CONCRETO por la API local, por su nombre y sin cascada detrás. Sirve para comparar motores de verdad: con respaldo, un motor que falla queda indistinguible de uno que acierta, porque contesta otro en su lugar. Si el nombre no existe, lo dice y lista los activos en vez de callar y usar otro",
             "Con eso se midieron los 20 motores con el mismo audio y la misma referencia. Cuatro transcriben sin un solo error; el que la cascada usa primero comete 1,86 %",

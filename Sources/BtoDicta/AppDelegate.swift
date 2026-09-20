@@ -2333,6 +2333,90 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             func chk(_ ok: Bool, _ q: String) { print("SILENCIO \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
             let fm = FileManager.default
 
+            // Carpeta con trozos etiquetados por su NOMBRE: los que empiezan por
+            // «ambiente» no deben enviarse; los que empiezan por «voz», sí.
+            // Un detector que acierte en teoría pero falle contra el ruido real
+            // de esta oficina no sirve de nada — eso fue justamente lo que pasó.
+            if let dir = ProcessInfo.processInfo.environment["BTODICTA_SILENCIODIR"] {
+                let u = URL(fileURLWithPath: dir)
+                let archivos = ((try? fm.contentsOfDirectory(at: u, includingPropertiesForKeys: nil)) ?? [])
+                    .filter { $0.pathExtension == "wav" }.sorted { $0.path < $1.path }
+                var falsosEnvios = 0, vocesPerdidas = 0, amb = 0, voz = 0
+                for a in archivos {
+                    let nombre = a.lastPathComponent
+                    let silencio = AudioSilencio.esSilencio(a)
+                    if nombre.hasPrefix("ambiente") {
+                        amb += 1; if !silencio { falsosEnvios += 1 }
+                    } else if nombre.hasPrefix("voz") {
+                        voz += 1; if silencio { vocesPerdidas += 1 }
+                    }
+                }
+                print("SILENCIO contra audio REAL: \(amb) trozos de ambiente, \(voz) de voz")
+                chk(vocesPerdidas == 0,
+                    "no se descarta NI UNA voz (\(voz - vocesPerdidas)/\(voz) reconocidas)")
+                chk(falsosEnvios <= amb / 5,
+                    "el ambiente ya no se manda a la nube (\(amb - falsosEnvios)/\(amb) frenados, antes 0)")
+                // Y el PORTERO sobre los mismos trozos: un motor local decide
+                // si hubo voz. Aquí no importa que transcriba bien, solo que
+                // acierte al abrir o cerrar la puerta.
+                if let portero = Config.bitacoraPortero() {
+                    var pAmb = 0, pVoz = 0, aciertoAmb = 0, aciertoVoz = 0, dudas = 0
+                    for a in archivos {
+                        let v = PorteroVoz.hayVoz(en: a, motor: portero)
+                        if a.lastPathComponent.hasPrefix("ambiente") {
+                            pAmb += 1
+                            if v == .silencio { aciertoAmb += 1 }
+                            if v == .noSePudo { dudas += 1 }
+                        } else if a.lastPathComponent.hasPrefix("voz") {
+                            pVoz += 1
+                            if v == .hayVoz { aciertoVoz += 1 }
+                            if v == .noSePudo { dudas += 1 }
+                        }
+                    }
+                    print("SILENCIO portero «\(portero)»: ambiente \(aciertoAmb)/\(pAmb) frenado · voz \(aciertoVoz)/\(pVoz) dejada pasar · \(dudas) dudas")
+                    chk(aciertoVoz == pVoz, "el portero no cierra la puerta a NINGUNA voz")
+
+                    // Lo que de verdad importa es la CADENA, que es como
+                    // funciona en producción: primero el filtro de energía, y
+                    // solo lo que pasa llega al portero. Medir cada puerta por
+                    // separado da un número peor que el real.
+                    var pasanTodo = 0, vocesEntregadas = 0
+                    for a in archivos {
+                        let esAmbiente = a.lastPathComponent.hasPrefix("ambiente")
+                        if AudioSilencio.esSilencio(a) { continue }              // puerta 1
+                        if PorteroVoz.hayVoz(en: a, motor: portero) == .silencio { continue }  // puerta 2
+                        if esAmbiente { pasanTodo += 1 } else { vocesEntregadas += 1 }
+                    }
+                    print("SILENCIO las dos puertas juntas: \(pasanTodo)/\(pAmb) trozos de ambiente llegan al motor de pago (antes \(pAmb)/\(pAmb))")
+                    chk(vocesEntregadas == pVoz, "toda la voz llega al motor bueno (\(vocesEntregadas)/\(pVoz))")
+                    chk(pasanTodo <= 1, "y casi nada de ambiente lo alcanza (\(pasanTodo) de \(pAmb))")
+                }
+                // La papelera interna: aparta, guarda unos días, y purga sola.
+                // Lo que se comprueba es que NO borra al momento y que SÍ borra
+                // lo caducado — un archivo que desaparece el mismo día no da
+                // tiempo a desdecirse, y uno que no desaparece nunca no es una
+                // papelera, es un armario.
+                let fm2 = FileManager.default
+                let pap = ContinuoLote.papeleraInterna
+                try? fm2.createDirectory(at: pap, withIntermediateDirectories: true)
+                let reciente = pap.appendingPathComponent("20260919-reciente.wav")
+                let caduco = pap.appendingPathComponent("20260101-caduco.wav")
+                fm2.createFile(atPath: reciente.path, contents: Data(repeating: 0, count: 100))
+                fm2.createFile(atPath: caduco.path, contents: Data(repeating: 0, count: 100))
+                // Envejecer el segundo más allá del plazo.
+                let viejo = Date().addingTimeInterval(-Double(Config.bitacoraPapeleraDias() + 3) * 86_400)
+                try? fm2.setAttributes([.modificationDate: viejo], ofItemAtPath: caduco.path)
+                ContinuoLote.purgarPapelera()
+                chk(fm2.fileExists(atPath: reciente.path),
+                    "lo retirado hace poco sigue recuperable")
+                chk(!fm2.fileExists(atPath: caduco.path),
+                    "y lo que pasó de \(Config.bitacoraPapeleraDias()) días se suelta solo")
+                try? fm2.removeItem(at: reciente)
+
+                print("SILENCIO \(mal == 0 ? "REAL OK" : "REAL FALLA")")
+                exit(mal == 0 ? 0 : 1)
+            }
+
             // 1) Audio fabricado: silencio puro y voz clara.
             let carpeta = fm.temporaryDirectory.appendingPathComponent("silenciotest-\(UUID().uuidString)")
             try? fm.createDirectory(at: carpeta, withIntermediateDirectories: true)
