@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.75.0
+
+- **El filtro del navegador mira la pestaña activa**, por su dirección: mirando
+  YouTube no graba; escribiendo un correo con un vídeo detrás, sí.
+- La dirección evita el engaño del título (un artículo *sobre* YouTube no es un
+  vídeo). Chrome, Edge, Brave, Safari y Arc.
+
 ### Novedades 0.74.0
 
 - **Filtro de bitácora por aplicación y título**: el juego, el reproductor o

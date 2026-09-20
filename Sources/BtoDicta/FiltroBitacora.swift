@@ -59,6 +59,37 @@ enum FiltroBitacora {
 
     // MARK: El veredicto
 
+    /// Lo que mira el filtro cuando al frente hay un navegador: la URL de la
+    /// PESTAÑA ACTIVA, no solo el título de la ventana.
+    ///
+    /// Un navegador no trabaja por ventanas sino por pestañas: en la misma
+    /// ventana conviven un vídeo y el correo. El título ayuda —refleja la
+    /// pestaña activa— pero puede engañar: un artículo llamado «Por qué dejé
+    /// YouTube» quedaría excluido sin ser un vídeo. La URL no se presta a eso.
+    ///
+    /// **Lo que NO se puede saber, y conviene decirlo:** qué pestaña está
+    /// sonando. Los navegadores lo saben y lo muestran con el altavoz en la
+    /// pestaña, pero no lo exponen a otras aplicaciones — comprobado el
+    /// 2026-09-20: `audible of active tab` da error -1700, y las únicas
+    /// propiedades que ofrecen son URL, name, loading, class e id. Solo una
+    /// extensión instalada dentro del navegador podría leerlo.
+    ///
+    /// No hace falta: el criterio es **qué pestaña estás mirando**. Con un vídeo
+    /// sonando detrás mientras escribes un correo, la pestaña activa es el
+    /// correo y el trozo se guarda, que es lo correcto.
+    ///
+    /// Firefox queda fuera de esto: no expone sus pestañas por AppleScript. Ahí
+    /// se sigue mirando el título de la ventana, que también refleja la pestaña
+    /// activa aunque sea menos preciso.
+    static func contextoDelFrente() -> (app: String?, pista: String?) {
+        let frente = ContextoApp.alFrente()
+        let app = frente.nombre.isEmpty ? nil : frente.nombre
+        if let url = ContextoApp.urlNavegador(frente.bundleId), !url.isEmpty {
+            return (app, url)
+        }
+        return (app, ContinuoPantalla.tituloVentanaAlFrente())
+    }
+
     static func decidir(app: String?, ventana: String?) -> Veredicto {
         guard hayReglas else { return .entra }
         let a = normalizar(app ?? "")

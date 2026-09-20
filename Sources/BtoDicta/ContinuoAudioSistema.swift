@@ -33,7 +33,7 @@ final class ContinuoAudioSistema: NSObject {
     /// Quién tenía el foco al empezar el trozo. Se compara con quién lo tiene al
     /// cerrarlo: solo se descarta si coinciden, porque un cambio de aplicación a
     /// mitad significa que en esos 30 s pasó algo más que el juego.
-    private var focoAlAbrir: (app: String?, ventana: String?) = (nil, nil)
+    private var focoAlAbrir: (app: String?, pista: String?) = (nil, nil)
     private var inicioTrozo = Date()
     private var bytesTrozo = 0
 
@@ -272,8 +272,7 @@ final class ContinuoAudioSistema: NSObject {
         mano = try? FileHandle(forWritingTo: url)
         rutaTrozo = url
         inicioTrozo = ahora
-        focoAlAbrir = (NSWorkspace.shared.frontmostApplication?.localizedName,
-                       ContinuoPantalla.tituloVentanaAlFrente())
+        focoAlAbrir = FiltroBitacora.contextoDelFrente()
         bytesTrozo = 0
     }
 
@@ -298,10 +297,9 @@ final class ContinuoAudioSistema: NSObject {
         // Si cambiaste de aplicación a mitad, en esos treinta segundos pasó algo
         // más y el trozo se conserva — ante la duda, se guarda.
         if FiltroBitacora.hayReglas {
-            let ahoraFoco = (NSWorkspace.shared.frontmostApplication?.localizedName,
-                             ContinuoPantalla.tituloVentanaAlFrente())
-            let alAbrir = FiltroBitacora.decidir(app: focoAlAbrir.app, ventana: focoAlAbrir.ventana)
-            let alCerrar = FiltroBitacora.decidir(app: ahoraFoco.0, ventana: ahoraFoco.1)
+            let ahoraFoco = FiltroBitacora.contextoDelFrente()
+            let alAbrir = FiltroBitacora.decidir(app: focoAlAbrir.app, ventana: focoAlAbrir.pista)
+            let alCerrar = FiltroBitacora.decidir(app: ahoraFoco.app, ventana: ahoraFoco.pista)
             if case .fuera(let motivo) = alAbrir, case .fuera = alCerrar {
                 // No se borra: se aparta a la papelera de la bitácora, donde se
                 // puede recuperar unos días. Lo que hoy no interesa puede

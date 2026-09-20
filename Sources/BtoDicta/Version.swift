@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.74.0"
+    static let numero = "0.75.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.75.0", "2026-09-20", [
+            "EL FILTRO DEL NAVEGADOR MIRA LA PESTAÑA, NO LA VENTANA. Un navegador no trabaja por ventanas: en la misma conviven un vídeo y el correo. Ahora se lee la dirección de la pestaña que tienes delante, así que mirando YouTube no se graba, y escribiendo un correo con un vídeo sonando detrás SÍ se graba",
+            "Usar la dirección en vez del título evita confusiones: un artículo que HABLA de YouTube ya no se toma por un vídeo de YouTube",
+            "Funciona con Chrome, Edge, Brave, Safari y Arc. Firefox no deja consultar sus pestañas, así que ahí se sigue mirando el título de la ventana",
+        ]),
         ("0.74.0", "2026-09-20", [
             "LA BITÁCORA YA NO ANOTA TU OCIO. Puedes decirle qué aplicaciones y qué títulos de ventana no te interesan —un juego, un reproductor, YouTube, Instagram— y deja de grabar su sonido y sus capturas. El sonido de esas aplicaciones NI SE CAPTURA: da igual que el juego esté minimizado, que la música suene en otro monitor o que tengas el foco en otra cosa",
             "Una lista de excepciones GANA siempre a la de exclusiones: puedes apartar un navegador entero y rescatar las reuniones que ocurren dentro de él",

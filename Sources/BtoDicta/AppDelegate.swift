@@ -3156,6 +3156,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                            ("bitacora_incluir_apps", previas.2), ("bitacora_incluir_titulos", previas.3)] {
                 Config.set(k, to: v ?? [String]())
             }
+            // 7) El navegador trabaja por PESTAÑAS, no por ventanas: en la
+            //    misma ventana conviven un vídeo y el correo. Lo que decide es
+            //    la pestaña que se está mirando. URLs reales del equipo.
+            Config.set("bitacora_excluir_apps", to: [String]())
+            Config.set("bitacora_incluir_apps", to: [String]())
+            Config.set("bitacora_excluir_titulos", to: ["youtube", "facebook", "instagram", "tiktok", "netflix"])
+            Config.set("bitacora_incluir_titulos", to: ["meet.google", "teams", "zoom", "gmail"])
+            chk(!entra("Brave Browser", "https://www.youtube.com/watch?v=1VMNr2jLRSg"),
+                "mirando YouTube: no se graba")
+            chk(entra("Microsoft Edge", "https://mail.google.com/mail/u/0/#inbox"),
+                "mirando Gmail con un vídeo sonando detrás: SÍ se graba")
+            chk(!entra("Microsoft Edge", "https://www.facebook.com/watch/live/?v=21579251447"),
+                "un directo de Facebook: no se graba")
+            chk(entra("Microsoft Edge", "https://meet.google.com/abc-defg-hij"),
+                "una reunión en el mismo navegador: se graba")
+            chk(entra("Google Chrome", "https://quipux.uea.edu.ec/bandeja"),
+                "y el trabajo de siempre entra")
+            // La URL evita el engaño del título: un artículo que HABLA de
+            // YouTube no es un vídeo de YouTube.
+            chk(entra("Microsoft Edge", "https://elpais.com/tecnologia/por-que-deje-el-video"),
+                "un artículo sobre vídeos no se confunde con un vídeo (gracias a la URL)")
+
             print("FILTRO \(mal == 0 ? "TODO OK — entra el trabajo, se aparta el ocio" : "FALLA (\(mal))")")
             exit(mal == 0 ? 0 : 1)
         }

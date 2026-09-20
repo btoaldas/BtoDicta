@@ -1067,6 +1067,28 @@ otro monitor o con el foco puesto en otra cosa.
 **Lo que queda fuera no se borra**: va a la papelera de la bitácora
 (`~/.btodicta/papelera-bitacora/`), recuperable unos días.
 
+**En el navegador se mira la PESTAÑA, no la ventana** (0.75.0). Un navegador no
+trabaja por ventanas: en la misma conviven un vídeo y el correo. Se lee la
+dirección de la pestaña activa, de modo que:
+
+| Lo que tienes delante | ¿Se graba? |
+|---|---|
+| YouTube | No |
+| Gmail, con un vídeo sonando en otra pestaña | **Sí** |
+| Un directo de Facebook | No |
+| Una reunión de Meet en ese mismo navegador | **Sí** |
+
+Usar la dirección y no el título evita confusiones: un artículo que *habla* de
+YouTube no es un vídeo de YouTube.
+
+Funciona con Chrome, Edge, Brave, Safari y Arc. **Firefox no permite consultar
+sus pestañas** desde fuera, así que ahí se mira el título de la ventana.
+
+**Lo que no se puede saber:** qué pestaña está sonando. El navegador lo sabe y lo
+muestra con el altavoz, pero no lo expone a otras aplicaciones (`audible` no
+existe en su interfaz). No hace falta para esto: lo que decide es la pestaña que
+estás mirando.
+
 **Un límite que conviene conocer.** Dentro de un navegador, YouTube y una reunión
 son la misma aplicación, y el sistema no puede separar su sonido. Ahí el filtro
 se apoya en el título de la ventana activa, que acierta cuando el vídeo está
