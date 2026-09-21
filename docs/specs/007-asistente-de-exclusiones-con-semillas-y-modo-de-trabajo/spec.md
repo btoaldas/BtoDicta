@@ -1,11 +1,11 @@
 # Spec 007 — Asistente de exclusiones con semillas y modo de trabajo
 
-- Estado: Borrador
+- Estado: Aprobada
 - Tipo: funcionalidad
 - Nivel: P (heredado del ROADMAP; lo fija sw-ciclo)
 - Fecha: 2026-09-21
 - Modifica: ninguna
-- Aprobada por: PENDIENTE
+- Aprobada por: Alberto — 2026-09-21 — «si dale» (a «¿Apruebo la spec y paso al plan?»)
 - Rama: `main` (como el resto del trabajo reciente del proyecto)
 
 ## 1. Problema y propósito
