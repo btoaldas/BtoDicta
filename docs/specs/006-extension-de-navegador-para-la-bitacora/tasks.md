@@ -73,6 +73,9 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
 - [x] T24 (RF-09) Sacar la extensión desde la aplicación al sitio que se elija, con su manual — `Sources/BtoDicta/ExportarExtension.swift`, `Sources/BtoDicta/SettingsWindow.swift` — Evidencia esperada: una acción deja la carpeta con la extensión y un manual en español
   - Evidencia (2026-09-20): botón «Sacarla a una carpeta…» en Ajustes. Deja `manifest.json` con el nombre que el navegador espera, el código y `COMO-INSTALAR.md` con los pasos reales y la versión de la que salió. Exportar dos veces reemplaza sin fallar, y lo anterior va a la Papelera por si alguien dejó algo dentro
 
+- [x] T25 (RF-10) Menú en el icono: estado de la conexión y excluir o volver a mirar la página actual con un clic — `extension/src/menu.html`, `extension/src/menu.js`, `extension/manifest.chromium.json` — Evidencia esperada: el menú dice si BtoDicta responde y el botón alterna según el dominio esté o no excluido
+  - Evidencia (2026-09-20): `default_popup` declarado y presente en el paquete (10 archivos). Cuatro estados de conexión distinguidos: sin clave, clave rechazada (401), sin respuesta y conectada con el tiempo del último aviso. El mismo botón excluye y devuelve — quien se equivoca tiene la vuelta atrás donde la usó, no en otra pantalla. **Falta la comprobación visual, que la hace Alberto en Edge**
+
 ## Fase F — Cierre
 
 - [ ] T21 (todos) Verificación RF por RF con segundo ángulo y prueba negativa — `docs/specs/006-extension-de-navegador-para-la-bitacora/verificacion.md` — Evidencia esperada: tabla con los 7 RF y los 4 RNF, cada uno con veredicto

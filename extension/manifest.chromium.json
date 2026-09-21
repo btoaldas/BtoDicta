@@ -3,23 +3,42 @@
   "name": "BtoDicta — bitácora del navegador",
   "version": "0.1.0",
   "description": "Le cuenta a BtoDicta qué pestaña estás mirando y cuál está sonando. Solo observa: no modifica páginas ni bloquea nada.",
-  "permissions": ["tabs", "storage", "alarms", "scripting"],
-  "host_permissions": ["http://127.0.0.1:8787/*", "<all_urls>"],
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8787/*",
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "src/fondo.js",
     "type": "module"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/contenido.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/contenido.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/texto.js", "src/exclusiones.js", "src/navegador.js", "src/enviar.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "src/texto.js",
+        "src/exclusiones.js",
+        "src/navegador.js",
+        "src/enviar.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "options_ui": {
@@ -27,6 +46,7 @@
     "open_in_tab": true
   },
   "action": {
-    "default_title": "BtoDicta — qué no mirar"
+    "default_title": "BtoDicta — bitácora del navegador",
+    "default_popup": "src/menu.html"
   }
 }

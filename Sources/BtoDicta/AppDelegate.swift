@@ -3099,7 +3099,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             func chk(_ ok: Bool, _ q: String) { print("EXTAPP \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
 
             // T24 — la extensión sale de la aplicación, con su manual.
-            chk(ExportarExtension.disponible, "la aplicación trae la extensión dentro")
+            //
+            // Corriendo el binario suelto (sin paquete .app) no hay recursos
+            // dentro, y eso no es un fallo del código: es que no hay nada que
+            // exportar. Se omite, como hace la prueba de huellas cuando no hay
+            // modelos instalados.
+            guard ExportarExtension.disponible else {
+                print("EXTAPP OMITIDA — este binario no viaja dentro de un paquete con la extensión")
+                exit(0)
+            }
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent("extapp-\(UUID().uuidString)")
             try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)

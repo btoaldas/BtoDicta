@@ -171,6 +171,18 @@ parte del día— sin degradar nada de lo que ya funciona.
   - Cuando se pide sacar la extensión al Escritorio
   - Entonces aparece una carpeta con la extensión y un manual de instalación en español
 
+### RF-10 — Un menú en el icono de la extensión
+
+- Actor: la persona que dicta
+- Acción: pulsa el icono de la extensión y ve, en un solo sitio, si está funcionando, si BtoDicta está viva, y puede excluir o volver a mirar la página que tiene delante
+- Resultado: excluir un sitio deja de exigir abrir una pantalla de opciones y teclear un dominio — se hace donde ya se está, sobre la página que se está viendo
+- Medida: excluir la página actual cuesta **un** clic desde el icono, y el estado de la conexión se ve sin salir de ahí
+- Prioridad: P1
+- Criterio de aceptación:
+  - Dado una página abierta que no está excluida
+  - Cuando se pulsa el icono de la extensión
+  - Entonces se ve si BtoDicta está viva y un botón que excluye ese dominio; si ya estaba excluido, el mismo botón lo devuelve
+
 ## 5. Requerimientos no funcionales
 
 | ID | Dimensión | Requerimiento con cifra u observable | Cómo se mide |
@@ -225,6 +237,13 @@ parte del día— sin degradar nada de lo que ya funciona.
   espacio donde el usuario se pueda descargar desde la app a su escritorio o
   donde quiera la extensión con su manual claro de instalación» (decisión de
   Alberto). Nace **RF-09**.
+- P: ¿Cómo se excluye una página sin abrir las opciones? → R: «sería genial que
+  en el icono de BtoDicta del plugin se asomen opciones para activar, desactivar,
+  agregar esa página o url o dominio, o quitarlo si ya está, y que dé un detalle
+  de si está funcionando y BtoDicta está vivo» (decisión de Alberto). Nace
+  **RF-10**. Encaja con el motivo del RF-05: con «leer todo salvo lo excluido»,
+  la velocidad de excluir ES la protección, y un clic sobre la página que se está
+  viendo es más rápido que teclear un dominio en otra pantalla.
 - P: ¿Se prueba en los cuatro navegadores ahora? → R: «estamos solo probando con
   Edge por el momento» (decisión de Alberto). El RF-07 (Firefox) se construye
   pero su comprobación en vivo queda pendiente de que Alberto lo pruebe.

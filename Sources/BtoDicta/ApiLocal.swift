@@ -433,7 +433,15 @@ enum ApiLocal {
         case .fuera(let motivo): decision["se_grabaria"] = false; decision["motivo"] = motivo
         }
 
+        // Si alguna extensión se quedó atrás, el menú del navegador puede
+        // enseñarlo donde el usuario ya está mirando.
+        let viejas = EstadoNavegadores.desactualizadas()
+        var avisoVersion = ""
+        if let v = viejas.first {
+            avisoVersion = "Tu extensión es la \(v.tiene) y esta versión trae la \(v.deberia). Vuelve a sacarla desde Ajustes."
+        }
         responder(conexion, 200, [
+            "aviso_version": avisoVersion,
             "informes": detalle,
             "vigencia_segundos": Int(EstadoNavegadores.segundosDeVigencia()),
             "hay_reglas": FiltroBitacora.hayReglas,

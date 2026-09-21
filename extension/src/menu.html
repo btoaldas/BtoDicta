@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 13px/1.45 -apple-system, system-ui, sans-serif; margin: 0;
+         padding: 14px; width: 288px; }
+  .estado { display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+            padding-bottom: 11px; border-bottom: 1px solid rgba(128,128,128,.25); }
+  .luz { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #999; }
+  .luz.viva { background: #3aa76d; }
+  .luz.muerta { background: #d1534a; }
+  .luz.avisa { background: #d99a2b; }
+  .titulo { font-weight: 600; }
+  .sub { opacity: .7; font-size: 12px; }
+  .pagina { font-size: 12px; opacity: .8; margin-bottom: 10px; word-break: break-all; }
+  button { width: 100%; padding: 8px; font-size: 13px; border-radius: 7px;
+           cursor: pointer; border: 1px solid rgba(128,128,128,.45);
+           background: transparent; margin-bottom: 7px; }
+  button.excluir { background: #d1534a; color: #fff; border-color: #d1534a; }
+  button.volver  { background: #3aa76d; color: #fff; border-color: #3aa76d; }
+  .pie { margin-top: 10px; padding-top: 10px;
+         border-top: 1px solid rgba(128,128,128,.25); }
+  .pie a { font-size: 12px; opacity: .8; cursor: pointer; text-decoration: none;
+           color: inherit; }
+  .pie a:hover { text-decoration: underline; }
+  .aviso { background: rgba(217,154,43,.15); border-radius: 6px; padding: 7px 9px;
+           font-size: 12px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+  <div class="estado">
+    <span class="luz" id="luz"></span>
+    <div>
+      <div class="titulo" id="titulo">Comprobando…</div>
+      <div class="sub" id="detalle"></div>
+    </div>
+  </div>
+
+  <div id="avisoVersion" class="aviso" style="display:none"></div>
+
+  <div class="pagina" id="pagina"></div>
+  <button id="alternar" style="display:none"></button>
+
+  <div class="pie">
+    <a id="opciones">Ver todos los dominios excluidos →</a>
+  </div>
+
+  <script type="module" src="menu.js"></script>
+</body>
+</html>

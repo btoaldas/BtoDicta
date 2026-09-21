@@ -113,7 +113,12 @@ enum EmbeddingServer {
     /// para no retener 400 MB toda la tarde. Arrancar en frío cuesta ~1 s, así
     /// que equivocarse por corto es barato.
     static func minutosDeGracia() -> Double {
-        max(1, (Config.json0("embeddings_apagar_tras_minutos") as? Double) ?? 10)
+        // El mínimo es bajo a propósito. Con `max(1, …)` una gracia de seis
+        // segundos se convertía en sesenta, y como el vigía miraba cada minuto
+        // la espera real llegaba a dos. Eso hacía imposible comprobar el apagado
+        // sin esperar minutos, y una prueba que tarda minutos es una prueba que
+        // no se corre.
+        max(0.05, (Config.json0("embeddings_apagar_tras_minutos") as? Double) ?? 10)
     }
 
     /// Se duerme solo cuando nadie lo usa, y libera la memoria del modelo.
@@ -133,7 +138,11 @@ enum EmbeddingServer {
         candadoVigia.lock(); defer { candadoVigia.unlock() }
         guard vigia == nil else { return }
         let t = DispatchSource.makeTimerSource(queue: colaVigia)
-        t.schedule(deadline: .now() + 60, repeating: 60)
+        // Se mira a mitad de la gracia, con tope de un minuto: con gracia larga
+        // basta mirar de vez en cuando, y con gracia corta hay que mirar pronto
+        // o el apagado llegaría al doble de tarde de lo pedido.
+        let cada = min(60.0, max(2.0, minutosDeGracia() * 60 / 2))
+        t.schedule(deadline: .now() + cada, repeating: cada)
         t.setEventHandler {
             guard corriendo else { return }
             let ocioso = Date().timeIntervalSince(ultimoUso)
