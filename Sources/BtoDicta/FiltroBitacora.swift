@@ -124,24 +124,40 @@ enum FiltroBitacora {
     }
 
     static func decidir(app: String?, ventana: String?) -> Veredicto {
-        guard hayReglas else { return .entra }
+        decidir(app: app, ventana: ventana,
+                excluirApps: appsExcluidas(), excluirTitulos: titulosExcluidos(),
+                incluirApps: appsIncluidas(), incluirTitulos: titulosIncluidos())
+    }
+
+    /// La decisión, sin leer nada de disco.
+    ///
+    /// Está separada de la anterior para poder probarla. `decidir(app:ventana:)`
+    /// saca las listas de `Config`, que apunta al `config.json` de quien esté
+    /// usando el equipo: una prueba escrita contra ella mediría la configuración
+    /// real del usuario en vez de la regla, y cambiaría de resultado según el día.
+    static func decidir(app: String?, ventana: String?,
+                        excluirApps: [String], excluirTitulos: [String],
+                        incluirApps: [String], incluirTitulos: [String]) -> Veredicto {
+        // Sin una sola regla escrita no se mira nada: el caso normal es que el
+        // usuario no haya configurado nada y todo entre.
+        guard !excluirApps.isEmpty || !excluirTitulos.isEmpty else { return .entra }
         let a = normalizar(app ?? "")
         let v = normalizar(ventana ?? "")
 
         // La lista blanca manda. Va PRIMERO a propósito: sirve para rescatar
         // excepciones de una regla ancha («no grabes el navegador, salvo las
         // reuniones»), y eso solo funciona si se mira antes de excluir.
-        for permitida in appsIncluidas() where !a.isEmpty && a.contains(normalizar(permitida)) {
+        for permitida in incluirApps where !a.isEmpty && a.contains(normalizar(permitida)) {
             return .entra
         }
-        for permitido in titulosIncluidos() where !v.isEmpty && v.contains(normalizar(permitido)) {
+        for permitido in incluirTitulos where !v.isEmpty && v.contains(normalizar(permitido)) {
             return .entra
         }
 
-        for excluida in appsExcluidas() where !a.isEmpty && a.contains(normalizar(excluida)) {
+        for excluida in excluirApps where !a.isEmpty && a.contains(normalizar(excluida)) {
             return .fuera("la aplicación «\(app ?? "")» está en tu lista de excluidas")
         }
-        for excluido in titulosExcluidos() where !v.isEmpty && v.contains(normalizar(excluido)) {
+        for excluido in excluirTitulos where !v.isEmpty && v.contains(normalizar(excluido)) {
             return .fuera("el título contiene «\(excluido)», que excluiste")
         }
         return .entra
