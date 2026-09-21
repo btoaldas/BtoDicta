@@ -1,9 +1,9 @@
 # Plan técnico 007 — Asistente de exclusiones con semillas y modo de trabajo
 
-- Estado: Borrador
+- Estado: Aprobado
 - Fecha: 2026-09-21
 - Spec: `spec.md` (Aprobada 2026-09-21, nivel P)
-- Aprobado por: PENDIENTE
+- Aprobado por: Alberto — 2026-09-21 — «si» (a «¿Apruebo el plan y paso a las tareas?»)
 
 ## 1. Lo que se encontró antes de planificar
 
