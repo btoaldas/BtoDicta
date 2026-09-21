@@ -45,15 +45,20 @@ asistente escribe **siempre** por `Config.set`, nunca tocando el archivo.
 
 ## 2. Comprobación contra la constitución
 
-| Regla | Cómo la cumple este plan |
-|---|---|
-| MANIFIESTO: lo que se graba es del usuario y no sale del equipo | Las semillas viajan embarcadas; cero consultas de red al proponer o aceptar |
-| Nivel P (piloto/interno) | Prueba por RF, verificación con segundo ángulo, sin exigir rama propia |
-| Features parametrizables | Modo, categorías y cada entrada: todo configurable y reversible |
-| Valor de fábrica peligroso = fallo | El modo restrictivo con inclusiones vacías avisa antes de guardar (RF-08) |
-| Avisar antes de cambiar | Nada se escribe hasta Aceptar (RNF-02) |
-| Datos genéricos en el repo | El catálogo son dominios públicos; ni un dato del usuario |
-| Sin secretos | No hay credenciales en juego |
+- [x] **MANIFIESTO — lo que se graba es del usuario y no sale del equipo.** Las
+      semillas viajan embarcadas; cero consultas de red al proponer o al aceptar.
+- [x] **Nivel P.** Una prueba por RF, verificación con segundo ángulo, sin exigir
+      rama propia.
+- [x] **Features parametrizables.** Modo, categorías y cada entrada: todo
+      configurable y reversible.
+- [x] **Un valor de fábrica peligroso es un fallo.** El modo restrictivo con la
+      lista de inclusiones vacía avisa antes de guardar (RF-08).
+- [x] **Avisar antes de cambiar.** Nada se escribe hasta pulsar Aceptar (RNF-02).
+- [x] **Datos genéricos en el repo.** El catálogo son dominios públicos; ni un
+      dato del usuario.
+- [x] **Sin secretos.** No hay credenciales en juego.
+- [x] **Tres capas.** El catálogo es dato, la decisión es `FiltroBitacora` sin
+      leer disco, y la interfaz solo presenta y confirma.
 
 ## 3. Componentes
 
