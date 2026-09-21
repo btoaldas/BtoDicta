@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BtoDicta — bitácora del navegador",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Le cuenta a BtoDicta qué pestaña estás mirando y cuál está sonando. Solo observa: no modifica páginas ni bloquea nada.",
   "permissions": [
     "tabs",
@@ -34,7 +34,8 @@
         "src/texto.js",
         "src/exclusiones.js",
         "src/navegador.js",
-        "src/enviar.js"
+        "src/enviar.js",
+        "src/diagnostico.js"
       ],
       "matches": [
         "<all_urls>"

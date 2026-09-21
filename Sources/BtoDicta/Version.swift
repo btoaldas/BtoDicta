@@ -8,11 +8,15 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.76.0"
+    static let numero = "0.76.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.76.1", "2026-09-20", [
+            "LA EXTENSIÓN SE REVISA SOLA Y TE DICE QUÉ FALLA. Antes podía dejar de enviar sin avisar de nada: se descubría días después mirando si habían llegado informes. Ahora su pantalla comprueba seis cosas en orden —permisos, clave, si BtoDicta responde, si acepta la clave, si llegan tus avisos— y cuando algo falla dice EXACTAMENTE qué hacer, no solo que falló",
+            "Al pegar la clave se comprueba en el acto si sirve, en vez de guardarla en silencio",
+        ]),
         ("0.76.0", "2026-09-20", [
             "EXTENSIÓN PARA EL NAVEGADOR, opcional. La bitácora no puede saber desde fuera qué pestaña está sonando —el sistema no lo deja ver— y sin ese dato un vídeo de fondo acaba anotado como si fuera trabajo. La extensión se lo cuenta, y de paso aporta el texto real de las páginas en vez del reconocimiento de la imagen: medido, once veces más texto y sin errores de lectura",
             "SE SACA DESDE AJUSTES y la clave se copia sola: al pulsar «Sacarla a una carpeta…» ya la llevas en el portapapeles, con los pasos a la vista. Antes había que encender la puerta local, buscar el token y recordar dónde pegarlo",

@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.76.1
+
+- **La extensión se diagnostica sola**: seis comprobaciones encadenadas, cada
+  fallo con su instrucción. Antes podía quedarse muda sin avisar.
+- Al pegar la clave se comprueba en el acto si sirve.
+
 ### Novedades 0.76.0
 
 - **Extensión de navegador opcional**: le cuenta a la bitácora qué pestaña suena

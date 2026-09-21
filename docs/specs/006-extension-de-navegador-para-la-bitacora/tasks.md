@@ -86,6 +86,9 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
 - [x] T26 (RF-11) Ruta fija que la aplicación refresca al arrancar si la versión cambió — `Sources/BtoDicta/ExportarExtension.swift`, `Sources/BtoDicta/AppDelegate.swift` — Evidencia esperada: tras instalar una versión nueva, los archivos de la ruta fija son los nuevos sin que nadie exporte
   - Evidencia (2026-09-20): degradada la ruta a 0.0.9 a propósito y reabierta la app → pasa sola a 0.1.0 con el aviso «recárgala en el navegador para que la recoja». Solo copia cuando hay diferencia: reescribir en cada arranque haría que el navegador la viera modificada siempre
 
+- [x] T27 (RF-12) Autodiagnóstico en la pantalla de la extensión: qué funciona, qué no, y qué hacer — `extension/src/opciones.html`, `extension/src/opciones.js`, `extension/src/diagnostico.js` — Evidencia esperada: con la clave sin poner, dice qué falta y cómo; con todo bien, lo confirma
+  - Evidencia (2026-09-20): seis comprobaciones encadenadas en el orden en que dependen unas de otras —permisos, clave, BtoDicta viva, clave aceptada, informes llegando, dominios excluidos—. Cada fallo trae su instrucción concreta. Al guardar la clave se revisa EN EL ACTO: guardarla en silencio fue lo que permitió que la extensión estuviera muda sin que nadie lo supiera. El menú del icono resume el primer fallo
+
 ## Fase F — Cierre
 
 - [x] T21 (todos) Verificación RF por RF con segundo ángulo y prueba negativa — `docs/specs/006-extension-de-navegador-para-la-bitacora/verificacion.md` — Evidencia esperada: tabla con los 7 RF y los 4 RNF, cada uno con veredicto

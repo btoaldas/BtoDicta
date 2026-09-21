@@ -195,6 +195,18 @@ parte del día— sin degradar nada de lo que ya funciona.
   - Cuando arranca una versión nueva de BtoDicta
   - Entonces los archivos de esa ruta pasan a ser los nuevos, y el navegador los usa al recargar la extensión
 
+### RF-12 — La extensión se diagnostica sola
+
+- Actor: la persona que dicta
+- Acción: abre la extensión y ve qué funciona y qué no, con el motivo y qué hacer
+- Resultado: cuando algo falla se entera en el momento y sabe por dónde seguir, en vez de descubrir días después que no se estaba guardando nada
+- Medida: cada comprobación (clave puesta, BtoDicta viva, clave aceptada, informes llegando) muestra su estado y, si falla, una instrucción concreta
+- Prioridad: P1
+- Criterio de aceptación:
+  - Dado una extensión con la clave sin poner o mal puesta
+  - Cuando se abre su pantalla de configuración
+  - Entonces dice exactamente qué falta y cómo resolverlo, sin que el usuario tenga que mirar registros
+
 ## 5. Requerimientos no funcionales
 
 | ID | Dimensión | Requerimiento con cifra u observable | Cómo se mide |
@@ -249,6 +261,10 @@ parte del día— sin degradar nada de lo que ya funciona.
   espacio donde el usuario se pueda descargar desde la app a su escritorio o
   donde quiera la extensión con su manual claro de instalación» (decisión de
   Alberto). Nace **RF-09**.
+- P: ¿Por qué no supe que no funcionaba? → R: «le pongo la clave y ni siquiera
+  me dice está mal, está bien… necesito ver el estado de los que están, de los
+  que no están, los logs, cómo así está funcionando» (petición de Alberto, tras
+  quedarse la extensión sin enviar sin que nada lo avisara). Nace **RF-12**.
 - P: ¿Puede el plugin actualizarse solo? → R: «el propio plugin se puede
   autoactualizar para que se conecte bien a BtoDicta… porque si no BtoDicta no va
   a saber si el plugin funciona y el plugin no va a saber si BtoDicta le escucha»

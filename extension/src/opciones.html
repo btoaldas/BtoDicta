@@ -21,6 +21,16 @@
        margin-bottom: 6px; }
   li button { padding: 3px 9px; font-size: 12px; }
   .vacio { opacity: .6; padding: 14px 0; }
+  .chk { display: flex; gap: 9px; align-items: flex-start; padding: 8px 0;
+         border-bottom: 1px solid rgba(128,128,128,.18); }
+  .chk:last-child { border-bottom: none; }
+  .marca { flex: none; width: 17px; text-align: center; font-weight: 700; }
+  .ok .marca { color: #3aa76d; }
+  .mal .marca { color: #d1534a; }
+  .chk-t { font-weight: 600; }
+  .chk-d { font-size: 12px; opacity: .78; }
+  .chk-a { font-size: 12px; margin-top: 3px; padding: 6px 8px; border-radius: 6px;
+           background: rgba(217,154,43,.16); }
   .nota { margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(128,128,128,.25);
           opacity: .75; font-size: 13px; }
 </style>
@@ -33,6 +43,10 @@
     <button id="guardarToken">Guardar</button>
   </div>
   <p class="sub" id="estadoToken"></p>
+
+  <h1 style="margin-top:24px">¿Está funcionando?</h1>
+  <div id="diagnostico"></div>
+  <button id="revisar" style="width:100%;margin-top:8px">Volver a revisar</button>
 
   <h1 style="margin-top:26px">Qué no debe mirar la bitácora</h1>
   <p class="sub">De fábrica esta lista está vacía: se mira todo hasta que tú digas lo contrario.</p>

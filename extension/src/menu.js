@@ -16,6 +16,7 @@
 import { api } from "./navegador.js";
 import { leerExcluidos, excluir, dejarDeExcluir, dominioDe, estaExcluida } from "./exclusiones.js";
 import { leerToken } from "./enviar.js";
+import { revisar, resumir } from "./diagnostico.js";
 
 const $ = (id) => document.getElementById(id);
 const API = "http://127.0.0.1:8787";
@@ -96,8 +97,20 @@ async function pintar() {
     if (fuera) await dejarDeExcluir(dominio);
     else await excluir(dominio);
     pintar();
+pintarResumen();
   };
+}
+
+// Si algo va mal, el menú lo dice Y ofrece el sitio donde arreglarlo. Antes
+// mostraba el problema y dejaba al usuario buscando.
+async function pintarResumen() {
+  const r = resumir(await revisar());
+  if (r.ok) return;
+  const aviso = document.getElementById("avisoVersion");
+  aviso.textContent = r.texto;
+  aviso.style.display = "block";
 }
 
 $("opciones").addEventListener("click", () => api.runtime.openOptionsPage());
 pintar();
+pintarResumen();

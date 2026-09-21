@@ -8,6 +8,7 @@
 
 import { leerExcluidos, excluir, dejarDeExcluir, normalizarDominio } from "./exclusiones.js";
 import { leerToken, guardarToken } from "./enviar.js";
+import { revisar } from "./diagnostico.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -27,7 +28,46 @@ async function pintar() {
     quitar.textContent = "Volver a mirar";
     quitar.addEventListener("click", async () => {
       await dejarDeExcluir(d);
-      async function pintarToken() {
+      async function pintarDiagnostico() {
+  const caja = $("diagnostico");
+  caja.replaceChildren();
+  const cargando = document.createElement("div");
+  cargando.className = "chk-d";
+  cargando.textContent = "Comprobando…";
+  caja.append(cargando);
+
+  const pasos = await revisar();
+  caja.replaceChildren();
+  for (const p of pasos) {
+    const fila = document.createElement("div");
+    fila.className = "chk " + (p.ok ? "ok" : "mal");
+    const marca = document.createElement("span");
+    marca.className = "marca";
+    marca.textContent = p.ok ? "✓" : "✗";
+    const cuerpo = document.createElement("div");
+    const t = document.createElement("div");
+    t.className = "chk-t";
+    t.textContent = p.titulo;
+    const d = document.createElement("div");
+    d.className = "chk-d";
+    d.textContent = p.detalle;
+    cuerpo.append(t, d);
+    // La instrucción solo aparece cuando hace falta: un consejo permanente se
+    // vuelve invisible el día que importa.
+    if (!p.ok && p.arreglo) {
+      const a = document.createElement("div");
+      a.className = "chk-a";
+      a.textContent = "→ " + p.arreglo;
+      cuerpo.append(a);
+    }
+    fila.append(marca, cuerpo);
+    caja.append(fila);
+  }
+}
+
+$("revisar").addEventListener("click", pintarDiagnostico);
+
+async function pintarToken() {
   const t = await leerToken();
   $("estadoToken").textContent = t
     ? "Clave guardada. La extensión ya puede hablar con BtoDicta."
@@ -35,13 +75,18 @@ async function pintar() {
 }
 
 $("guardarToken").addEventListener("click", async () => {
-  await guardarToken($("token").value);
+  const valor = $("token").value.trim();
+  await guardarToken(valor);
   $("token").value = "";
-  pintarToken();
+  // Comprobar EN EL ACTO si la clave sirve. Guardarla en silencio fue lo que
+  // permitió que la extensión estuviera muda sin que nadie lo supiera.
+  await pintarToken();
+  await pintarDiagnostico();
 });
 
 pintar();
 pintarToken();
+pintarDiagnostico();
     });
     li.append(nombre, quitar);
     ul.append(li);
