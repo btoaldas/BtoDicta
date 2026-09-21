@@ -101,14 +101,67 @@ def main():
                 males.append(f"la categoría «{c.get('id')}» va a la lista de aplicaciones "
                              f"pero tiene dominios: {', '.join(con_punto)}")
 
+    males += un_solo_escritor()
+
     if males:
         print(f"SEMILLAS FALLA — {len(males)} problemas:")
         for m in males:
             print(f"   · {m}")
         return 1
 
-    print("SEMILLAS TODO OK — ninguna entrada que no pueda coincidir")
+    print("SEMILLAS TODO OK — ninguna entrada que no pueda coincidir, y un solo sitio las escribe")
     return 0
+
+
+def un_solo_escritor():
+    """Las listas del asistente solo se escriben desde un sitio (spec 007, RNF-02).
+
+    «Nada se escribe hasta Aceptar» no se puede afirmar leyendo el código a ojo:
+    basta un `Config.set` suelto en cualquier otro archivo para romperlo, y el
+    fallo sería silencioso — la configuración del usuario cambia y nadie lo pidió.
+
+    Se cuentan los sitios. Se descuentan los bloques del arnés de pruebas, que
+    guardan las listas, las machacan a propósito y las restauran: ese código sí
+    debe escribirlas, y está tras una variable de entorno que nadie tiene puesta
+    en uso normal. Se localizan contando llaves desde la línea de la guarda, no
+    por cercanía de texto, que acertaría por casualidad.
+    """
+    aqui = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    fuentes = os.path.join(aqui, "Sources", "BtoDicta")
+    if not os.path.isdir(fuentes):
+        return []
+
+    escrituras = []
+    for nombre in sorted(os.listdir(fuentes)):
+        if not nombre.endswith(".swift"):
+            continue
+        lineas = open(os.path.join(fuentes, nombre), encoding="utf-8").read().split("\n")
+
+        # Rangos de línea que pertenecen al arnés de pruebas.
+        arnes = set()
+        for i, l in enumerate(lineas):
+            if 'ProcessInfo.processInfo.environment["BTODICTA_' not in l:
+                continue
+            profundidad = 0
+            for j in range(i, len(lineas)):
+                profundidad += lineas[j].count("{") - lineas[j].count("}")
+                arnes.add(j)
+                if j > i and profundidad <= 0:
+                    break
+
+        for i, l in enumerate(lineas):
+            if 'Config.set("bitacora_excluir_' not in l or i in arnes:
+                continue
+            escrituras.append(f"{nombre}:{i + 1}")
+
+    print(f"SEMILLAS escriben las listas: {', '.join(escrituras) if escrituras else 'nadie'}")
+    males = []
+    fuera = [e for e in escrituras if not e.startswith("SemillasExclusion.swift:")]
+    if fuera:
+        males.append("las listas del asistente se escriben fuera de SemillasExclusion: " + ", ".join(fuera))
+    if len(escrituras) > 2:
+        males.append(f"se escriben en {len(escrituras)} sitios; deberían ser 2 (apps y títulos)")
+    return males
 
 
 if __name__ == "__main__":

@@ -136,4 +136,78 @@ enum SemillasExclusion {
         }
         return salida
     }
+
+    // MARK: Calcular y escribir (spec 007, T06, RF-01)
+
+    /// Qué quedaría en cada lista al aceptar. **No escribe nada.**
+    ///
+    /// Está separada de `aplicar` por un motivo concreto: `Config.set` escribe en
+    /// el `config.json` de quien esté usando el equipo. Una prueba de la función
+    /// que escribe modificaría la configuración real del usuario — el sitio donde
+    /// se prueba una escritura nunca es el dato bueno. Así se prueba la decisión,
+    /// que es lo que puede equivocarse, sin tocar nada de nadie.
+    static func nuevasListas(apps actualApps: [String], titulos actualTitulos: [String],
+                             elegidas: [Categoria]) -> (apps: [String], titulos: [String]) {
+        let (nuevasApps, nuevosTitulos) = repartir(elegidas)
+        return (unir(actualApps, con: nuevasApps), unir(actualTitulos, con: nuevosTitulos))
+    }
+
+    /// Escribe lo elegido. **El único sitio de todo el programa que toca estas
+    /// listas desde el asistente**, y solo se llama desde el botón de aceptar.
+    ///
+    /// Que sea el único importa: es lo que sostiene el RNF-02 —abrir y cerrar la
+    /// pantalla sin aceptar no cambia un byte— y hay una prueba que lo comprueba
+    /// contando los sitios que escriben, no leyendo el código a ojo.
+    ///
+    /// Se escribe por `Config.set` y nunca tocando el archivo: `Config` mantiene
+    /// la configuración en caché y la reescribe entera, así que una edición por
+    /// fuera se perdería en el siguiente guardado.
+    @discardableResult
+    static func aplicar(_ elegidas: [Categoria]) -> (apps: Int, titulos: Int) {
+        let nuevas = nuevasListas(apps: FiltroBitacora.appsExcluidas(),
+                                  titulos: FiltroBitacora.titulosExcluidos(),
+                                  elegidas: elegidas)
+        Config.set("bitacora_excluir_apps", to: nuevas.apps)
+        Config.set("bitacora_excluir_titulos", to: nuevas.titulos)
+        return (nuevas.apps.count, nuevas.titulos.count)
+    }
+
+    // MARK: Lo que el usuario rechazó (spec 007, T08, RF-07)
+
+    /// Identificadores de categoría que el usuario desmarcó en su día.
+    ///
+    /// Hace falta guardar el rechazo, y no solo lo aceptado: sin esto no se
+    /// distingue «nunca se lo propusimos» de «dijo que no», y cada versión nueva
+    /// se lo volvería a proponer marcado. Una propuesta que reaparece sola
+    /// después de haberla rechazado es una forma de decidir por el usuario.
+    static func rechazadas() -> Set<String> {
+        Set((Config.json0("bitacora_semillas_rechazadas") as? [String]) ?? [])
+    }
+
+    static func guardarRechazadas(_ ids: Set<String>) {
+        Config.set("bitacora_semillas_rechazadas", to: Array(ids).sorted())
+    }
+
+    /// Versión del catálogo que el usuario ya revisó.
+    static func versionVista() -> Int { (Config.json0("bitacora_asistente_visto") as? Int) ?? 0 }
+
+    static func guardarVersionVista(_ v: Int) { Config.set("bitacora_asistente_visto", to: v) }
+
+    /// Qué proponer, y cuáles vienen marcadas.
+    ///
+    /// Se proponen todas las categorías —para que el usuario pueda cambiar de
+    /// opinión sobre una que rechazó— pero **solo vienen marcadas las que no ha
+    /// rechazado**. Ocultar las rechazadas sería peor: dejaría al usuario sin
+    /// forma de volver atrás desde la misma pantalla.
+    static func propuesta(_ c: Catalogo, rechazadas rech: Set<String>)
+        -> [(categoria: Categoria, marcada: Bool)] {
+        c.categorias.map { ($0, !rech.contains($0.id)) }
+    }
+
+    /// ¿Hay algo nuevo que enseñar sin que el usuario lo pida?
+    ///
+    /// Solo si el catálogo trae una versión posterior a la que ya revisó. Con la
+    /// misma versión no se molesta a nadie, aunque haya categorías rechazadas:
+    /// rechazar es una respuesta, no un pendiente.
+    static func hayNovedades(_ c: Catalogo, vista: Int) -> Bool { c.version > vista }
 }

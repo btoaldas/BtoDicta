@@ -104,6 +104,56 @@ final class SemillasExclusionTests: XCTestCase {
         XCTAssertEqual(males.count, 7, "no debería encontrar nada más: \(males)")
     }
 
+    // MARK: Calcular lo que quedaría (T06)
+
+    func testLoQueQuedariaUneConLoQueYaHabia() {
+        let r = SemillasExclusion.nuevasListas(
+            apps: ["mibanco"], titulos: ["intranet.ejemplo"],
+            elegidas: [cat("r", .apps, ["vlc"]), cat("v", .titulos, ["youtube.com"])])
+        XCTAssertEqual(r.apps, ["mibanco", "vlc"])
+        XCTAssertEqual(r.titulos, ["intranet.ejemplo", "youtube.com"])
+    }
+
+    /// Aceptar dos veces no puede hacer crecer nada. Se comprueba encadenando,
+    /// que es lo que pasa de verdad cuando alguien vuelve a abrir el asistente.
+    func testAceptarDosVecesDejaLoMismo() {
+        let cats = [cat("r", .apps, ["vlc"]), cat("v", .titulos, ["youtube.com"])]
+        let una = SemillasExclusion.nuevasListas(apps: [], titulos: [], elegidas: cats)
+        let dos = SemillasExclusion.nuevasListas(apps: una.apps, titulos: una.titulos, elegidas: cats)
+        XCTAssertEqual(una.apps, dos.apps)
+        XCTAssertEqual(una.titulos, dos.titulos)
+    }
+
+    /// Lo que el usuario tenía escrito a mano sobrevive intacto y va primero.
+    func testNoPisaLoQueElUsuarioEscribio() {
+        let r = SemillasExclusion.nuevasListas(
+            apps: [], titulos: ["mi-banco-privado.ejemplo"],
+            elegidas: [cat("v", .titulos, ["youtube.com", "netflix.com"])])
+        XCTAssertEqual(r.titulos.first, "mi-banco-privado.ejemplo")
+        XCTAssertEqual(r.titulos.count, 3)
+    }
+
+    // MARK: Lo rechazado no vuelve marcado (T08, RF-07)
+
+    func testLoRechazadoSeSigueOfreciendoPeroDesmarcado() {
+        let c = SemillasExclusion.Catalogo(version: 2, categorias: [
+            cat("redes", .titulos, ["facebook.com"]),
+            cat("video", .titulos, ["youtube.com"]),
+        ])
+        let p = SemillasExclusion.propuesta(c, rechazadas: ["video"])
+        XCTAssertEqual(p.count, 2, "lo rechazado se sigue viendo: si no, no hay forma de cambiar de opinión")
+        XCTAssertTrue(p.first { $0.categoria.id == "redes" }!.marcada)
+        XCTAssertFalse(p.first { $0.categoria.id == "video" }!.marcada,
+                       "una propuesta que reaparece marcada tras rechazarla decide por el usuario")
+    }
+
+    func testSoloSeMolestaAlUsuarioConUnCatalogoMasNuevo() {
+        let c = SemillasExclusion.Catalogo(version: 2, categorias: [])
+        XCTAssertTrue(SemillasExclusion.hayNovedades(c, vista: 1))
+        XCTAssertFalse(SemillasExclusion.hayNovedades(c, vista: 2), "la misma versión no vuelve a salir sola")
+        XCTAssertFalse(SemillasExclusion.hayNovedades(c, vista: 3))
+    }
+
     /// Una entrada legítima no debe dar falso positivo, o el validador acabaría
     /// ignorándose.
     ///

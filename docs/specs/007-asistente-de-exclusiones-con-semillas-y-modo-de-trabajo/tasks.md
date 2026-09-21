@@ -61,23 +61,26 @@ el material que no se grabó.
   - Evidencia esperada: prueba en rojo al invertir el destino en el cargador.
   - Evidencia (2026-09-21): `swift test --filter SemillasExclusionTests` → 7 de 7. La prueba encontró un fallo real en el validador: exigía 4 letras a toda entrada y rechazaba «vlc», que estaba en el propio catálogo. El mínimo pasa a depender del destino (4 para títulos, 3 para aplicaciones) con la razón escrita. Sabotaje del catálogo → código 1 con los tres problemas señalados; restaurado → código 0.
 
-- [ ] T06 (RF-01) Aplicar la selección, por unión
+- [x] T06 (RF-01) Aplicar la selección, por unión
   - Archivos: `Sources/BtoDicta/SemillasExclusion.swift`
   - Escribe por `Config.set` (D-7). Une con lo que ya hubiera; no concatena ni
     duplica.
   - Evidencia esperada: prueba que acepta dos veces la misma categoría y la lista
     no crece la segunda vez.
+  - Evidencia (2026-09-21): `nuevasListas` calcula sin escribir y `aplicar` es el único que escribe. Tres pruebas: une con lo previo, aceptar dos veces no hace crecer la lista, y lo escrito a mano sobrevive y va primero.
 
 - [ ] T07 (RNF-02) Nada se escribe antes de Aceptar
   - Archivos: `Tests/BtoDictaTests/SemillasExclusionTests.swift`
   - Evidencia esperada: `sha256` de la configuración antes de abrir y después de
     cerrar sin aceptar — idéntico. Y distinto tras aceptar.
+  - Parcial (2026-09-21): la mitad estructural ya está y se vigila en QA — `qa-semillas.py` cuenta los sitios que escriben las listas y exige que sean dos, ambos en `SemillasExclusion.aplicar`, descontando los 13 del arnés de pruebas por conteo de llaves. Verificado en rojo colando una escritura en `ContinuoView`. La mitad de punta a punta —`sha256` del `config.json` al abrir y cerrar sin aceptar— necesita la pantalla y se cierra con T09.
 
-- [ ] T08 (RF-07) Rechazos y versión del catálogo
+- [x] T08 (RF-07) Rechazos y versión del catálogo
   - Archivos: `Sources/BtoDicta/SemillasExclusion.swift`, `Sources/BtoDicta/Config.swift`
   - `bitacora_semillas_rechazadas` por identificador y `bitacora_asistente_visto`.
   - Evidencia esperada: prueba que desmarca una semilla, sube la versión del
     catálogo y comprueba que esa semilla no vuelve marcada.
+  - Evidencia (2026-09-21): `rechazadas`/`versionVista` y sus escritores. `testLoRechazadoSeSigueOfreciendoPeroDesmarcado`: lo rechazado se sigue viendo —si no, no hay forma de cambiar de opinión— pero desmarcado. `testSoloSeMolestaAlUsuarioConUnCatalogoMasNuevo`: con la misma versión no vuelve a salir solo.
 
 ## Fase C — La pantalla
 
