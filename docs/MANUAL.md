@@ -1123,7 +1123,7 @@ Es **opcional**: BtoDicta funciona igual sin ella.
 
 **Instalarla**
 
-1. *Ajustes → «Mostrar cómo instalarla…»*. Se abre `~/.btodicta/extension` y la
+1. *Ajustes → «Mostrar cómo instalarla…»*. Se abre `~/BtoDicta Extensión` y la
    clave queda copiada.
 2. En `edge://extensions` (o `chrome://`, `brave://`), activa **«Modo de
    desarrollador»** y pulsa **«Cargar descomprimida»**.
@@ -1148,7 +1148,7 @@ dice qué hacer:
 
 | Comprobación | Si falla |
 |---|---|
-| Permiso para ver las pestañas | Recárgala desde `~/.btodicta/extension` |
+| Permiso para ver las pestañas | Recárgala desde `~/BtoDicta Extensión` |
 | Clave de BtoDicta | Dónde copiarla, con el camino exacto |
 | BtoDicta responde | Enciende «Abrir la puerta local» en Ajustes |
 | La clave sirve | La clave cambió: cópiala otra vez |
@@ -1180,7 +1180,7 @@ BtoDicta los descarte después, es que nunca los recibe.
 **Actualizaciones**
 
 Una extensión cargada a mano **no se actualiza sola** — el navegador lo impide a
-propósito. Pero si la cargaste desde `~/.btodicta/extension`, los archivos se
+propósito. Pero si la cargaste desde `~/BtoDicta Extensión`, los archivos se
 renuevan solos al actualizar BtoDicta; basta reiniciar el navegador o pulsar
 «Actualizar» en su tarjeta. La aplicación avisa cuando toca.
 

@@ -758,7 +758,7 @@ struct SettingsView: View {
                     Button("Mostrar cómo instalarla…") { ExportarExtension.mostrarParaInstalar() }
                         .disabled(!ExportarExtension.disponible)
                 }
-                Text("Le cuenta a la bitácora qué pestaña estás mirando y cuál está sonando — eso el sistema no puede verlo solo, y sin ese dato un vídeo de fondo acaba anotado como trabajo. Vive en ~/.btodicta/extension y BtoDicta la mantiene al día ahí: instálala desde esa carpeta y recibirá las mejoras. Es opcional: BtoDicta funciona igual sin ella.")
+                Text("Le cuenta a la bitácora qué pestaña estás mirando y cuál está sonando — eso el sistema no puede verlo solo, y sin ese dato un vídeo de fondo acaba anotado como trabajo. Vive en ~/BtoDicta Extensión y BtoDicta la mantiene al día ahí: instálala desde esa carpeta y recibirá las mejoras. Es opcional: BtoDicta funciona igual sin ella.")
                     .font(.caption2).foregroundStyle(.secondary)
                 if !m.avisoExtension.isEmpty {
                     Text(m.avisoExtension)

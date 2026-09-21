@@ -1,9 +1,9 @@
 # Tareas 007 — Asistente de exclusiones con semillas y modo de trabajo
 
-- Estado: Borrador
+- Estado: Aprobadas
 - Fecha: 2026-09-21
 - Spec: `spec.md` (Aprobada 2026-09-21) · Plan: `plan.md` (Aprobado 2026-09-21)
-- Aprobadas por: PENDIENTE
+- Aprobado por: Alberto — 2026-09-21 — «sigue adelante las tareas y arranca por t01»
 
 Cada tarea cita su RF y dice qué evidencia la cierra. Un `[x]` sin `Evidencia:`
 es una promesa, no un hecho.
@@ -17,27 +17,30 @@ el material que no se grabó.
 
 ## Fase A — El modo, antes que nada
 
-- [ ] T01 (RF-03) El modo en la decisión pura
+- [x] T01 (RF-03) El modo en la decisión pura
   - Archivos: `Sources/BtoDicta/FiltroBitacora.swift`
   - `Modo` (`.permisivo` / `.restrictivo`) y parámetro nuevo en
     `decidir(app:ventana:excluirApps:…)`. En restrictivo entra **solo** lo que
     esté en alguna lista de inclusión.
   - Evidencia esperada: `swift test --filter FiltroBitacoraTests` en verde, y las
     8 pruebas de hoy intactas — el modo permisivo no cambia de comportamiento.
+  - Evidencia (2026-09-21): `swift test --filter FiltroBitacoraTests` → 14 de 14, y las 8 anteriores intactas: el modo permisivo no cambió de comportamiento.
 
-- [ ] T02 (RF-03) Pruebas de los dos modos, vistas en ROJO
+- [x] T02 (RF-03) Pruebas de los dos modos, vistas en ROJO
   - Archivos: `Tests/BtoDictaTests/FiltroBitacoraTests.swift`
   - Casos: restrictivo con una app autorizada deja fuera al resto; restrictivo con
     inclusiones vacías no graba nada; permisivo se comporta como hoy.
   - Evidencia esperada: salida del sabotaje —invertir el modo en el código— con
     las pruebas nuevas en rojo, y en verde tras restaurar.
+  - Evidencia (2026-09-21): Tres sabotajes, tres rojos. Caer a restrictivo ante un valor desconocido → **8 fallos**; el restrictivo que no filtra → 4; la lista blanca que deja de ir primero → 3. Restaurado: 14 de 14.
 
-- [ ] T03 (RF-03) `bitacora_modo` y la variante que lo lee
+- [x] T03 (RF-03) `bitacora_modo` y la variante que lo lee
   - Archivos: `Sources/BtoDicta/Config.swift`, `Sources/BtoDicta/FiltroBitacora.swift`
   - De fábrica `"permisivo"`. Un valor desconocido cae a permisivo, nunca a
     restrictivo: equivocarse hacia el lado que apaga la bitácora sería peor.
   - Evidencia esperada: prueba con la clave ausente, con valor válido y con valor
     basura.
+  - Evidencia (2026-09-21): `FiltroBitacora.modo()` lee por `Config`. `testModoDesconocidoCaeAPermisivo` cubre nil, vacío, espacios, «restricitvo», «strict», «RESTRICTIVE», «1» y «null»; `testLosValoresBuenosSeReconocen` evita que pase con un código que ignore todo.
 
 ## Fase B — El catálogo
 

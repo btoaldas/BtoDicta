@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.77.1"
-    static let fecha = "2026-09-14"
+    static let numero = "0.78.0"
+    static let fecha = "2026-09-21"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.78.0", "2026-09-21", [
+            "LA EXTENSIÓN YA NO SE ESCONDE. Vivía en ~/.btodicta/extension, y una carpeta que empieza por punto está OCULTA en el Finder: el selector de carpetas de los navegadores no la enseña ni escribiendo la ruta, así que cargar la extensión era pelearse con el explorador de archivos. Ahora está en «BtoDicta Extensión», en tu carpeta de usuario y al lado de «BtoDicta Bitácora». Se sigue manteniendo al día sola, igual que antes",
+            "La copia anterior NO se borra: si la tenías cargada sigue funcionando. Deja de actualizarse, eso sí, y el registro lo avisa",
+            "Nuevo modo de trabajo para la bitácora: «no mirar nada salvo lo incluido», además del de siempre. Viene apagado. Un valor que el programa no reconozca cae SIEMPRE al modo de siempre: grabar de más se corrige borrando, pero no grabar no se corrige nunca, porque el pasado no se puede grabar después",
+        ]),
         ("0.77.1", "2026-09-20", [
             "EL CAMPO DE LA CLAVE YA NO LO PISA EL NAVEGADOR. Era un campo de contraseña, y el gestor de contraseñas lo rellenaba solo con otra cosa: se veían puntos, parecía que la clave estaba puesta, y no lo estaba. Ahora es un campo normal, sin autocompletado, y al guardar se enseña el principio y el final de lo guardado para poder compararlo",
             "Y si la pantalla de la extensión falla al cargarse, lo DICE en vez de quedarse en blanco. Antes un error dejaba la página muda y sin botones que respondieran, sin forma de saber por qué",

@@ -37,7 +37,7 @@ export async function revisar() {
   } catch {
     paso("Permiso para ver las pestañas", false,
          "El navegador no deja consultarlas",
-         "Quita la extensión y vuelve a cargarla desde ~/.btodicta/extension");
+         "Quita la extensión y vuelve a cargarla desde ~/BtoDicta Extensión");
   }
 
   // 2. ¿Hay clave? Sin ella ni se intenta enviar — que es exactamente lo que

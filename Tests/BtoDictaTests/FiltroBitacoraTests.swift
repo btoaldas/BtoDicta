@@ -18,10 +18,12 @@ final class FiltroBitacoraTests: XCTestCase {
 
     private func graba(app: String?, ventana: String?,
                        apps: [String] = [], titulos: [String] = [],
-                       salvoApps: [String] = [], salvoTitulos: [String] = []) -> Bool {
+                       salvoApps: [String] = [], salvoTitulos: [String] = [],
+                       modo: FiltroBitacora.Modo = .permisivo) -> Bool {
         let v = FiltroBitacora.decidir(app: app, ventana: ventana,
                                        excluirApps: apps, excluirTitulos: titulos,
-                                       incluirApps: salvoApps, incluirTitulos: salvoTitulos)
+                                       incluirApps: salvoApps, incluirTitulos: salvoTitulos,
+                                       modo: modo)
         if case .entra = v { return true }
         return false
     }
@@ -80,5 +82,58 @@ final class FiltroBitacoraTests: XCTestCase {
     func testUnCampoVacioNoExcluye() {
         XCTAssertTrue(graba(app: nil, ventana: nil, apps: ["vlc"], titulos: ["youtube"]))
         XCTAssertTrue(graba(app: "", ventana: "", apps: ["vlc"], titulos: ["youtube"]))
+    }
+
+    // MARK: Modo de trabajo (spec 007, T02, RF-03)
+
+    /// El modo permisivo es el de siempre. Las ocho pruebas de arriba no pasan
+    /// `modo`, así que ya lo comprueban por omisión; esta lo dice explícito para
+    /// que se vea que el valor de fábrica no cambia de comportamiento.
+    func testPermisivoSeComportaComoSiempre() {
+        XCTAssertTrue(graba(app: "Xcode", ventana: "", apps: ["vlc"], modo: .permisivo))
+        XCTAssertFalse(graba(app: "VLC media player", ventana: "", apps: ["vlc"], modo: .permisivo))
+    }
+
+    /// El caso que justifica el modo: solo entra lo autorizado.
+    func testRestrictivoDejaFueraLoNoAutorizado() {
+        XCTAssertTrue(graba(app: "Xcode", ventana: "", salvoApps: ["xcode"], modo: .restrictivo))
+        XCTAssertFalse(graba(app: "Safari", ventana: "", salvoApps: ["xcode"], modo: .restrictivo))
+    }
+
+    /// Restrictivo con las listas de inclusión vacías **no graba nada**. Es
+    /// coherente —«nada salvo lo incluido», y no hay nada incluido— y es justo
+    /// el estado que la interfaz tiene que avisar antes de guardar (RF-08).
+    /// Aquí se fija el comportamiento para que nadie lo «arregle» sin querer.
+    func testRestrictivoSinInclusionesNoGrabaNada() {
+        XCTAssertFalse(graba(app: "Xcode", ventana: "trabajo", modo: .restrictivo))
+        XCTAssertFalse(graba(app: nil, ventana: nil, modo: .restrictivo))
+    }
+
+    /// En restrictivo, una lista de exclusión llena no autoriza nada por sí sola:
+    /// lo que manda es la de inclusión. Sin esto, alguien podría creer que
+    /// vaciar las exclusiones «abre» el modo restrictivo.
+    func testEnRestrictivoLasExclusionesNoAutorizan() {
+        XCTAssertFalse(graba(app: "Xcode", ventana: "", apps: ["vlc"], titulos: ["youtube"],
+                             modo: .restrictivo))
+    }
+
+    /// Un valor que el código no reconoce cae SIEMPRE a permisivo.
+    ///
+    /// Los dos errores no cuestan lo mismo: caer a permisivo graba de más y se
+    /// corrige borrando; caer a restrictivo no graba nada, sin aviso, y el pasado
+    /// no se puede grabar después. Se elige el error reversible.
+    func testModoDesconocidoCaeAPermisivo() {
+        for crudo in [nil, "", "   ", "restricitvo", "strict", "RESTRICTIVE", "1", "null"] {
+            XCTAssertEqual(FiltroBitacora.Modo.desde(crudo), .permisivo,
+                           "«\(crudo ?? "nil")» debería caer a permisivo")
+        }
+    }
+
+    /// Y los valores buenos sí se reconocen, con espacios y mayúsculas de por
+    /// medio: si no, la prueba anterior pasaría con un código que ignora todo.
+    func testLosValoresBuenosSeReconocen() {
+        XCTAssertEqual(FiltroBitacora.Modo.desde("permisivo"), .permisivo)
+        XCTAssertEqual(FiltroBitacora.Modo.desde("restrictivo"), .restrictivo)
+        XCTAssertEqual(FiltroBitacora.Modo.desde("  Restrictivo  "), .restrictivo)
     }
 }

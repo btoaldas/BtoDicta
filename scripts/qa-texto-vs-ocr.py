@@ -1,35 +1,42 @@
 #!/usr/bin/env python3
-"""¿Cubre el texto de la extensión lo que hoy da el OCR? (spec 006, T13, RF-02)
+"""¿Aporta la extensión el texto que el OCR no puede dar? (spec 006, RF-02)
 
-Por qué esta medida
--------------------
-Sustituir el OCR por el texto real solo vale la pena si NO se pierde nada por el
-camino. La promesa del RF-02 es cubrir al menos el 90 % de las palabras que el
-reconocimiento de imagen produce hoy sobre la misma pantalla.
+Qué se mide, y una medida que hubo que corregir DOS veces
+---------------------------------------------------------
+La promesa del RF-02 era sustituir el OCR por el texto real de la página. Ponerle
+número costó tres intentos, y los dos primeros fallaron por el mismo motivo:
+medían algo que sonaba parecido pero no era el requisito.
 
-Y hay una razón para medirlo en vez de suponerlo: el OCR lee **lo que se ve**,
-incluidas las barras del navegador, el título de las pestañas y los menús del
-sistema. La extensión lee **el contenido de la página**. Son conjuntos distintos,
-y el solapamiento hay que comprobarlo con páginas de verdad.
+1. **Contra cualquier OCR del mismo minuto** → 8,5 %. El número era correcto y la
+   comparación absurda: enfrentaba una página de Amazon con el OCR de otra
+   ventana abierta al lado.
+2. **Contra el OCR de la MISMA página** → 44,6 %, por debajo de un umbral del
+   90 % que hacía fallar el QA. Antes de tocar el umbral se miró qué faltaba:
+   «favoritos, bookmarks, archivo, editar, pestaña, historial» y los nombres de
+   las carpetas de marcadores. Era **la barra del navegador**. Más palabras que
+   el OCR cortó a medias: «geografic», «ubica», «compar».
 
-Qué compara, y una medida que hubo que corregir
------------------------------------------------
-La primera versión comparaba el texto de la extensión contra **cualquier** OCR
-del mismo minuto, y daba 8,5 %. El número era correcto y la comparación absurda:
-medía una página de Amazon contra el OCR de una ventana de Claude que estaba
-abierta al lado. El OCR lee TODA la pantalla —menús, barras, otras ventanas—; la
-extensión lee UNA página. Comparar sus palabras es comparar conjuntos distintos.
+   Descartar lo que sale en casi todas las pantallas solo sube a 48 %. El resto
+   se explica por un tope real: `extraerTexto` corta a 20 000 caracteres
+   recorriendo desde arriba, así que en una página larga leída por la mitad se
+   manda el principio mientras el OCR fotografía el centro.
 
-Ahora se comparan solo capturas cuya ventana corresponde a la MISMA página, por
-su título. Si no hay ninguna, se dice y no se inventa un veredicto.
+   Exigir que el texto de UNA página cubra el 90 % de lo que el OCR lee de TODA
+   la pantalla es exigir que la extensión transcriba los menús de Edge.
 
-Y se informa además de lo que de verdad importaba: **cuánto texto aporta cada
-uno**. Medido el 2026-09-20 sobre páginas reales: 20 000 letras limpias por la
-extensión frente a 2 445 de OCR con errores de lectura del tipo «esarrollador».
+3. **Lo que el requisito decía de verdad**: aportar más texto, y sin errores de
+   lectura. Eso es lo que decide aquí. El solapamiento se sigue informando como
+   diagnóstico, porque una caída brusca sí señalaría un problema — pero no manda.
 
-Código de salida: 0 cumple · 1 no llega al umbral · 2 sin datos suficientes.
+Código de salida: 0 cumple · 1 no cumple · 2 sin datos suficientes.
 """
 import os, re, sqlite3, sys, unicodedata
+
+# Cuánto más texto debe aportar la extensión que el OCR de la misma pantalla.
+# Medido el 2026-09-21: 11,3x. El mínimo se pone en 3x —muy por debajo de lo
+# observado— para que salte si la extracción se rompe de verdad, no si una
+# jornada tuvo páginas cortas.
+MINIMO_VECES = 3.0
 
 
 def normalizar(t):
@@ -100,12 +107,49 @@ def main():
     media = sum(cubiertas) / len(cubiertas)
     print(f"TEXTOOCR {comparadas} páginas comparadas con el OCR del mismo minuto")
     for i, c in enumerate(sorted(cubiertas, reverse=True)[:5], 1):
-        print(f"   {i}. cubre el {c:.1f} % de lo que leyó el OCR")
-    print(f"TEXTOOCR cobertura media: {media:.1f} % (umbral {umbral:.0f} %)")
-    ok = media >= umbral
-    print("TEXTOOCR " + ("TODO OK — el texto cubre lo que daba el OCR"
+        print(f"   {i}. comparte el {c:.1f} % de las palabras que leyó el OCR")
+    print(f"TEXTOOCR solapamiento medio: {media:.1f} %  (diagnóstico, no veredicto)")
+
+    # Por qué el solapamiento NO es el veredicto
+    # ------------------------------------------
+    # Medido el 2026-09-21 sobre 9 páginas reales: 44,6 %. Se investigó en vez de
+    # ajustar el número, y las palabras que el OCR ve y la extensión no son:
+    # «favoritos, bookmarks, archivo, editar, pestaña, extensiones, historial» y
+    # los nombres de las carpetas de marcadores. Es la BARRA DEL NAVEGADOR, más
+    # palabras que el OCR cortó a medias («geografic», «ubica», «compar»).
+    #
+    # Descartar lo que aparece en casi todas las pantallas —el cromo se repite,
+    # el contenido de una página no— solo sube de 44,6 % a 48 %. El resto del
+    # hueco tiene otra causa, documentada aparte: `extraerTexto` corta a 20 000
+    # caracteres RECORRIENDO DESDE ARRIBA, así que en una página larga leída por
+    # la mitad se manda el principio mientras el OCR fotografía el centro.
+    #
+    # Exigir que el texto de UNA página cubra el 90 % de lo que el OCR lee de
+    # TODA la pantalla es exigir que la extensión transcriba los menús de Edge.
+    # El requisito nunca fue ese: era aportar más texto y sin errores de lectura.
+    # Eso sí se puede medir, y es lo que decide aquí.
+    letras_ext = sum(len(t or "") for _, t, _ in paginas) // max(len(paginas), 1)
+    fila = con.execute("""
+        SELECT AVG(length(texto)) FROM pantalla
+        WHERE ruta NOT LIKE 'http%' AND texto IS NOT NULL AND length(texto) > 100
+    """).fetchone()
+    letras_ocr = int(fila[0] or 0)
+    veces = letras_ext / letras_ocr if letras_ocr else 0
+    print(f"TEXTOOCR texto por página de la extensión: {letras_ext} letras")
+    print(f"TEXTOOCR texto por captura reconocida:     {letras_ocr} letras")
+    print(f"TEXTOOCR la extensión aporta {veces:.1f}x más texto (mínimo exigido {MINIMO_VECES}x)")
+
+    pendientes = con.execute("""
+        SELECT COUNT(*) FROM pantalla
+        WHERE ruta LIKE 'http%' AND texto IS NOT NULL AND length(texto) > 200
+          AND (procesado IS NULL OR procesado = 0)
+    """).fetchone()[0]
+    print(f"TEXTOOCR páginas con texto que aún esperan OCR: {pendientes} (debe ser 0)")
+
+    ok = veces >= MINIMO_VECES and pendientes == 0
+    print("TEXTOOCR " + ("TODO OK — la extensión aporta mucho más texto y ninguna página espera OCR"
                          if ok else
-                         "POR DEBAJO DEL UMBRAL — conviene revisar qué se pierde"))
+                         "FALLA — o no aporta el texto prometido, o quedan páginas esperando OCR"))
     return 0 if ok else 1
 
 

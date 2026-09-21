@@ -83,7 +83,7 @@ enum ExportarExtension {
         **Cárgala desde esta ruta y no desde otra copia:**
 
         ```
-        ~/.btodicta/extension
+        ~/BtoDicta Extensión
         ```
 
         **Instálala desde esa carpeta y no desde una copia.** BtoDicta la
@@ -143,7 +143,7 @@ enum ExportarExtension {
         sola sería un agujero. Solo se auto-actualizan las que vienen de una
         tienda.
 
-        Lo que sí ocurre, si la cargaste desde `~/.btodicta/extension`: **los
+        Lo que sí ocurre, si la cargaste desde `~/BtoDicta Extensión`: **los
         archivos se ponen al día solos** en cuanto arranca la versión nueva de
         BtoDicta. Para que el navegador los recoja, una de estas dos:
 
@@ -173,7 +173,30 @@ enum ExportarExtension {
     /// agujero—, y solo lo hacen las que vienen de una tienda. Lo que se
     /// consigue aquí es que los archivos estén al día; recogerlos es cosa del
     /// navegador, al reiniciarse o al pulsar «Actualizar».
+    /// **Por qué está en el home y no en `~/.btodicta`.**
+    ///
+    /// Estuvo en `~/.btodicta/extension`, que es donde vive el resto de la
+    /// configuración y parecía el sitio natural. Era el sitio equivocado: una
+    /// carpeta que empieza por punto está oculta en el Finder, y el selector de
+    /// carpetas de los navegadores —que es lo único que se usa para cargar una
+    /// extensión— no la enseña ni escribiendo la ruta. Cargar la extensión se
+    /// volvía una pelea contra el explorador de archivos.
+    ///
+    /// Ahora va al lado de `BtoDicta Bitácora`, por el mismo motivo por el que
+    /// aquella está ahí: se ve, se alcanza de un clic y no hay que saber nada.
     static var rutaFija: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(nombreCarpetaVisible, isDirectory: true)
+    }
+
+    static let nombreCarpetaVisible = "BtoDicta Extensión"
+
+    /// Dónde vivía antes. Se conserva: no se borra nada sin decirlo.
+    ///
+    /// Sirve para dos cosas: avisar en el registro de que quedó una copia vieja,
+    /// y no dejar a medias a quien ya tuviera la extensión cargada desde ahí —
+    /// esa sigue funcionando hasta que la recargue desde la carpeta nueva.
+    static var rutaAnterior: URL {
         Config.dir.appendingPathComponent("extension", isDirectory: true)
     }
 
@@ -197,12 +220,18 @@ enum ExportarExtension {
         let puesta = versionEnRutaFija()
         guard !traida.isEmpty, traida != puesta else { return }
 
-        switch exportar(a: Config.dir, nombreCarpeta: "extension") {
+        switch exportar(a: FileManager.default.homeDirectoryForCurrentUser,
+                        nombreCarpeta: nombreCarpetaVisible) {
         case .success:
             if puesta.isEmpty {
                 Log.log(.sistema, "extensión del navegador preparada en \(rutaFija.path)")
             } else {
                 Log.log(.sistema, "extensión del navegador actualizada de la \(puesta) a la \(traida) — recárgala en el navegador para que la recoja")
+            }
+            // La copia vieja no se toca: si alguien la tiene cargada, sigue
+            // funcionando. Solo se deja dicho que está ahí y que no se actualiza.
+            if FileManager.default.fileExists(atPath: rutaAnterior.path) {
+                Log.log(.sistema, "queda una copia anterior en \(rutaAnterior.path); ya no se actualiza — recarga la extensión desde \(rutaFija.path)")
             }
         case .failure(let m):
             Log.log(.sistema, "no pude poner al día la extensión: \(m.texto)")

@@ -51,10 +51,20 @@ enum FiltroBitacora {
             .filter { !$0.isEmpty }
     }
 
+    /// El modo guardado (spec 007, T03, RF-03).
+    ///
+    /// Se lee por `Config`, que es quien mantiene la caché y reescribe el
+    /// archivo: leer `config.json` por nuestra cuenta daría un valor viejo.
+    static func modo() -> Modo { Modo.desde(Config.json0("bitacora_modo") as? String) }
+
     /// ¿Hay alguna regla escrita? Si no, ni se consulta: el caso normal es que
     /// el usuario no haya configurado nada y todo entre.
+    ///
+    /// En modo restrictivo siempre hay regla, aunque las listas estén vacías: la
+    /// regla es «nada salvo lo incluido», y con la lista vacía eso significa
+    /// nada en absoluto.
     static var hayReglas: Bool {
-        !appsExcluidas().isEmpty || !titulosExcluidos().isEmpty
+        modo() == .restrictivo || !appsExcluidas().isEmpty || !titulosExcluidos().isEmpty
     }
 
     // MARK: El veredicto
@@ -123,10 +133,37 @@ enum FiltroBitacora {
         return (app, ContinuoPantalla.tituloVentanaAlFrente())
     }
 
+    // MARK: Modo de trabajo (spec 007, T01, RF-03)
+
+    /// Las dos formas de plantear el filtro.
+    ///
+    /// No son simétricas, y por eso el valor de fábrica no es una preferencia
+    /// estética. Equivocarse hacia `.permisivo` graba algo que no se quería: se
+    /// borra y se ajusta la lista. Equivocarse hacia `.restrictivo` **no graba
+    /// nada**, sin error ni aviso, y una bitácora que no registra se ve igual
+    /// que un día tranquilo. Eso no se arregla: el pasado no se puede grabar.
+    ///
+    /// Regla: ante cualquier duda —clave ausente, valor con un dedazo, archivo a
+    /// medio escribir, configuración copiada de otra versión— se cae a
+    /// `.permisivo`, que es el único de los dos errores reversible.
+    enum Modo: String {
+        /// Mirar todo salvo lo excluido. El de fábrica y el de siempre.
+        case permisivo
+        /// No mirar nada salvo lo incluido.
+        case restrictivo
+
+        /// Nunca falla: lo que no reconoce es `.permisivo`.
+        static func desde(_ crudo: String?) -> Modo {
+            Modo(rawValue: (crudo ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+                ?? .permisivo
+        }
+    }
+
     static func decidir(app: String?, ventana: String?) -> Veredicto {
         decidir(app: app, ventana: ventana,
                 excluirApps: appsExcluidas(), excluirTitulos: titulosExcluidos(),
-                incluirApps: appsIncluidas(), incluirTitulos: titulosIncluidos())
+                incluirApps: appsIncluidas(), incluirTitulos: titulosIncluidos(),
+                modo: modo())
     }
 
     /// La decisión, sin leer nada de disco.
@@ -137,22 +174,33 @@ enum FiltroBitacora {
     /// real del usuario en vez de la regla, y cambiaría de resultado según el día.
     static func decidir(app: String?, ventana: String?,
                         excluirApps: [String], excluirTitulos: [String],
-                        incluirApps: [String], incluirTitulos: [String]) -> Veredicto {
-        // Sin una sola regla escrita no se mira nada: el caso normal es que el
-        // usuario no haya configurado nada y todo entre.
-        guard !excluirApps.isEmpty || !excluirTitulos.isEmpty else { return .entra }
+                        incluirApps: [String], incluirTitulos: [String],
+                        modo: Modo = .permisivo) -> Veredicto {
         let a = normalizar(app ?? "")
         let v = normalizar(ventana ?? "")
 
-        // La lista blanca manda. Va PRIMERO a propósito: sirve para rescatar
-        // excepciones de una regla ancha («no grabes el navegador, salvo las
-        // reuniones»), y eso solo funciona si se mira antes de excluir.
-        for permitida in incluirApps where !a.isEmpty && a.contains(normalizar(permitida)) {
-            return .entra
+        // La lista blanca se mira PRIMERO en los dos modos, y por motivos
+        // distintos: en permisivo sirve para rescatar excepciones de una regla
+        // ancha («no grabes el navegador, salvo las reuniones»); en restrictivo
+        // es la única forma de entrar.
+        let permitidaPorApp = incluirApps.contains { !a.isEmpty && a.contains(normalizar($0)) }
+        let permitidaPorTitulo = incluirTitulos.contains { !v.isEmpty && v.contains(normalizar($0)) }
+        if permitidaPorApp || permitidaPorTitulo { return .entra }
+
+        if modo == .restrictivo {
+            // No mirar nada salvo lo incluido. Lo que no esté autorizado, fuera
+            // —incluida la ventana sin título y la app desconocida—, porque en
+            // este modo la ausencia de dato no puede significar permiso.
+            //
+            // El aviso de que esto deja la bitácora ciega con la lista vacía es
+            // cosa de la interfaz (RF-08), no de aquí: el filtro tiene que hacer
+            // lo que se le pidió, y avisar donde se puede rectificar.
+            return .fuera("el modo «no mirar nada salvo lo incluido» está activo y esto no está en tu lista")
         }
-        for permitido in incluirTitulos where !v.isEmpty && v.contains(normalizar(permitido)) {
-            return .entra
-        }
+
+        // Sin una sola regla de exclusión escrita no se mira nada: el caso normal
+        // es que el usuario no haya configurado nada y todo entre.
+        guard !excluirApps.isEmpty || !excluirTitulos.isEmpty else { return .entra }
 
         for excluida in excluirApps where !a.isEmpty && a.contains(normalizar(excluida)) {
             return .fuera("la aplicación «\(app ?? "")» está en tu lista de excluidas")
