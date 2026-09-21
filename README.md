@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.77.0
+
+- **Se instala desde `~/.btodicta/extension`**, no desde una copia: el botón abre
+  esa carpeta y copia la clave. Una copia no se actualiza nunca.
+- El diagnóstico enseña qué clave tiene guardada (4+4 caracteres) y el error
+  literal del navegador.
+
 ### Novedades 0.76.1
 
 - **La extensión se diagnostica sola**: seis comprobaciones encadenadas, cada

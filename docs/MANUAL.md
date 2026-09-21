@@ -1123,12 +1123,12 @@ Es **opcional**: BtoDicta funciona igual sin ella.
 
 **Instalarla**
 
-1. *Ajustes → Dejar que otros programas transcriban → «Sacarla a una carpeta…»*,
-   o directamente desde `~/.btodicta/extension`.
+1. *Ajustes → «Mostrar cómo instalarla…»*. Se abre `~/.btodicta/extension` y la
+   clave queda copiada.
 2. En `edge://extensions` (o `chrome://`, `brave://`), activa **«Modo de
    desarrollador»** y pulsa **«Cargar descomprimida»**.
-3. **Elige `~/.btodicta/extension`**, no una copia. Esa carpeta la mantiene
-   BtoDicta al día sola.
+3. **Elige esa carpeta, no una copia.** BtoDicta la mantiene al día ahí; una
+   copia se queda como esté el día que la hiciste.
 4. En las opciones de la extensión, pega la clave de la API local.
 
 Sin la clave, la extensión no envía absolutamente nada.

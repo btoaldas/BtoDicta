@@ -86,10 +86,11 @@ enum ExportarExtension {
         ~/.btodicta/extension
         ```
 
-        Esa carpeta la mantiene BtoDicta al día sola. Si la cargas desde ahí,
-        cada vez que la aplicación se actualice los archivos se renuevan y el
-        navegador recoge las mejoras al recargar la extensión. Si la cargas desde
-        una copia en el Escritorio, esa copia se queda como está.
+        **Instálala desde esa carpeta y no desde una copia.** BtoDicta la
+        mantiene al día ahí: cada vez que la aplicación se actualice, los
+        archivos se renuevan y el navegador recoge las mejoras al recargar la
+        extensión. Una copia en el Escritorio se queda como esté el día que la
+        hiciste, y deja de entenderse con BtoDicta en cuanto algo cambie.
 
         1. Abre `edge://extensions` (o `chrome://extensions`, `brave://extensions`).
         2. Activa **«Modo de desarrollador»**.
@@ -206,6 +207,52 @@ enum ExportarExtension {
         case .failure(let m):
             Log.log(.sistema, "no pude poner al día la extensión: \(m.texto)")
         }
+    }
+
+    /// Enseña la carpeta desde la que hay que instalarla, y copia la clave.
+    ///
+    /// Esto sustituye a «exportar a donde quieras», que era un error de diseño:
+    /// una copia en el Escritorio **no se actualiza nunca**, y mantenerla al día
+    /// es justo el motivo de que exista la ruta fija. Ofrecer las dos cosas
+    /// invitaba a elegir la que no funciona a largo plazo.
+    @discardableResult
+    static func mostrarParaInstalar() -> URL? {
+        refrescarRutaFija()
+        guard FileManager.default.fileExists(atPath: rutaFija.path) else {
+            let a = NSAlert()
+            a.messageText = "No encuentro la extensión"
+            a.informativeText = "Esta copia de BtoDicta no la trae dentro."
+            a.runModal()
+            return nil
+        }
+
+        let token = ApiLocal.token()
+        if !token.isEmpty {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(token, forType: .string)
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([rutaFija])
+
+        let a = NSAlert()
+        a.messageText = "Instalar la extensión"
+        var pasos = """
+        Se ha abierto la carpeta. Instálala DESDE AHÍ:
+
+        1. Abre  edge://extensions  (o chrome://, brave://)
+        2. Activa «Modo de desarrollador»
+        3. «Cargar descomprimida» → elige la carpeta que acaba de abrirse
+        4. En las opciones de la extensión, pega la clave
+
+        Instálala desde esa carpeta y no desde una copia: esa es la que BtoDicta
+        mantiene al día en cada actualización.
+        """
+        pasos += token.isEmpty
+            ? "\n\nLa puerta local está apagada, así que todavía no hay clave. Enciéndela arriba."
+            : "\n\nLa clave ya está copiada: en el paso 4 solo tienes que pegar."
+        a.informativeText = pasos
+        a.addButton(withTitle: "Entendido")
+        a.runModal()
+        return rutaFija
     }
 
     /// Pregunta dónde y exporta. Devuelve la carpeta creada.

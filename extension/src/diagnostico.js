@@ -43,8 +43,14 @@ export async function revisar() {
   // 2. ¿Hay clave? Sin ella ni se intenta enviar — que es exactamente lo que
   //    pasó sin que nadie se enterara.
   const token = await leerToken();
+  // Se enseñan el principio y el final, nunca la clave entera: con eso basta
+  // para compararla de un vistazo con la de BtoDicta, y no queda a la vista de
+  // quien pase por detrás. Sin esto, «la clave está mal» no dice SI la guardada
+  // es la que uno cree haber pegado — que fue justo la duda que hubo que
+  // resolver a mano.
+  const pista = token ? `${token.slice(0, 4)}…${token.slice(-4)} (${token.length} caracteres)` : "";
   paso("Clave de BtoDicta", Boolean(token),
-       token ? `Guardada (${token.length} caracteres)` : "No hay ninguna clave guardada",
+       token ? `Guardada: ${pista}` : "No hay ninguna clave guardada",
        "Cópiala en BtoDicta → Ajustes → «Dejar que otros programas transcriban» → Copiar, y pégala aquí arriba");
 
   // 3. ¿Está BtoDicta viva? Se pregunta a la puerta que no exige clave, para
@@ -60,8 +66,9 @@ export async function revisar() {
       paso("BtoDicta responde", false, `Contestó con el código ${r.status}`,
            "Reinicia BtoDicta");
     }
-  } catch {
-    paso("BtoDicta responde", false, "No contesta en 127.0.0.1:8787",
+  } catch (e) {
+    paso("BtoDicta responde", false,
+         `No contesta en 127.0.0.1:8787 — ${e && e.message ? e.message : e}`,
          "Abre BtoDicta y enciende «Abrir la puerta local» en Ajustes. Viene apagada de fábrica");
   }
 
@@ -70,8 +77,11 @@ export async function revisar() {
     try {
       const r = await fetch(API + "/navegador", { headers: { Authorization: "Bearer " + token } });
       if (r.status === 401) {
-        paso("La clave sirve", false, "BtoDicta la rechazó",
-             "La clave cambió. Cópiala otra vez desde Ajustes y pégala aquí");
+        let motivo = "";
+        try { motivo = (await r.json()).error || ""; } catch { /* sin cuerpo */ }
+        paso("La clave sirve", false,
+             `BtoDicta rechazó la clave ${pista}${motivo ? " — " + motivo : ""}`,
+             "Compara esos 4+4 caracteres con los de BtoDicta → Ajustes → Token. Si no coinciden, la clave cambió: cópiala de nuevo y pégala aquí");
       } else if (r.ok) {
         const d = await r.json();
         const mios = (d.informes || []).length;
@@ -89,9 +99,11 @@ export async function revisar() {
       } else {
         paso("La clave sirve", false, `Código ${r.status}`, "Mira el registro de BtoDicta");
       }
-    } catch {
-      paso("La clave sirve", false, "No se pudo preguntar",
-           "Comprueba que BtoDicta sigue abierta");
+    } catch (e) {
+      // El mensaje del navegador, tal cual. Un «no se pudo» genérico obliga a
+      // abrir la consola, que es justo lo que este panel viene a evitar.
+      paso("La clave sirve", false, `No se pudo preguntar: ${e && e.message ? e.message : e}`,
+           "Si dice «Failed to fetch», el navegador está bloqueando la llamada a 127.0.0.1: quita la extensión y vuelve a cargarla para que recoja sus permisos");
     }
   }
 
