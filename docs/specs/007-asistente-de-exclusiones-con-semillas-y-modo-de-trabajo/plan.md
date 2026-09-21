@@ -113,10 +113,10 @@ variante que lee de `Config` saca el modo de `bitacora_modo`.
 | D-2 | El asistente escribe en la lista **ancha** | Escribir en las tres | Cada lista significa algo distinto; unificarlas sería decidir por el usuario. La sincronización quedó fuera de alcance en la spec |
 | D-3 | **Entradas de dominio completo**, nunca fragmentos | Palabras sueltas («sex», «porn») | La comparación es por subcadena: «sex» casa con «Essex» y «sexta». Un fragmento corto deja sin bitácora media jornada sin que nadie entienda por qué |
 | D-4 | **Las dos**: corta embarcada de fábrica + ampliación pública opcional y apagada (RF-09) | Solo una de las dos | Decisión de Alberto. La corta cubre el caso normal sin red ni dependencias; la ampliación da cobertura real a quien la quiera y se puede apagar |
-| D-8 | **Dos formas de comparar según la lista** (ver §4.1) | Meter la lista ampliada en el mismo bucle de subcadena | 50 000 comparaciones de subcadena por decisión no caben en los 5 ms del RNF-05, y una subcadena sobre una lista enorme dispara los falsos positivos |
 | D-5 | Rechazos guardados **por identificador de entrada** | Guardar solo lo aceptado | Sin registrar el rechazo no se distingue «nunca se lo propusimos» de «dijo que no», y cada versión se lo volvería a proponer |
 | D-6 | Sección dentro de la pestaña Bitácora | Pestaña nueva | `.asistente` ya existe y es otra cosa; y esto pertenece al sitio donde se configura la bitácora |
 | D-7 | Escribir por `Config.set` | Escribir `config.json` | `Config` cachea y reescribe entero: una edición externa se pierde |
+| D-8 | **Dos formas de comparar según la lista** (ver §4.1) | Meter la lista ampliada en el mismo bucle de subcadena | 50 000 comparaciones de subcadena por decisión no caben en los 5 ms del RNF-05, y una subcadena sobre una lista enorme dispara los falsos positivos |
 
 Salen a `docs/adr/`: D-3 (comparación por subcadena y su trampa), D-4 (alcance de
 la lista de contenido adulto) y D-8 (las dos formas de comparar).
