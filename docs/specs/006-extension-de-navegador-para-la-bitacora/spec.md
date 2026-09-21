@@ -147,6 +147,30 @@ parte del día— sin degradar nada de lo que ya funciona.
   - Cuando BtoDicta consulta el estado del navegador
   - Entonces recibe la pestaña activa y la que suena, como en Chrome
 
+### RF-08 — La extensión avisa cuando se queda vieja
+
+- Actor: BtoDicta
+- Acción: compara la versión que reporta la extensión con la que ella trae, y avisa si no coinciden
+- Resultado: quien la tenga instalada se entera de que hay una versión nueva, en vez de seguir con una vieja sin saberlo
+- Medida: con una extensión de versión anterior a la de la aplicación, aparece un aviso en menos de 2 min desde que reporta
+- Prioridad: P1
+- Criterio de aceptación:
+  - Dado una extensión que reporta una versión anterior a la que trae la aplicación
+  - Cuando envía su informe
+  - Entonces la aplicación lo registra y avisa a la persona de que debe recargarla
+
+### RF-09 — Sacar la extensión de la aplicación, con su manual
+
+- Actor: la persona que dicta
+- Acción: pide desde BtoDicta una copia de la extensión donde quiera
+- Resultado: tiene la carpeta lista para cargar y un manual que explica cómo, sin buscar nada por el disco
+- Medida: una sola acción deja la carpeta en el destino elegido, con el manual dentro
+- Prioridad: P1
+- Criterio de aceptación:
+  - Dado BtoDicta instalada
+  - Cuando se pide sacar la extensión al Escritorio
+  - Entonces aparece una carpeta con la extensión y un manual de instalación en español
+
 ## 5. Requerimientos no funcionales
 
 | ID | Dimensión | Requerimiento con cifra u observable | Cómo se mide |
@@ -189,6 +213,21 @@ parte del día— sin degradar nada de lo que ya funciona.
   el incógnito queda invisible por decisión del navegador, no de esta spec.
 
 ## 9. Decisiones y aclaraciones
+
+### Sesión 2026-09-20 (ampliación tras probarla)
+
+- P: ¿Qué pasa cuando cambiemos la extensión? → R: «necesito que de alguna forma
+  esta extensión se actualice cada vez que hagamos algún cambio y el sistema se
+  lo haga saber al usuario» (decisión de Alberto). Nace **RF-08**. La spec se
+  amplía DESPUÉS de aprobada, con esta entrada fechada: no viaja hacia atrás en
+  silencio.
+- P: ¿Cómo la consigue alguien que no tenga el repositorio? → R: «necesito un
+  espacio donde el usuario se pueda descargar desde la app a su escritorio o
+  donde quiera la extensión con su manual claro de instalación» (decisión de
+  Alberto). Nace **RF-09**.
+- P: ¿Se prueba en los cuatro navegadores ahora? → R: «estamos solo probando con
+  Edge por el momento» (decisión de Alberto). El RF-07 (Firefox) se construye
+  pero su comprobación en vivo queda pendiente de que Alberto lo pruebe.
 
 ### Sesión 2026-09-20
 

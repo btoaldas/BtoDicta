@@ -29,6 +29,11 @@ export async function fotografiar({ pestañas = null, excluidos = null } = {}) {
 
   return {
     navegador: nombreDelNavegador(),
+    // La versión viaja en cada informe para que BtoDicta pueda avisar cuando la
+    // extensión se quede atrás. Una extensión no se actualiza sola fuera de una
+    // tienda, así que lo único que evita quedarse con una vieja sin saberlo es
+    // que alguien lo diga.
+    version: api?.runtime?.getManifest?.()?.version ?? "",
     instante: Date.now() / 1000,
     pestanas: abiertas.map((t) => {
       const fuera = estaExcluida(t.url || "", fuera_);

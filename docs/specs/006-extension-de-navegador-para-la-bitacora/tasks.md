@@ -13,6 +13,11 @@ T13 y T14 para poder cargar la extensión y probarla en un navegador real antes 
 seguir. Las cerraduras (fases A y B) ya estaban hechas, así que adelantar el
 empaquetado no salta ninguna protección.
 
+**Ampliación (2026-09-20, tras probarla):** nacen RF-08 y RF-09 con sus tareas
+T23 y T24. Y la comprobación en vivo se limita a Edge por decisión de Alberto
+—«estamos solo probando con Edge por el momento»—, así que T15 y T16 se dan por
+hechas con la carga real en Edge y la construcción verificada para el resto.
+
 ## Fase A — La puerta, antes de que nadie llame
 
 - [x] T01 (RF-01, RNF-01) Punto de entrada `POST /navegador` en la API local, con el token, el tope de cuerpo y el límite de peticiones que ya existen — `Sources/BtoDicta/ApiLocal.swift` — Evidencia esperada: `curl` sin token devuelve 401 y con token válido devuelve 200
@@ -60,6 +65,13 @@ empaquetado no salta ninguna protección.
 - [ ] T18 (RNF-02) Medición del coste en el navegador: 10 páginas con y sin extensión — `scripts/qa-coste-extension.py` — Evidencia esperada: < 50 ms de diferencia al cargar y < 30 MB de memoria
 - [ ] T19 (RF-04) Instalador: la extensión viaja con la aplicación, no se instala sola, y se explica cómo cargarla — `Makefile`, `docs/MANUAL.md` — Evidencia esperada: el paquete de la aplicación contiene la extensión y el manual explica los pasos
 - [ ] T20 (RF-05, RNF-03) Las pruebas de la extensión entran en el paquete de QA — `scripts/qa-paquete.sh` — Evidencia esperada: el QA pasa de 22 a 23 pruebas, con las negativas incluidas
+
+## Fase G — Lo que pidió Alberto tras probarla (RF-08, RF-09)
+
+- [x] T23 (RF-08) La extensión reporta su versión y BtoDicta avisa si es vieja — `extension/src/fondo.js`, `Sources/BtoDicta/EstadoNavegador.swift`, `Sources/BtoDicta/ApiLocal.swift` — Evidencia esperada: con una versión anterior, la respuesta lo dice y queda un aviso en el registro
+  - Evidencia (2026-09-20): la extensión manda su versión en cada informe; con 0.0.1 frente a la 0.1.0 que trae la app, se detecta con ambas versiones. Una al día no avisa, y una que no dice su versión tampoco — mejor callar que avisar en falso. El aviso sale una vez por versión, no en cada informe
+- [x] T24 (RF-09) Sacar la extensión desde la aplicación al sitio que se elija, con su manual — `Sources/BtoDicta/ExportarExtension.swift`, `Sources/BtoDicta/SettingsWindow.swift` — Evidencia esperada: una acción deja la carpeta con la extensión y un manual en español
+  - Evidencia (2026-09-20): botón «Sacarla a una carpeta…» en Ajustes. Deja `manifest.json` con el nombre que el navegador espera, el código y `COMO-INSTALAR.md` con los pasos reales y la versión de la que salió. Exportar dos veces reemplaza sin fallar, y lo anterior va a la Papelera por si alguien dejó algo dentro
 
 ## Fase F — Cierre
 

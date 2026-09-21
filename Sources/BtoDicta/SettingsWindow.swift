@@ -78,6 +78,14 @@ final class SettingsModel: ObservableObject {
     @Published var dictadosDias: Double { didSet { Config.set("dictados_conservar_dias", to: Int(dictadosDias)) } }
     @Published var registroTexto: Bool { didSet { Config.set("registro_incluye_texto", to: registroTexto) } }
     @Published var apiActiva: Bool { didSet { Config.set("api_local_activa", to: apiActiva); ApiLocal.reconfigurar() } }
+    /// Aviso cuando alguna extensión cargada se quedó en una versión anterior.
+    /// Una extensión cargada a mano no se actualiza sola: si nadie lo dice, se
+    /// sigue usando una vieja sin enterarse.
+    var avisoExtension: String {
+        let viejas = EstadoNavegadores.desactualizadas()
+        guard let v = viejas.first else { return "" }
+        return "La extensión de \(v.navegador) es la \(v.tiene) y esta versión trae la \(v.deberia). Vuelve a sacarla y pulsa «Actualizar» en la página de extensiones."
+    }
     @Published var apiToken: String = ApiLocal.token()
     @Published var pausarMultimedia: Bool { didSet { Config.set("atenuar_multimedia", to: pausarMultimedia) } }
     @Published var bajarVolumen: Bool { didSet { Config.set("silenciar_ademas", to: bajarVolumen) } }
@@ -732,6 +740,23 @@ struct SettingsView: View {
                         .font(.caption2).foregroundStyle(.secondary)
                     Text("Solo puede leer audios de las carpetas de Descargas, Documentos y la temporal del sistema; nada más del disco.")
                         .font(.caption2).foregroundStyle(.secondary)
+
+                    // La extensión del navegador vive detrás de esta misma puerta:
+                    // sin la API abierta no tendría con quién hablar, así que
+                    // ofrecerla aparte solo confundiría.
+                    Divider().padding(.vertical, 4)
+                    HStack {
+                        Text("Extensión para el navegador").font(.caption).bold()
+                        Spacer()
+                        Button("Sacarla a una carpeta…") { ExportarExtension.exportarPreguntando() }
+                            .disabled(!ExportarExtension.disponible)
+                    }
+                    Text("Le cuenta a la bitácora qué pestaña estás mirando y cuál está sonando — eso el sistema no puede verlo solo, y sin ese dato un vídeo de fondo acaba anotado como trabajo. Se copia donde elijas, con un manual de instalación. Es opcional: BtoDicta funciona igual sin ella.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    if !m.avisoExtension.isEmpty {
+                        Text(m.avisoExtension)
+                            .font(.caption2).foregroundStyle(.orange)
+                    }
                 }
 
                 Divider().padding(.vertical, 6)

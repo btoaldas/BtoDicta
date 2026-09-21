@@ -3093,6 +3093,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("HUELLAMEM \(mal == 0 ? "TODO OK — verificar un modelo no carga el modelo" : "FALLA (\(mal))")")
             exit(mal == 0 ? 0 : 1)
         }
+        // Sacar la extensión y avisar si se quedó vieja: BTODICTA_EXTENSIONTEST=1
+        if ProcessInfo.processInfo.environment["BTODICTA_EXTENSIONTEST"] == "1" {
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("EXTAPP \(ok ? "✓" : "✗") \(q)"); if !ok { mal += 1 } }
+
+            // T24 — la extensión sale de la aplicación, con su manual.
+            chk(ExportarExtension.disponible, "la aplicación trae la extensión dentro")
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent("extapp-\(UUID().uuidString)")
+            try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+            switch ExportarExtension.exportar(a: tmp) {
+            case .failure(let m):
+                chk(false, "exportar falló: \(m.texto)")
+            case .success(let carpeta):
+                let fm = FileManager.default
+                chk(fm.fileExists(atPath: carpeta.appendingPathComponent("manifest.json").path),
+                    "el manifiesto queda con el nombre que el navegador espera")
+                chk(fm.fileExists(atPath: carpeta.appendingPathComponent("src/fondo.js").path),
+                    "y el código de la extensión también")
+                let manualURL = carpeta.appendingPathComponent("COMO-INSTALAR.md")
+                let manual = (try? String(contentsOf: manualURL, encoding: .utf8)) ?? ""
+                chk(!manual.isEmpty, "hay manual de instalación")
+                chk(manual.contains("Modo de desarrollador") && manual.contains("Cargar descomprimida"),
+                    "y explica los pasos reales, no generalidades")
+                chk(manual.contains(Version.numero),
+                    "el manual dice de qué versión de BtoDicta salió")
+                // Exportar dos veces no debe acumular ni fallar.
+                let otra = ExportarExtension.exportar(a: tmp)
+                if case .success = otra { chk(true, "exportar de nuevo reemplaza sin fallar") }
+                else { chk(false, "exportar dos veces falla") }
+            }
+            try? FileManager.default.removeItem(at: tmp)
+
+            // T23 — el aviso de versión vieja.
+            let traida = EstadoNavegadores.versionQueTraeLaApp()
+            chk(!traida.isEmpty, "se sabe qué versión de extensión trae la aplicación (\(traida))")
+            EstadoNavegadores.olvidarTodo()
+            EstadoNavegadores.anotar(EstadoNavegador(navegador: "Microsoft Edge", pestañas: [],
+                                                     version: "0.0.1"))
+            let viejas = EstadoNavegadores.desactualizadas()
+            chk(viejas.count == 1 && viejas[0].tiene == "0.0.1",
+                "una extensión vieja se detecta, con la versión que tiene y la que debería")
+            EstadoNavegadores.olvidarTodo()
+            EstadoNavegadores.anotar(EstadoNavegador(navegador: "Microsoft Edge", pestañas: [],
+                                                     version: traida))
+            chk(EstadoNavegadores.desactualizadas().isEmpty, "y una al día no genera aviso")
+            EstadoNavegadores.olvidarTodo()
+            EstadoNavegadores.anotar(EstadoNavegador(navegador: "Firefox", pestañas: [], version: ""))
+            chk(EstadoNavegadores.desactualizadas().isEmpty,
+                "una extensión que no dice su versión tampoco: mejor callar que avisar en falso")
+
+            print("EXTAPP \(mal == 0 ? "TODO OK — la extensión sale con su manual y avisa si envejece" : "FALLA (\(mal))")")
+            exit(mal == 0 ? 0 : 1)
+        }
         // El punto de entrada del navegador: BTODICTA_NAVEGADORTEST=1  (spec 006)
         //
         // Se prueba ANTES de que exista la extensión que va a usarlo. El riesgo

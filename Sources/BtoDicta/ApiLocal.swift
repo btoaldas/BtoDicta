@@ -317,8 +317,14 @@ enum ApiLocal {
             rechazar(conexion, 401, .tokenMalo); return
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: cuerpo) as? [String: Any] else {
-            rechazar(conexion, 400, .malFormada); return
+        // Un GET no lleva cuerpo, y exigírselo lo rechazaba antes de llegar a su
+        // ruta. El cuerpo solo es obligatorio para quien envía algo.
+        var json: [String: Any] = [:]
+        if metodo != "GET" {
+            guard let leido = try? JSONSerialization.jsonObject(with: cuerpo) as? [String: Any] else {
+                rechazar(conexion, 400, .malFormada); return
+            }
+            json = leido
         }
 
         guard cabeOtraPeticion() else {
@@ -329,6 +335,7 @@ enum ApiLocal {
         case ("POST", "/transcribir"): transcribir(conexion, json)
         case ("POST", "/pulir"):       pulir(conexion, json)
         case ("POST", "/navegador"):   navegador(conexion, json)
+        case ("GET",  "/navegador"):   verNavegador(conexion)
         default:
             responder(conexion, 404, ["error": "no existe \(metodo) \(ruta)"])
         }
@@ -398,6 +405,42 @@ enum ApiLocal {
         }
     }
 
+    /// Qué está viendo BtoDicta del navegador AHORA MISMO.
+    ///
+    /// Existe para contestar a una pregunta legítima: «¿cómo sé que esto
+    /// funciona?». Un sistema que decide en silencio qué se graba y qué no tiene
+    /// que poder enseñar en qué se basa; si no, la única forma de saber si
+    /// acierta es esperar a que se equivoque.
+    private static func verNavegador(_ conexion: NWConnection) {
+        let informes = EstadoNavegadores.vigentes()
+        let detalle: [[String: Any]] = informes.map { i in
+            [
+                "navegador": i.navegador,
+                "hace_segundos": Int(i.antiguedad),
+                "activa": i.activa.map { $0.url.isEmpty ? "(dominio excluido)" : $0.url } ?? "",
+                "suenan": i.audibles.map { $0.url.isEmpty ? "(dominio excluido)" : $0.url },
+                "pestanas": i.pestañas.count,
+            ]
+        }
+        // Y qué decidiría AHORA con lo que sabe, que es lo que de verdad
+        // interesa: no el dato crudo, sino su consecuencia.
+        let contexto = FiltroBitacora.contextoDelFrente()
+        let veredicto = FiltroBitacora.decidirConNavegador(app: contexto.app, pista: contexto.pista)
+        var decision: [String: Any] = ["al_frente": contexto.app ?? "(nada)",
+                                       "mirando": contexto.pista ?? ""]
+        switch veredicto {
+        case .entra:             decision["se_grabaria"] = true
+        case .fuera(let motivo): decision["se_grabaria"] = false; decision["motivo"] = motivo
+        }
+
+        responder(conexion, 200, [
+            "informes": detalle,
+            "vigencia_segundos": Int(EstadoNavegadores.segundosDeVigencia()),
+            "hay_reglas": FiltroBitacora.hayReglas,
+            "ahora_mismo": decision,
+        ])
+    }
+
     /// Lo que cuenta un navegador de sí mismo (spec 006, RF-01).
     ///
     /// Es un SENSOR, no un cliente que pida trabajo: informa y se va. Por eso la
@@ -410,6 +453,19 @@ enum ApiLocal {
             return
         }
         EstadoNavegadores.anotar(estado)
+
+        // ¿Se quedó atrás? Se avisa UNA vez por versión y navegador: repetirlo en
+        // cada informe llenaría el registro de la misma línea cada 30 segundos.
+        var avisoVersion: String? = nil
+        let esperada = EstadoNavegadores.versionQueTraeLaApp()
+        if !esperada.isEmpty, !estado.version.isEmpty, estado.version != esperada {
+            avisoVersion = "la extensión de \(estado.navegador) es la \(estado.version) y esta versión de BtoDicta trae la \(esperada)"
+            let clave = "\(estado.navegador)-\(estado.version)"
+            if !MemoriaPersistente.yaHechoHoy(tema: "aviso-extension", clave: clave) {
+                MemoriaPersistente.anotarAhora(tema: "aviso-extension", clave: clave)
+                Log.log(.sistema, "bitácora: \(avisoVersion!) — conviene volver a cargarla desde Ajustes")
+            }
+        }
 
         // El texto de la página, si viene (RF-02).
         //
@@ -435,9 +491,17 @@ enum ApiLocal {
             }
         }
 
-        responder(conexion, 200, ["recibido": estado.pestañas.count,
-                                  "audibles": estado.audibles.count,
-                                  "texto_guardado": textoGuardado])
+        var respuesta: [String: Any] = ["recibido": estado.pestañas.count,
+                                        "audibles": estado.audibles.count,
+                                        "texto_guardado": textoGuardado]
+        // La extensión recibe el aviso en su propia respuesta: así puede
+        // enseñarlo donde el usuario ya está mirando, sin depender de que abra
+        // los ajustes de la aplicación.
+        if let aviso = avisoVersion {
+            respuesta["aviso"] = aviso
+            respuesta["version_esperada"] = esperada
+        }
+        responder(conexion, 200, respuesta)
     }
 
     private static func pulir(_ conexion: NWConnection, _ json: [String: Any]) {

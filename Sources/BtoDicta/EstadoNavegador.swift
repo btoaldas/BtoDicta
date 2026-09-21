@@ -22,6 +22,8 @@ struct EstadoNavegador {
 
     /// Qué navegador habla: «Google Chrome», «Firefox»…
     let navegador: String
+    /// Versión de la extensión que informa, para saber si se quedó atrás.
+    let version: String
     let pestañas: [Pestaña]
     /// Cuándo lo dijo. No se usa la hora de llegada: entre que el navegador mira
     /// y la petición llega puede pasar tiempo, y un dato viejo presentado como
@@ -39,6 +41,7 @@ struct EstadoNavegador {
         guard let navegador = json["navegador"] as? String, !navegador.isEmpty,
               let crudas = json["pestanas"] as? [[String: Any]] else { return nil }
         self.navegador = navegador
+        self.version = (json["version"] as? String) ?? ""
         self.pestañas = crudas.compactMap { p in
             guard let url = p["url"] as? String else { return nil }
             return Pestaña(url: url,
@@ -56,8 +59,9 @@ struct EstadoNavegador {
     }
 
     /// Para las pruebas y para el uso interno.
-    init(navegador: String, pestañas: [Pestaña], instante: Date = Date()) {
+    init(navegador: String, pestañas: [Pestaña], instante: Date = Date(), version: String = "") {
         self.navegador = navegador
+        self.version = version
         self.pestañas = pestañas
         self.instante = instante
     }
@@ -95,6 +99,34 @@ enum EstadoNavegadores {
         candado.lock(); defer { candado.unlock() }
         let tope = segundosDeVigencia()
         return porNavegador.values.filter { $0.antiguedad <= tope }
+    }
+
+    /// La versión de extensión que trae esta copia de BtoDicta.
+    ///
+    /// Se lee del manifiesto que viaja dentro de la aplicación, no de una
+    /// constante escrita a mano: una constante y un manifiesto se desincronizan
+    /// el día que alguien toca uno y olvida el otro.
+    static func versionQueTraeLaApp() -> String {
+        guard let url = Bundle.main.url(forResource: "manifest.chromium", withExtension: "json"),
+              let d = try? Data(contentsOf: url),
+              let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              let v = j["version"] as? String else { return "" }
+        return v
+    }
+
+    /// ¿Hay alguna extensión informando con una versión distinta de la que
+    /// trae la aplicación? Devuelve los navegadores afectados.
+    ///
+    /// Una extensión cargada a mano NO se actualiza sola —eso solo lo hace una
+    /// tienda—, así que lo único que evita seguir con una vieja sin enterarse es
+    /// que alguien lo diga.
+    static func desactualizadas() -> [(navegador: String, tiene: String, deberia: String)] {
+        let esperada = versionQueTraeLaApp()
+        guard !esperada.isEmpty else { return [] }
+        return vigentes().compactMap { i in
+            guard !i.version.isEmpty, i.version != esperada else { return nil }
+            return (i.navegador, i.version, esperada)
+        }
     }
 
     static func olvidarTodo() {

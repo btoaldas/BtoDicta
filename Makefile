@@ -50,6 +50,13 @@ bundle: $(BUILD_DIR)/release/$(APP)
 	mkdir -p $(BUNDLE)/Contents/Resources
 	cp -R Resources/ $(BUNDLE)/Contents/Resources/
 	# Motores locales embarcados: la app instalada no depende de builds de dev
+	@# La extensión viaja DENTRO de la aplicación (spec 006, RF-09): sin esto,
+	@# conseguirla exigiría tener el repositorio, y eso convierte una función del
+	@# producto en algo reservado a quien lo desarrolla.
+	mkdir -p $(BUNDLE)/Contents/Resources/extension
+	cp -R extension/src extension/manifest.chromium.json $(BUNDLE)/Contents/Resources/extension/
+	@if [ -f extension/manifest.firefox.json ]; then cp extension/manifest.firefox.json $(BUNDLE)/Contents/Resources/extension/; fi
+	cp extension/manifest.chromium.json $(BUNDLE)/Contents/Resources/manifest.chromium.json
 	mkdir -p $(BUNDLE)/Contents/Resources/bin
 	@if [ -x native/bto-stream ]; then cp native/bto-stream $(BUNDLE)/Contents/Resources/bin/; fi
 	@if [ -x $(HOME)/transcribe.cpp/build/bin/transcribe-cli ]; then \
