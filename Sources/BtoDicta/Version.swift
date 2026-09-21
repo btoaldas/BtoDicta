@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.78.1"
+    static let numero = "0.79.0"
     static let fecha = "2026-09-21"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.79.0", "2026-09-21", [
+            "EL CORTE POR SILENCIO NUNCA HABÍA FUNCIONADO. Comparaba contra el valor del MEDIDOR, que viene amplificado 12 veces y con raíz cuadrada para que un susurro mueva la barra. Con ese transformador, un nivel de 0,0019 —silencio digital— ya daba 0,15 y contaba como voz: hacía falta una sala casi 2 veces más callada que una habitación vacía para que el dictado se cerrara solo. Un dictado se quedó abierto ocho minutos sin nadie hablando, y ese silencio se transcribió y se pagó",
+            "Ahora se decide con el nivel REAL, y el umbral es tuyo: un control en Ajustes con la referencia medida (una sala vacía da 0,004)",
+            "EL BORDE DE LA PANTALLA TE AVISA de que sigues grabando, cada cinco minutos y en todas las pantallas. No acepta clics ni roba el foco: se ve por el rabillo del ojo sin estorbar lo que estés haciendo, y no sale como un fogonazo si compartes pantalla",
+            "Y un tope de duración —veinte minutos de fábrica— porque el corte por silencio no sirve de freno: cualquier ruido reinicia su cuenta, así que una tecla cada pocos segundos mantiene el dictado abierto para siempre. Al llegar al tope DECIDES TÚ: seguir o cerrar. Si nadie contesta se cierra, que es el lado seguro. Todo parametrizable, incluido apagarlo",
+        ]),
         ("0.78.1", "2026-09-21", [
             "EL DICTADO VOLVÍA A NO GRABAR. La tecla respondía, el registro decía «iniciar», y no se grababa nada: la bitácora soltaba el micrófono y se lo llevaba de vuelta en el mismo segundo. El dictado abría después un dispositivo ya ocupado, y no daba ningún error — que es la peor forma de fallar",
             "Causa: entre soltar el micrófono y abrirlo había una rendija en la que nadie figuraba como dueño. En ese hueco la aplicación monta el panel, calienta la red y pregunta al navegador por su dirección, así que era ancha. Ahora el dictado consta como dueño hasta que el grabador tiene el micrófono de verdad",

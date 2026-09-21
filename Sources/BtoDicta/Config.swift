@@ -47,6 +47,59 @@ struct Config {
 
     static func hotkey() -> String { (json()["tecla"] as? String) ?? "fn" }
     static func maxSilence() -> TimeInterval { (json()["silencio_max_seg"] as? Double) ?? 120 }
+
+    /// A partir de qué RMS se considera que alguien está hablando.
+    ///
+    /// Se compara contra el RMS **crudo**, no contra el valor del medidor. De
+    /// fábrica 0,02, que sigue el mismo criterio que la bitácora
+    /// (`bitacora_umbral_silencio` = 800 sobre 32768 ≈ 0,024) y está medido:
+    /// una sala vacía da 0,0036, unas cinco veces por debajo.
+    ///
+    /// Subirlo hace falta oficina ruidosa; bajarlo, si se habla muy flojo. Un
+    /// valor demasiado bajo devuelve el fallo que esto corrige: el dictado no se
+    /// cierra nunca y se transcribe silencio, que se paga.
+    static func umbralVozDictado() -> Double {
+        let v = (json()["dictado_umbral_voz"] as? Double) ?? 0.02
+        return min(max(v, 0.001), 0.5)
+    }
+
+    /// Cada cuántos minutos late el borde recordando que se está grabando.
+    /// 0 = nunca. De fábrica 5.
+    static func avisoGrabandoMin() -> Double {
+        max((json()["dictado_aviso_min"] as? Double) ?? 5, 0)
+    }
+
+    /// ¿Se enciende el borde de la pantalla? De fábrica sí.
+    ///
+    /// Es lo único que se ve sin mirar. El contador del notch ya existía y no
+    /// evitó ocho minutos de grabación en silencio.
+    static func avisoGrabandoBorde() -> Bool {
+        (json()["dictado_aviso_borde"] as? Bool) ?? true
+    }
+
+    /// Qué hacer al llegar al tope: `preguntar` (de fábrica), `parar` o `seguir`.
+    static func alLlegarAlTope() -> String {
+        let v = (json()["dictado_al_tope"] as? String) ?? "preguntar"
+        return ["preguntar", "parar", "seguir"].contains(v) ? v : "preguntar"
+    }
+
+    /// Cuántos segundos se espera una respuesta antes de decidir solo.
+    ///
+    /// Si nadie contesta se PARA, que es el lado seguro: seguir grabando sin
+    /// nadie delante es exactamente el fallo que esto corrige, y cuesta dinero.
+    static func esperaEnElTopeSeg() -> Double {
+        min(max((json()["dictado_tope_espera_seg"] as? Double) ?? 30, 5), 300)
+    }
+
+    /// Tope absoluto de un dictado, en minutos. 0 = sin tope.
+    ///
+    /// El corte por silencio no basta: cualquier ruido por encima del umbral
+    /// reinicia su cuenta, así que un golpe cada catorce segundos mantiene el
+    /// dictado abierto indefinidamente. Esto es el freno que no depende de que
+    /// haya o no ruido.
+    static func maxDictadoMin() -> Double {
+        max((json()["dictado_max_min"] as? Double) ?? 20, 0)
+    }
     static func sounds() -> Bool { (json()["sonidos"] as? Bool) ?? true }
     static func escCancels() -> Bool { (json()["esc_cancela"] as? Bool) ?? true }
     static func duckMedia() -> Bool { (json()["atenuar_multimedia"] as? Bool) ?? true }

@@ -197,6 +197,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var activacionVozRearmeIntentos = 0
     private var activacionVozUltimoForzado = Date.distantPast
     private var iniciandoDictado = false
+    /// Cuántos recordatorios de «sigues grabando» se han dado en esta sesión.
+    private var avisosGrabandoDados = 0
+    /// Hay una pregunta del tope en pantalla: no se vuelve a preguntar encima.
+    private var preguntandoPorElTope = false
     /// Si fn se soltó mientras el oyente todavía entregaba el micrófono, se
     /// ejecuta apenas Recorder arranque. `true` descarta (fn usado como atajo),
     /// `false` transcribe. Evita una grabación huérfana por esa carrera breve.
@@ -237,6 +241,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// `silencioso`: sin sonido ni panel "✕ Cancelado" (para descartar un
     /// arranque espurio de push-to-talk cuando fn se usó como atajo).
     private func cancelDictation(silencioso: Bool = false) {
+        AvisoGrabando.shared.apagar()
         guard recorder.isRecording else { return }
         limpiarContinuacionDictadoAsistido()
         limpiarAclaracionCaptura(origen: "dictado_cancelado")
@@ -900,6 +905,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
                 print("CARRERAMICRO FALLA timeout"); fflush(stdout); exit(4)
+            }
+            return
+        }
+        // El borde de aviso, para poder MIRARLO. BTODICTA_BORDETEST=1
+        // Lo deja encendido y se queda: un aviso visual no se da por bueno
+        // porque compile, se da por bueno cuando se ha visto.
+        if ProcessInfo.processInfo.environment["BTODICTA_BORDETEST"] == "1" {
+            Config.set("dictado_aviso_borde", to: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                AvisoGrabando.shared.mantener()
+                print("BORDETEST encendido")
+                fflush(stdout)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+                AvisoGrabando.shared.apagar()
+                print("BORDETEST apagado"); fflush(stdout); exit(0)
             }
             return
         }
@@ -4645,10 +4666,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
 
         recorder.onLevel = { [weak self] level in
+            DispatchQueue.main.async { self?.panel.meter.push(level) }
+        }
+        // «¿Hay voz?» se decide con el RMS CRUDO, no con el valor del medidor.
+        //
+        // Estuvo comparando `level > 0.15`, y `level` viene amplificado 12× y con
+        // raíz cuadrada para que un susurro mueva la barra. Con ese transformador
+        // un RMS de 0,0019 ya da 0,15: silencio digital. Medido en una sala vacía
+        // el RMS es 0,0036 → level 0,208, siempre por encima. **El corte por
+        // silencio no podía saltar en ninguna sala del mundo**, y un dictado se
+        // quedó abierto ocho minutos sin nadie hablando: transcrito y pagado.
+        recorder.onRMS = { [weak self] rms in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.panel.meter.push(level)
-                if level > 0.15 {
+                if rms > Float(Config.umbralVozDictado()) {
                     self.lastVoice = Date()
                     self.huboVozEnSesion = true
                 }
@@ -6124,6 +6155,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    /// El último aviso: el borde se queda encendido y hay que decidir.
+    ///
+    /// No se cierra en silencio a propósito. Un dictado de veinte minutos puede
+    /// ser perfectamente legítimo —una explicación larga, una reunión— y cortarlo
+    /// sin avisar destruiría trabajo real. Pero tampoco se deja abierto sin más:
+    /// si nadie contesta en el plazo, **se para**, que es el lado seguro. Seguir
+    /// grabando sin nadie delante es el fallo que esto corrige, y se paga.
+    private func preguntarPorElTope(minutos: Int) {
+        guard !preguntandoPorElTope, recorder.isRecording else { return }
+        preguntandoPorElTope = true
+        let espera = Config.esperaEnElTopeSeg()
+        AvisoGrabando.shared.mantener()
+        playSound("Funk")
+        Log.log(.sistema, "dictado: tope de \(minutos) min — pregunto si seguir (plazo \(Int(espera)) s)")
+
+        let alerta = NSAlert()
+        alerta.alertStyle = .warning
+        alerta.messageText = "Llevas \(minutos) minutos grabando"
+        alerta.informativeText = """
+        ¿Sigues dictando, o se quedó abierto?
+
+        Si nadie contesta en \(Int(espera)) segundos se cierra y se transcribe lo \
+        grabado hasta ahora, para no seguir grabando —y pagando— en silencio.
+        """
+        alerta.addButton(withTitle: "Sigo grabando")
+        alerta.addButton(withTitle: "Cerrar y transcribir")
+
+        // Si no contesta, se cierra la alerta sola y se para.
+        var decidido = false
+        let plazo = DispatchWorkItem { [weak self] in
+            guard !decidido else { return }
+            decidido = true
+            NSApp.abortModal()
+            guard let self else { return }
+            self.preguntandoPorElTope = false
+            AvisoGrabando.shared.apagar()
+            Log.log(.sistema, "dictado: sin respuesta en el tope — cierro y transcribo")
+            self.panel.update("⏱️ Sin respuesta — cierro el dictado")
+            self.stopAndTranscribe()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + espera, execute: plazo)
+
+        let r = alerta.runModal()
+        guard !decidido else { return }
+        decidido = true
+        plazo.cancel()
+        preguntandoPorElTope = false
+        AvisoGrabando.shared.apagar()
+
+        if r == .alertFirstButtonReturn {
+            // Sigue: se reinicia la cuenta para volver a preguntar dentro de otro
+            // tope, no para dejar de preguntar nunca más.
+            inicioDictado = Date()
+            avisosGrabandoDados = 0
+            Log.log(.sistema, "dictado: sigue grabando por decisión del usuario — la cuenta vuelve a empezar")
+            panel.update("🔴 Sigo grabando")
+        } else {
+            Log.log(.sistema, "dictado: cerrado por el usuario en el aviso del tope")
+            stopAndTranscribe()
+        }
+    }
+
     private func startDictationAhora() {
         // La bandera se suelta por TODOS los caminos de salida. Si se quedara en
         // alto, `activacionVozOcupada` sería cierto para siempre y la bitácora no
@@ -6231,6 +6324,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.avisarSiLibre("🎙️ El micrófono no entregó audio — revisa qué app lo está usando o cámbialo en Ajustes")
                 return
             }
+            let llevaSeg = Date().timeIntervalSince(self.inicioDictado)
+
+            // Recordatorio periódico: el borde de la pantalla late. El contador
+            // del notch ya existía y no evitó ocho minutos grabando en silencio,
+            // porque uno mira donde trabaja, no donde está el reloj.
+            let avisoMin = Config.avisoGrabandoMin()
+            if avisoMin > 0 {
+                let toca = Int(llevaSeg / (avisoMin * 60))
+                if toca > self.avisosGrabandoDados {
+                    self.avisosGrabandoDados = toca
+                    AvisoGrabando.shared.latir()
+                    self.panel.update("🔴 Llevas \(Int(llevaSeg / 60)) min grabando")
+                    Log.log(.sistema, "dictado: aviso de los \(Int(llevaSeg / 60)) min")
+                }
+            }
+
+            // Tope absoluto. El corte por silencio NO basta como único freno:
+            // cualquier ruido por encima del umbral reinicia su cuenta, así que
+            // un golpe cada catorce segundos —una tecla, la silla, un aviso del
+            // sistema— mantiene el dictado abierto para siempre. Esto no depende
+            // de que haya ruido.
+            let topeMin = Config.maxDictadoMin()
+            if topeMin > 0, llevaSeg >= topeMin * 60, !self.preguntandoPorElTope {
+                switch Config.alLlegarAlTope() {
+                case "seguir":
+                    // Se avisa igual, pero no se corta: decisión del usuario.
+                    break
+                case "parar":
+                    timer.invalidate()
+                    Log.log(.sistema, "dictado: tope de \(Int(topeMin)) min — cierro y transcribo lo grabado")
+                    self.panel.update("⏱️ \(Int(topeMin)) min — cierro el dictado")
+                    self.stopAndTranscribe()
+                    return
+                default:
+                    self.preguntarPorElTope(minutos: Int(topeMin))
+                }
+            }
             let quiet = Date().timeIntervalSince(self.lastVoice)
             let limit = Config.maxSilence()
             if quiet >= limit {
@@ -6259,6 +6389,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // AQUÍ, y no antes: a partir de este punto `recorder.isRecording` ya
             // sostiene por sí solo «el micrófono está ocupado».
             iniciandoDictado = false
+            avisosGrabandoDados = 0
+            preguntandoPorElTope = false
             armEsc()
             media.dictationStarted()
             playSound("Tink")
@@ -6714,6 +6846,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func stopAndTranscribe() {
+        // El borde se apaga por CUALQUIER vía de cierre. Un aviso que se queda
+        // encendido cuando ya no se graba enseña a ignorarlo.
+        AvisoGrabando.shared.apagar()
         disarmEsc()
         setIcono(.procesando)
         media.dictationEnded()

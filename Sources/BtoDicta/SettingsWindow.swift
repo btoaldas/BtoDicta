@@ -61,6 +61,12 @@ final class SettingsModel: ObservableObject {
         }
     }
     @Published var silencioMax: Double { didSet { Config.set("silencio_max_seg", to: silencioMax) } }
+    @Published var umbralVoz: Double { didSet { Config.set("dictado_umbral_voz", to: umbralVoz) } }
+    @Published var avisoGrabandoMin: Double { didSet { Config.set("dictado_aviso_min", to: avisoGrabandoMin) } }
+    @Published var avisoGrabandoBorde: Bool { didSet { Config.set("dictado_aviso_borde", to: avisoGrabandoBorde) } }
+    @Published var maxDictadoMin: Double { didSet { Config.set("dictado_max_min", to: maxDictadoMin) } }
+    @Published var alLlegarAlTope: String { didSet { Config.set("dictado_al_tope", to: alLlegarAlTope) } }
+    @Published var esperaEnElTope: Double { didSet { Config.set("dictado_tope_espera_seg", to: esperaEnElTope) } }
     @Published var sonidos: Bool { didSet { Config.set("sonidos", to: sonidos) } }
     @Published var escCancela: Bool { didSet { Config.set("esc_cancela", to: escCancela) } }
     @Published var escDoble: Bool { didSet { Config.set("esc_doble", to: escDoble) } }
@@ -200,6 +206,12 @@ final class SettingsModel: ObservableObject {
         atajoAprender = Config.atajoAprender()
         porSonido = Config.correccionPorSonido()
         silencioMax = Config.maxSilence()
+        umbralVoz = Config.umbralVozDictado()
+        avisoGrabandoMin = Config.avisoGrabandoMin()
+        avisoGrabandoBorde = Config.avisoGrabandoBorde()
+        maxDictadoMin = Config.maxDictadoMin()
+        alLlegarAlTope = Config.alLlegarAlTope()
+        esperaEnElTope = Config.esperaEnElTopeSeg()
         sonidos = Config.sounds()
         escCancela = Config.escCancels()
         escDoble = Config.escDoble()
@@ -851,6 +863,50 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Auto-cerrar tras \(Int(m.silencioMax)) s de silencio").font(.subheadline)
                     Slider(value: $m.silencioMax, in: 15...300, step: 15).tint(acento)
+                    Text("A partir de qué nivel se considera que hablas: \(String(format: "%.3f", m.umbralVoz))")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Slider(value: $m.umbralVoz, in: 0.005...0.100, step: 0.005).tint(acento)
+                    Text("Más bajo capta voces lejanas; más alto evita que el ruido de la sala cuente como voz y el dictado no se cierre nunca. Una sala vacía suele medir 0,004.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            tarjeta("Que no se quede grabando solo", "record.circle") {
+                Text("Un dictado se quedó abierto ocho minutos sin nadie hablando. El contador del notch estaba ahí y no se miró: uno mira donde trabaja. Ese silencio se transcribe y se paga.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Toggle("Encender el borde de la pantalla al avisar", isOn: $m.avisoGrabandoBorde)
+                    .help("Un marco que late alrededor de todas las pantallas. No acepta clics ni roba el foco: se ve sin estorbar.")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(m.avisoGrabandoMin == 0
+                         ? "Sin recordatorios mientras grabas"
+                         : "Recordar cada \(Int(m.avisoGrabandoMin)) min que sigue grabando").font(.subheadline)
+                    Slider(value: $m.avisoGrabandoMin, in: 0...30, step: 1).tint(acento)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(m.maxDictadoMin == 0
+                         ? "Sin tope de duración"
+                         : "Tope del dictado: \(Int(m.maxDictadoMin)) min").font(.subheadline)
+                    Slider(value: $m.maxDictadoMin, in: 0...120, step: 5).tint(acento)
+                    Text("El corte por silencio no basta como freno: cualquier ruido por encima del umbral reinicia su cuenta, así que un golpe cada pocos segundos mantiene el dictado abierto indefinidamente.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if m.maxDictadoMin > 0 {
+                    Picker("Al llegar al tope", selection: $m.alLlegarAlTope) {
+                        Text("Preguntarme").tag("preguntar")
+                        Text("Cerrar y transcribir").tag("parar")
+                        Text("Solo avisar y seguir").tag("seguir")
+                    }
+                    if m.alLlegarAlTope == "preguntar" {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Si no contesto en \(Int(m.esperaEnElTope)) s, cerrar").font(.subheadline)
+                            Slider(value: $m.esperaEnElTope, in: 5...300, step: 5).tint(acento)
+                            Text("Sin respuesta se cierra, que es el lado seguro: seguir grabando sin nadie delante es justo el fallo que esto evita.")
+                                .font(.caption2).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
             }
             tarjeta("Al terminar el dictado", "return") {

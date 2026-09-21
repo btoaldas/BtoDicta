@@ -38,6 +38,16 @@ final class Recorder {
 
     var onChunk: ((Data) -> Void)?
     var onLevel: ((Float) -> Void)?
+
+    /// El RMS CRUDO, sin la amplificación del medidor.
+    ///
+    /// `onLevel` entrega un valor pensado para PINTAR una barra: `rms * 12`
+    /// y luego raíz cuadrada, para que un susurro ya mueva el medidor. Usarlo
+    /// para decidir «¿hay voz?» fue un fallo real y caro: con ese transformador,
+    /// un RMS de 0,0019 —silencio digital— ya da 0,15, así que el corte por
+    /// silencio no podía saltar en ninguna sala del mundo. Un dictado se quedó
+    /// abierto ocho minutos sin nadie hablando, y se transcribió y se pagó.
+    var onRMS: ((Float) -> Void)?
     private(set) var isRecording = false
 
     /// PCM crudo acumulado hasta ahora (para transcripción parcial en vivo).
@@ -219,7 +229,8 @@ final class Recorder {
             }
             let rms = Float((sum / Double(max(n, 1))).squareRoot())
             let boosted = Float(pow(Double(min(rms * 12, 1.0)), 0.5))
-            self.onLevel?(boosted)
+            self.onLevel?(boosted)   // para el medidor: amplificado a propósito
+            self.onRMS?(rms)         // para decidir: el valor real
         }
 
         }
