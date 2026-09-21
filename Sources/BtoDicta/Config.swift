@@ -5,7 +5,28 @@ import Carbon.HIToolbox
 // MARK: - Configuración
 
 struct Config {
-    static let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".btodicta")
+    /// Dónde vive la configuración.
+    ///
+    /// **Por qué se puede desviar con una variable de entorno.**
+    /// Los arneses de prueba escriben en estas mismas claves para comprobar el
+    /// filtro, y uno de ellos dejó de restaurar cuando se le añadió una sección
+    /// al final: cada pasada del QA sobrescribía la configuración real de quien
+    /// tuviera el equipo delante. No se notó porque las listas todavía no tenían
+    /// interfaz y nadie había escrito nada suyo en ellas — el día que la tuvieran,
+    /// el QA le habría borrado lo que hubiera puesto.
+    ///
+    /// Restaurar al final es frágil: depende de que cada sección nueva se acuerde,
+    /// y `exit()` no ejecuta un `defer`. Aquí se corta por lo sano — una prueba
+    /// que apunta a otra carpeta no puede tocar el dato bueno aunque se olvide de
+    /// todo.
+    static let dir: URL = {
+        if let desvio = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !desvio.isEmpty {
+            let u = URL(fileURLWithPath: (desvio as NSString).expandingTildeInPath, isDirectory: true)
+            try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
+            return u
+        }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".btodicta")
+    }()
 
     private static let lock = NSLock()
     private static let pasarelaTokenLock = NSLock()

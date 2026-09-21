@@ -7,6 +7,32 @@ umask 077
 VERSION_PAQUETE="0.47.0"
 SCRIPT_DIR="${0:A:h}"
 REPO="${SCRIPT_DIR:h}"
+
+# La configuración del usuario NO puede cambiar por correr el QA.
+#
+# Esto existe por un fallo real: el arnés del filtro guardaba las listas de
+# exclusión, las machacaba para probar, restauraba... y una sección añadida
+# después volvía a machacarlas y terminaba en `exit()`, que no ejecuta ningún
+# `defer`. Cada pasada del QA dejaba escritos los valores del test en la
+# configuración real. No se notó durante días porque esas listas aún no tenían
+# interfaz y nadie había escrito nada suyo en ellas.
+#
+# Restaurar al final es frágil: depende de que cada sección nueva se acuerde.
+# Esto no depende de nadie — compara la huella antes y después.
+# Se comparan SOLO las claves de la bitácora, no el archivo entero: la
+# aplicación escribe configuración al arrancar por motivos normales, y un guard
+# que salta por eso acaba ignorándose, que es la peor forma de fallar.
+CONFIG_USUARIO="$HOME/.btodicta/config.json"
+huella_bitacora() {
+  [[ -f "$CONFIG_USUARIO" ]] || return 0
+  /usr/bin/python3 -c "
+import json,hashlib,sys
+try: d=json.load(open('$CONFIG_USUARIO'))
+except Exception: sys.exit()
+s={k:v for k,v in d.items() if k.startswith('bitacora_')}
+print(hashlib.sha256(json.dumps(s,sort_keys=True,ensure_ascii=False).encode()).hexdigest())"
+}
+CONFIG_ANTES="$(huella_bitacora)"
 if [[ -f "$SCRIPT_DIR/matriz-camino-feliz.tsv" ]]; then
   QA_DIR="$SCRIPT_DIR"
   REPO=""
@@ -105,10 +131,17 @@ omitidas=0
 ejecutar() {
   local id="$1" variable="$2" valor="$3" limite="${4:-90}"
   local log="$salida/logs-automaticos/$id.log"
-  local inicio fin codigo estado
+  local inicio fin codigo estado desvio=()
+  # Los arneses que escriben en la configuración corren contra una carpeta
+  # aparte. Confiar en que restauren al terminar ya falló una vez: una sección
+  # añadida al final volvió a machacar y `exit()` no ejecuta ningún `defer`.
+  case "$id" in
+    filtro_bitacora|navegador_informe|exclusiones_asistente)
+      desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id") ;;
+  esac
   inicio="$(/bin/date +%s)"
   /usr/bin/perl -e 'alarm shift; exec @ARGV' "$limite" \
-    /usr/bin/env "$variable=$valor" "$BIN" > "$log" 2>&1
+    /usr/bin/env "$variable=$valor" "${desvio[@]}" "$BIN" > "$log" 2>&1
   codigo=$?
   fin="$(/bin/date +%s)"
   total=$((total + 1))
@@ -188,6 +221,21 @@ else
   estatica "lectura_por_trozos" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-lectura-por-trozos.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "memoria_en_disco" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-memoria-en-disco.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "conexion_compartida" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-conexion-compartida.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
+fi
+
+# ¿Alguna prueba tocó la configuración real? Se comprueba al final, y cuenta
+# como prueba: un QA que estropea lo que vigila es peor que no tenerlo.
+if [[ -n "$CONFIG_ANTES" ]]; then
+  CONFIG_DESPUES="$(huella_bitacora)"
+  total=$(( total + 1 ))
+  if [[ "$CONFIG_ANTES" == "$CONFIG_DESPUES" ]]; then
+    print "[PASA] config_del_usuario_intacta"
+    print "config_del_usuario_intacta\tPASA\t0\t0\t-" >> "$salida/resumen.tsv"
+  else
+    print "[FALLA] config_del_usuario_intacta — alguna prueba escribió en $CONFIG_USUARIO"
+    print "config_del_usuario_intacta\tFALLA\t1\t0\t-" >> "$salida/resumen.tsv"
+    fallos=$(( fallos + 1 ))
+  fi
 fi
 
 copiar_evidencia

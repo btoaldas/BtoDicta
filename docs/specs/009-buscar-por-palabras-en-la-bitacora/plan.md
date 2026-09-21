@@ -1,8 +1,8 @@
 # Plan técnico — Spec 009 Buscar por palabras en la bitácora
 
-- Estado: Borrador
+- Estado: Aprobado
 - Fecha: 2026-09-21
-- Aprobado por: PENDIENTE
+- Aprobado por: Alberto — 2026-09-21 — «vamos aprobado todo y sigue»
 - Spec: ./spec.md (Aprobada 2026-09-21)
 
 ## 1. Enfoque en un párrafo

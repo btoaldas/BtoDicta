@@ -692,6 +692,17 @@ struct ContinuoView: View {
                 }
             }
 
+            // Va aquí y no en una pestaña propia: la pestaña «Asistente» ya
+            // existe y es el agente de IA, y esto pertenece al sitio donde se
+            // configura la bitácora. Abierta de salida mientras el usuario no
+            // haya pasado por ella: es lo único de esta pantalla que decide si
+            // algo se graba, y nacía vacía sin que nadie lo supiera.
+            SeccionPlegable("Qué no debe mirar la bitácora", icono: "eye.slash",
+                            abierto: SemillasExclusion.hayNovedades(SemillasExclusion.catalogo(),
+                                                                    vista: SemillasExclusion.versionVista())) {
+                VistaExclusiones()
+            }
+
             SeccionPlegable("Texto de las capturas", icono: "text.viewfinder") {
                 VStack(alignment: .leading, spacing: 10) {
                     Toggle("Leer el texto de las capturas", isOn: $m.ocrActivo)
