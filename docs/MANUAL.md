@@ -1133,6 +1133,27 @@ Es **opcional**: BtoDicta funciona igual sin ella.
 
 Sin la clave, la extensión no envía absolutamente nada.
 
+**Si algo no funciona, la extensión te lo dice** (0.76.1)
+
+Su pantalla de configuración comprueba seis cosas en orden y, cuando algo falla,
+dice qué hacer:
+
+| Comprobación | Si falla |
+|---|---|
+| Permiso para ver las pestañas | Recárgala desde `~/.btodicta/extension` |
+| Clave de BtoDicta | Dónde copiarla, con el camino exacto |
+| BtoDicta responde | Enciende «Abrir la puerta local» en Ajustes |
+| La clave sirve | La clave cambió: cópiala otra vez |
+| Tus avisos llegan | Cambia de pestaña; si sigue vacío, recarga la extensión |
+| Dominios excluidos | (informativo) |
+
+El orden importa: sin permisos no hay pestañas, sin clave no se intenta enviar y
+sin BtoDicta viva da igual lo demás. Así un solo problema se ve como un solo
+problema, y no como tres.
+
+Al pegar la clave se comprueba **en el acto** si sirve. El menú del icono resume
+el primer fallo, para verlo sin abrir nada.
+
 **El menú del icono**
 
 Pulsando su icono se ve si BtoDicta responde, hace cuánto llegó el último aviso,
