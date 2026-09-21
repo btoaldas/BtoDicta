@@ -112,24 +112,48 @@ variante que lee de `Config` saca el modo de `bitacora_modo`.
 | D-1 | Catálogo en un JSON de recursos | Literal Swift | Revisable y diffeable sin leer código; se actualiza sin tocar lógica |
 | D-2 | El asistente escribe en la lista **ancha** | Escribir en las tres | Cada lista significa algo distinto; unificarlas sería decidir por el usuario. La sincronización quedó fuera de alcance en la spec |
 | D-3 | **Entradas de dominio completo**, nunca fragmentos | Palabras sueltas («sex», «porn») | La comparación es por subcadena: «sex» casa con «Essex» y «sexta». Un fragmento corto deja sin bitácora media jornada sin que nadie entienda por qué |
-| D-4 | Lista de contenido adulto **corta y embarcada** (~25 dominios de más tráfico) | Blocklist pública de decenas de miles | Una lista enorme engorda el paquete, envejece sola y obliga a mantener algo ajeno. La cobertura completa exige clasificación, que la spec dejó fuera |
+| D-4 | **Las dos**: corta embarcada de fábrica + ampliación pública opcional y apagada (RF-09) | Solo una de las dos | Decisión de Alberto. La corta cubre el caso normal sin red ni dependencias; la ampliación da cobertura real a quien la quiera y se puede apagar |
+| D-8 | **Dos formas de comparar según la lista** (ver §4.1) | Meter la lista ampliada en el mismo bucle de subcadena | 50 000 comparaciones de subcadena por decisión no caben en los 5 ms del RNF-05, y una subcadena sobre una lista enorme dispara los falsos positivos |
 | D-5 | Rechazos guardados **por identificador de entrada** | Guardar solo lo aceptado | Sin registrar el rechazo no se distingue «nunca se lo propusimos» de «dijo que no», y cada versión se lo volvería a proponer |
 | D-6 | Sección dentro de la pestaña Bitácora | Pestaña nueva | `.asistente` ya existe y es otra cosa; y esto pertenece al sitio donde se configura la bitácora |
 | D-7 | Escribir por `Config.set` | Escribir `config.json` | `Config` cachea y reescribe entero: una edición externa se pierde |
 
-Salen a `docs/adr/`: D-3 (comparación por subcadena y su trampa) y D-4 (alcance
-de la lista de contenido adulto).
+Salen a `docs/adr/`: D-3 (comparación por subcadena y su trampa), D-4 (alcance de
+la lista de contenido adulto) y D-8 (las dos formas de comparar).
+
+### 4.1 Por qué la lista ampliada no puede compararse como las demás
+
+El filtro compara hoy **por subcadena** contra el título de la ventana. Con
+decenas de entradas es correcto y barato. Con 50 000 se rompe por dos lados:
+
+- **Coste.** Una comparación de subcadena por entrada y por decisión. El RNF-05
+  exige menos de 5 ms; ese bucle no cabe.
+- **Falsos positivos.** Cuantas más entradas, más probable que alguna sea
+  subcadena de algo legítimo. Con una lista ajena de decenas de miles, ni siquiera
+  se puede revisar.
+
+Por eso la lista ampliada usa otro camino: se extrae el **anfitrión** de la URL y
+se busca ese anfitrión y sus dominios padre en un conjunto — tres o cuatro
+búsquedas de coste constante, sin recorrer la lista.
+
+**Limitación que hay que decir en la pantalla:** eso exige una URL de verdad. Se
+tiene cuando el navegador la aporta (extensión de la spec 006, o el contexto del
+sistema); un título de ventana suelto no basta. La lista corta embarcada sigue
+funcionando por subcadena en ambos casos, y es la red de seguridad.
 
 ## 5. Catálogo propuesto — **a revisar antes de escribir código**
 
 Esto es lo que quedó abierto en la puerta de la spec. Las categorías y su destino:
+
+**LinkedIn queda fuera de «redes sociales»** por decisión de Alberto (2026-09-21):
+para él es trabajo.
 
 | Categoría | Destino | Entradas propuestas |
 |---|---|---|
 | Redes sociales | títulos | facebook.com · instagram.com · x.com · twitter.com · tiktok.com · snapchat.com · reddit.com · threads.net · bsky.app · mastodon.social · pinterest.com · tumblr.com |
 | Vídeo y música | títulos | youtube.com · netflix.com · primevideo.com · disneyplus.com · max.com · twitch.tv · spotify.com · vimeo.com · dailymotion.com |
 | Buscadores | títulos | google.com/search · bing.com/search · duckduckgo.com · search.yahoo.com · ecosia.org |
-| Contenido adulto | títulos | ~25 dominios de mayor tráfico, dominio completo (ver D-3 y D-4) |
+| Contenido adulto | títulos | ~25 dominios de mayor tráfico, dominio completo, embarcados (D-3, D-4). Ampliable a una lista pública desde la propia pantalla, apagado de fábrica (RF-09) |
 | Mensajería personal | títulos | web.whatsapp.com · messenger.com · telegram.org |
 | Reproductores y juegos | **apps** | vlc · dota · steam · iina · quicktime player · epic games |
 | Banca y claves | **apps** | 1password · bitwarden · keychain access · dashlane |
@@ -156,7 +180,9 @@ exista interfaz alguna.
 3. Sección de interfaz con las categorías desplegables.
 4. Aviso de bitácora ciega (RF-08).
 5. Apertura automática la primera vez (RF-05).
-6. Verificación RF por RF.
+6. Lista ampliada (RF-09): descarga explícita, coincidencia por anfitrión, y la
+   medida del RNF-05 con la lista entera cargada.
+7. Verificación RF por RF.
 
 ## 7. Riesgos
 
@@ -165,7 +191,9 @@ exista interfaz alguna.
 | El modo restrictivo deja la bitácora ciega sin que se note | RF-08 avisa; y las pruebas del punto 1 van antes que la interfaz |
 | Una entrada corta excluye de más | D-3: dominios completos, y el desplegable los enseña antes de aceptar |
 | El usuario cree que configuró todo y solo tocó una de las tres listas | La pantalla dice en una línea qué apaga cada lista |
-| La lista de contenido adulto envejece | D-4 asume cobertura parcial y lo dice; la completa exige la spec de clasificación |
+| La lista corta de contenido adulto envejece | D-4 asume cobertura parcial y lo dice; quien quiera más activa la ampliación (RF-09) |
+| La lista ampliada no está disponible o cambia de sitio | Se guarda en disco tras la primera descarga y se sigue usando sin conexión; si falla, se dice y se sigue con la corta |
+| La lista ampliada excluye algo legítimo y es ajena | Coincidencia por anfitrión exacto, no por subcadena (D-8); y se puede apagar sin perder lo escrito a mano |
 | Aceptar el catálogo entero duplica entradas que ya tenía | Unión, no concatenación (caso límite de la spec) |
 
 ## 8. Lo que este plan NO resuelve

@@ -166,11 +166,29 @@ prefiera.
   - Cuando el usuario intenta guardar
   - Entonces se le advierte y el cambio solo se aplica si confirma
 
+### RF-09 — Ampliar la lista de contenido adulto desde una fuente pública
+
+- Actor: usuario de BtoDicta
+- Acción: activa la ampliación y BtoDicta descarga una lista pública de dominios
+- Resultado: la categoría pasa de decenas a decenas de miles de dominios
+- Medida: apagada de fábrica; con ella activa, la lista en memoria supera los
+  10 000 dominios y la decisión del filtro sigue por debajo de 5 ms
+- Prioridad: P2
+- Criterio de aceptación:
+  - Dado que la ampliación está apagada
+  - Cuando el usuario abre el asistente
+  - Entonces no se hace ninguna petición de red, y la categoría usa solo la lista
+    embarcada
+- Nota: es la única parte de esta spec que toca la red. Se enseña la dirección
+  exacta antes de descargar, la lista descargada queda en disco para funcionar sin
+  conexión, y apagarla la retira sin tocar lo que el usuario escribió a mano.
+
 ## 5. Requerimientos no funcionales
 
 | ID | Dimensión | Requerimiento con cifra u observable | Cómo se mide |
 |---|---|---|---|
 | RNF-01 | Rendimiento | Aceptar el asistente completo (todas las categorías) tarda menos de 2 s y no bloquea la interfaz | Cronometrado sobre el catálogo entero |
+| RNF-05 | Rendimiento | Con la lista ampliada cargada (> 10 000 dominios), una decisión del filtro tarda menos de **5 ms** | Cronometrado con la lista completa en memoria |
 | RNF-02 | Seguridad de datos | **0 escrituras** en `config.json` entre abrir el asistente y pulsar Aceptar | `sha256` del `config.json` antes y después de abrir y cerrar sin aceptar |
 | RNF-03 | Reversibilidad | Tras **10** cambios de modo de ida y vuelta, las **4** listas siguen idénticas | Ida y vuelta entre modos: las cuatro listas sobreviven idénticas |
 | RNF-04 | Usabilidad | Dejar la configuración recomendada completa cuesta 2 interacciones: abrir y aceptar | Contado sobre la pantalla |
@@ -191,8 +209,12 @@ prefiera.
 - **No se guarda ningún dato personal nuevo.** El asistente escribe cadenas de
   texto —nombres de dominio y de aplicación— en el `config.json` local del
   usuario, el mismo archivo que ya edita a mano hoy.
-- **Nada sale del equipo.** Las semillas viajan embarcadas en la app; no hay
-  consulta a ningún servicio, ni en la propuesta ni al aceptar.
+- **De fábrica, nada sale del equipo.** Las semillas viajan embarcadas; no hay
+  consulta a ningún servicio al proponer ni al aceptar.
+- **Una sola excepción, apagada de fábrica y explícita** (RF-09): la ampliación de
+  la categoría de contenido adulto descarga una lista pública de dominios. Se
+  enseña la dirección antes de descargar. Lo que viaja es la petición de un
+  archivo estático; **no se envía nada del usuario**, ni qué mira, ni qué grabó.
 - **Las semillas son un catálogo público de dominios**, no información sobre el
   usuario. Qué categorías acepte cada quien queda solo en su equipo.
 - El efecto de esta spec es **reducir** lo que la bitácora registra, nunca
@@ -238,7 +260,25 @@ prefiera.
   también, como ayuda».
 - La detección automática de contenido adulto queda **fuera** por decisión expresa
   de Alberto, para otra spec.
+- P: ¿LinkedIn entra en redes sociales? → R: **fuera de la categoría** (decisión de
+  Alberto): para él es trabajo.
+- P: ¿Hasta dónde llega la lista de contenido adulto? → R: **«las dos»** (decisión
+  de Alberto): lista corta embarcada de fábrica **y** ampliación opcional desde una
+  fuente pública. Nace el RF-09.
 
 ## 11. Historial de cambios sobre la spec aprobada
 
-(ninguno todavía)
+### 2026-09-21 — Nace el RF-09 y cambia «Datos y cumplimiento»
+
+Al revisar el catálogo del plan, Alberto eligió **«las dos»** para la lista de
+contenido adulto: la corta embarcada y la ampliación desde una lista pública.
+
+Eso contradecía lo escrito en §7, que decía «nada sale del equipo» sin matices.
+Se corrige: de fábrica sigue sin salir nada, y la ampliación es la única
+excepción — apagada de fábrica, con la dirección a la vista y sin enviar ningún
+dato del usuario.
+
+Se añaden el **RF-09** (la ampliación) y el **RNF-05** (que una lista de más de
+10 000 dominios no ralentice la decisión del filtro por encima de 5 ms).
+
+Pendiente del OK de Alberto en la puerta del plan.
