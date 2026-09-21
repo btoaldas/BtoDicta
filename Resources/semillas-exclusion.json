@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "nota": "Catálogo de exclusiones propuestas (spec 007, RF-01 y RF-04). NADA de esto se aplica solo: son propuestas que el usuario acepta o desmarca. El campo `destino` decide en qué lista aterriza cada entrada — `titulos` compara contra el título de la ventana, `apps` contra el nombre de la aplicación. Equivocar el destino escribe una regla que nunca puede coincidir. Las entradas son dominios o nombres completos, nunca fragmentos cortos: la comparacion es por subcadena, asi que `sex` casaria con `Essex` y `porn` con una URL de trabajo.",
+  "categorias": [
+    {
+      "id": "redes",
+      "nombre": "Redes sociales",
+      "destino": "titulos",
+      "descripcion": "LinkedIn no está aquí a propósito: para mucha gente es trabajo.",
+      "entradas": [
+        "facebook.com",
+        "instagram.com",
+        "x.com",
+        "twitter.com",
+        "tiktok.com",
+        "snapchat.com",
+        "reddit.com",
+        "threads.net",
+        "bsky.app",
+        "mastodon.social",
+        "pinterest.com",
+        "tumblr.com"
+      ]
+    },
+    {
+      "id": "video",
+      "nombre": "Vídeo y música",
+      "destino": "titulos",
+      "descripcion": "Lo que suena de fondo y acaba anotado como si fuera trabajo.",
+      "entradas": [
+        "youtube.com",
+        "netflix.com",
+        "primevideo.com",
+        "disneyplus.com",
+        "max.com",
+        "twitch.tv",
+        "spotify.com",
+        "vimeo.com",
+        "dailymotion.com"
+      ]
+    },
+    {
+      "id": "buscadores",
+      "nombre": "Buscadores",
+      "destino": "titulos",
+      "descripcion": "Solo la página de resultados. Excluir google.com entero se comería Drive, Gmail y Meet.",
+      "entradas": [
+        "google.com/search",
+        "bing.com/search",
+        "duckduckgo.com",
+        "search.yahoo.com",
+        "ecosia.org"
+      ]
+    },
+    {
+      "id": "adulto",
+      "nombre": "Contenido adulto",
+      "destino": "titulos",
+      "descripcion": "Lista corta de los sitios de más tráfico. Cobertura parcial a propósito: la completa se activa aparte, descargando una lista pública.",
+      "entradas": [
+        "pornhub.com",
+        "xvideos.com",
+        "xnxx.com",
+        "xhamster.com",
+        "onlyfans.com",
+        "stripchat.com",
+        "chaturbate.com",
+        "redtube.com",
+        "youporn.com",
+        "spankbang.com",
+        "eporner.com",
+        "bongacams.com",
+        "livejasmin.com",
+        "tnaflix.com",
+        "hqporner.com",
+        "erome.com",
+        "motherless.com",
+        "porntrex.com",
+        "txxx.com",
+        "hentaihaven.xxx",
+        "nhentai.net",
+        "rule34.xxx",
+        "e-hentai.org",
+        "fapello.com",
+        "camsoda.com"
+      ]
+    },
+    {
+      "id": "mensajeria",
+      "nombre": "Mensajería personal",
+      "destino": "titulos",
+      "descripcion": "Conversaciones privadas que rara vez conviene tener transcritas.",
+      "entradas": [
+        "web.whatsapp.com",
+        "messenger.com",
+        "telegram.org",
+        "web.telegram.org"
+      ]
+    },
+    {
+      "id": "reproductores",
+      "nombre": "Reproductores y juegos",
+      "destino": "apps",
+      "descripcion": "Aplicaciones de escritorio. Van a la lista de aplicaciones, no a la de títulos.",
+      "entradas": [
+        "vlc",
+        "dota",
+        "steam",
+        "iina",
+        "quicktime player",
+        "epic games",
+        "infuse",
+        "plex"
+      ]
+    },
+    {
+      "id": "claves",
+      "nombre": "Banca y contraseñas",
+      "destino": "apps",
+      "descripcion": "Se solapa con la lista de capturas, pero con más alcance: allí apaga la foto, aquí también el audio.",
+      "entradas": [
+        "1password",
+        "bitwarden",
+        "keychain access",
+        "acceso a llaveros",
+        "dashlane",
+        "lastpass",
+        "keepassxc"
+      ]
+    }
+  ]
+}

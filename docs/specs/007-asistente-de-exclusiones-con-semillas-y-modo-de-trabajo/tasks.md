@@ -44,20 +44,22 @@ el material que no se grabó.
 
 ## Fase B — El catálogo
 
-- [ ] T04 (RF-01, RF-04) El archivo de semillas
+- [x] T04 (RF-01, RF-04) El archivo de semillas
   - Archivos: `Resources/semillas-exclusion.json`
   - Las siete categorías del §5 del plan, con `destino` (`titulos` o `apps`),
     `id` por entrada y `version`. LinkedIn **fuera** de redes sociales.
   - Evidencia esperada: el JSON valida y ninguna entrada es un fragmento corto
     (comprobación automática de longitud y de punto en el dominio, D-3).
+  - Evidencia (2026-09-21): `python3 scripts/qa-semillas.py` → versión 1 · 7 categorías · 70 entradas · ninguna entrada que no pueda coincidir. LinkedIn fuera de «redes sociales», y los buscadores entran como `google.com/search` para no comerse Drive ni Gmail.
 
-- [ ] T05 (RF-04) Cargar y validar el catálogo [P]
+- [x] T05 (RF-04) Cargar y validar el catálogo [P]
   - Archivos: `Sources/BtoDicta/SemillasExclusion.swift`,
     `Tests/BtoDictaTests/SemillasExclusionTests.swift`
   - Pruebas: una entrada con `destino: apps` aterriza en `bitacora_excluir_apps` y
     **no** en títulos; y al revés. Es el RF que nació de escribir dos apps en la
     lista de títulos, donde no podían coincidir nunca.
   - Evidencia esperada: prueba en rojo al invertir el destino en el cargador.
+  - Evidencia (2026-09-21): `swift test --filter SemillasExclusionTests` → 7 de 7. La prueba encontró un fallo real en el validador: exigía 4 letras a toda entrada y rechazaba «vlc», que estaba en el propio catálogo. El mínimo pasa a depender del destino (4 para títulos, 3 para aplicaciones) con la razón escrita. Sabotaje del catálogo → código 1 con los tres problemas señalados; restaurado → código 0.
 
 - [ ] T06 (RF-01) Aplicar la selección, por unión
   - Archivos: `Sources/BtoDicta/SemillasExclusion.swift`

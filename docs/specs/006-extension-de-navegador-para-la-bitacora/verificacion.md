@@ -83,6 +83,13 @@ revés. Queda como decisión pendiente de Alberto, no como defecto.
   una decisión consciente de Alberto.
 - **La extensión no se auto-actualiza** y no puede: lo impide el navegador. Se
   mitiga con la ruta fija, pero recargarla sigue siendo un acto humano.
+- **El texto de la página se corta a 20 000 caracteres, empezando por arriba.**
+  Descubierto el 2026-09-21 midiendo por qué el solapamiento con el OCR daba
+  44,6 %. `extraerTexto` recorre el documento desde el principio: en una página
+  larga leída por la mitad se envía el principio mientras el usuario mira el
+  centro. Varias páginas quedaron registradas con exactamente 20 000 letras, que
+  es la firma del tope. No resuelto; hay tres vías (priorizar lo visible, subir el
+  tope midiendo el coste, o trocear) y la decisión no es de esta spec.
 - **Un trozo de audio que empieza en una página y termina en otra se conserva**
   entero. Ante la duda se guarda, pero en cada transición pueden colarse hasta
   30 s de lo que no se quería.

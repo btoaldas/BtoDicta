@@ -176,6 +176,10 @@ else
   ejecutar "navegador_informe" "BTODICTA_NAVEGADORTEST" "1" 90
   # Qué entra en la bitácora y qué no: de fábrica entra todo.
   ejecutar "filtro_bitacora" "BTODICTA_FILTROTEST" "1" 90
+  # El catálogo de exclusiones propuestas, comprobado sobre el paquete construido.
+  # Aquí y no en las pruebas de Swift: allí `Bundle.main` no trae el recurso y la
+  # prueba se salta sola, así que nadie miraría el archivo que de verdad viaja.
+  estatica "semillas_exclusion" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-semillas.py"
   # El motor de embeddings retiene ~400 MB: tiene que dormirse solo y revivir.
   ejecutar "embeddings_se_duermen" "BTODICTA_EMBIDLETEST" "1" 200
   # Una petición de red sin `.resume()` no sale nunca: dejó mudos a cuatro
