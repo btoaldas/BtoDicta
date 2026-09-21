@@ -17,7 +17,8 @@
 | RF-07 | Firefox | Manifiesto propio con `scripts` e identificador de Gecko; capa `chrome.*`/`browser.*` | **Nadie lo ha cargado en Firefox**: decisión de probar solo con Edge | No cumple |
 | RF-08 | Avisar si la extensión envejece | Con 0.0.1 frente a 0.1.0: detectada, con ambas versiones. Aviso en Ajustes y en la respuesta al informe | Una al día no avisa; una que no dice su versión tampoco — mejor callar que avisar en falso | Cumple |
 | RF-09 | Sacarla de la app con su manual | Botón en Ajustes. Deja `manifest.json`, el código y `COMO-INSTALAR.md` con la versión de la que salió | Exportar dos veces reemplaza sin fallar; lo anterior va a la Papelera por si había algo dentro | Cumple |
-| RF-10 | Menú en el icono, excluir con un clic | `default_popup` declarado y presente. Cuatro estados de conexión distinguidos | El mismo botón excluye y devuelve. **Falta la comprobación visual**, que hace Alberto | Cumple |
+| RF-10 | Menú en el icono, excluir con un clic | `default_popup` declarado y presente. Cuatro estados de conexión distinguidos | El mismo botón excluye y devuelve. Comprobado en pantalla el 2026-09-20 sobre Edge | Cumple |
+| RF-12 | Autodiagnóstico que diga si funciona | **Comprobado en pantalla el 2026-09-20**: las seis comprobaciones en verde, incluida «Tus avisos llegan — 1 informe vigente». Antes de eso la pantalla nacía muerta (ver §Desviaciones) | Desde el otro lado: `GET /navegador` devuelve el informe con `hace_segundos: 7`, y la bitácora registra páginas de 20 000 letras con `procesado=1` | Cumple |
 | RF-11 | Ponerse al día sola | Ruta degradada a 0.0.9 a propósito → al reabrir pasa sola a 0.1.0 con su aviso | Solo copia si hay diferencia: reescribir siempre haría que el navegador la viera modificada en cada arranque | Cumple |
 
 ## Requerimientos no funcionales
@@ -48,6 +49,27 @@ cerraduras ya estaban hechas, así que no se saltó ninguna protección.
 
 **Cuatro requisitos nacieron después de aprobar la spec** (RF-08 a RF-11), todos
 de usar la extensión de verdad. Cada uno con su entrada fechada en §9 de la spec.
+
+**La pantalla de opciones estuvo muerta y las pruebas decían que no.** Una
+edición dejó dos funciones y los dos `addEventListener` de los botones dentro
+del callback de otro botón: el archivo parseaba, `node --check` lo aprobaba, y
+el botón de guardar la clave no tenía listener. El guardián escrito para esto
+buscaba una cadena de texto en el fuente —que estaba, intacta— y daba verde
+contra una pantalla muerta. Sustituido por una carga real del módulo contra un
+DOM simulado. Detalle en `docs/bitacora/2026-09-20.md`.
+
+## Dos listas de exclusión que no se hablan
+
+Constatado el 2026-09-20, sin decidir todavía:
+
+- La lista de **la extensión** (almacén del navegador) impide que la URL y el
+  título salgan siquiera del navegador. Hoy está vacía.
+- La lista de **BtoDicta** (`bitacora_excluir_titulos`) impide grabar cuando eso
+  está al frente. Hoy tiene cinco entradas.
+
+Ambas son legítimas y significan cosas distintas, pero nada las sincroniza: quien
+excluya un dominio desde el menú del icono no lo verá reflejado en BtoDicta, ni al
+revés. Queda como decisión pendiente de Alberto, no como defecto.
 
 ## Riesgos residuales
 
