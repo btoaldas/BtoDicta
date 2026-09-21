@@ -5,12 +5,23 @@
 // Si excluir un sitio exigiera abrir un archivo de configuración, nadie lo haría
 // en el momento en que hace falta — que es justo cuando se tiene delante la
 // página que no quiere uno que se guarde.
+//
+// Nota sobre la forma del archivo
+// -------------------------------
+// Las funciones se declaran al NIVEL DEL MÓDULO y los `addEventListener` van
+// justo detrás de la función que enganchan. No es estética: una edición anterior
+// dejó `pintarToken`, `pintarDiagnostico` y los dos botones metidos dentro del
+// callback de otro botón. El archivo seguía siendo JavaScript válido —`node
+// --check` lo aprobaba— pero el botón de guardar la clave no tenía listener y la
+// pantalla entera parecía muerta sin dar un solo error visible.
 
 import { leerExcluidos, excluir, dejarDeExcluir, normalizarDominio } from "./exclusiones.js";
 import { leerToken, guardarToken } from "./enviar.js";
 import { revisar } from "./diagnostico.js";
 
 const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------- exclusiones
 
 async function pintar() {
   const lista = await leerExcluidos();
@@ -28,7 +39,52 @@ async function pintar() {
     quitar.textContent = "Volver a mirar";
     quitar.addEventListener("click", async () => {
       await dejarDeExcluir(d);
-      async function pintarDiagnostico() {
+      pintar();
+    });
+    li.append(nombre, quitar);
+    ul.append(li);
+  }
+}
+
+async function anadir() {
+  const campo = $("dominio");
+  const d = normalizarDominio(campo.value);
+  if (!d) { campo.focus(); return; }
+  await excluir(d);
+  campo.value = "";
+  campo.focus();
+  pintar();
+}
+
+$("anadir").addEventListener("click", anadir);
+// Enter añade: un clic menos en la acción que más se repite.
+$("dominio").addEventListener("keydown", (e) => { if (e.key === "Enter") anadir(); });
+
+// ---------------------------------------------------------------------- clave
+
+async function pintarToken() {
+  const t = await leerToken();
+  // Se enseña el principio y el final: es lo que permite comprobar de un vistazo
+  // que lo guardado es lo que uno creía pegar. Decir solo «guardada» fue lo que
+  // dejó pasar un campo autocompletado por el navegador con otra cosa.
+  $("estadoToken").textContent = t
+    ? `Guardada: ${t.slice(0, 4)}…${t.slice(-4)} (${t.length} caracteres)`
+    : "Sin clave: la extensión no envía nada.";
+}
+
+$("guardarToken").addEventListener("click", async () => {
+  const valor = $("token").value.trim();
+  await guardarToken(valor);
+  $("token").value = "";
+  // Comprobar EN EL ACTO si la clave sirve. Guardarla en silencio fue lo que
+  // permitió que la extensión estuviera muda sin que nadie lo supiera.
+  await pintarToken();
+  await pintarDiagnostico();
+});
+
+// ---------------------------------------------------------------- diagnóstico
+
+async function pintarDiagnostico() {
   const caja = $("diagnostico");
   caja.replaceChildren();
   const cargando = document.createElement("div");
@@ -77,56 +133,20 @@ async function pintar() {
 
 $("revisar").addEventListener("click", pintarDiagnostico);
 
-async function pintarToken() {
-  const t = await leerToken();
-  // Se enseña el principio y el final: es lo que permite comprobar de un vistazo
-  // que lo guardado es lo que uno creía pegar. Decir solo «guardada» fue lo que
-  // dejó pasar un campo autocompletado por el navegador con otra cosa.
-  $("estadoToken").textContent = t
-    ? `Guardada: ${t.slice(0, 4)}…${t.slice(-4)} (${t.length} caracteres)`
-    : "Sin clave: la extensión no envía nada.";
-}
-
-$("guardarToken").addEventListener("click", async () => {
-  const valor = $("token").value.trim();
-  await guardarToken(valor);
-  $("token").value = "";
-  // Comprobar EN EL ACTO si la clave sirve. Guardarla en silencio fue lo que
-  // permitió que la extensión estuviera muda sin que nadie lo supiera.
-  await pintarToken();
-  await pintarDiagnostico();
-});
-
-pintar();
-pintarToken();
-pintarDiagnostico();
-    });
-    li.append(nombre, quitar);
-    ul.append(li);
-  }
-}
-
-async function anadir() {
-  const campo = $("dominio");
-  const d = normalizarDominio(campo.value);
-  if (!d) { campo.focus(); return; }
-  await excluir(d);
-  campo.value = "";
-  campo.focus();
-  pintar();
-}
-
-$("anadir").addEventListener("click", anadir);
-// Enter añade: un clic menos en la acción que más se repite.
-$("dominio").addEventListener("keydown", (e) => { if (e.key === "Enter") anadir(); });
-
-// Las tres, al abrir la pantalla.
+// --------------------------------------------------------------- al abrir
 //
-// Faltaban las dos últimas: una sustitución al editar este archivo no coincidió
-// y nadie lo comprobó. El resultado era el peor posible para diagnosticar — la
-// sección del diagnóstico salía VACÍA y sin ningún error, porque no fallaba
-// nada: simplemente no se llamaba. Un fallo silencioso dentro del panel que
-// existe para acabar con los fallos silenciosos.
-pintar();
-pintarToken();
-pintarDiagnostico();
+// Cada una con su red: si una revienta, las otras dos siguen pintándose y el
+// error se ve en su sitio. Sin esto, un fallo en la primera dejaba la pantalla
+// entera muda — que es exactamente lo que había que dejar de hacer.
+
+function noPudo(donde) {
+  return (e) => {
+    const caja = $(donde);
+    if (!caja) return;
+    caja.textContent = "No se pudo cargar: " + (e && e.message ? e.message : e);
+  };
+}
+
+pintar().catch(noPudo("vacio"));
+pintarToken().catch(noPudo("estadoToken"));
+pintarDiagnostico().catch(noPudo("diagnostico"));

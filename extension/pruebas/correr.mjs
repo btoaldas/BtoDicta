@@ -165,29 +165,94 @@ try { await enviarDeVerdad("/navegador", { x: 1 }); } catch { lanzo = true; }
 chk(!lanzo, "un envío imposible no lanza: un sensor no puede tumbar el navegador");
 chk(esperaRestante() >= 0, "y queda un tiempo de espera medible antes del siguiente intento");
 
-// ---------- Que las pantallas ARRANQUEN ----------
+// ---------- Que las pantallas ARRANQUEN DE VERDAD ----------
 //
-// Este guardián nace de un fallo que no dio ningún error: la pantalla de
-// opciones tenía sus funciones escritas y sus botones enganchados, pero NADIE
-// llamaba a dos de ellas al abrirla. La sección del diagnóstico salía vacía, sin
-// mensaje, sin nada que copiar — un fallo silencioso dentro del panel que existe
-// precisamente para acabar con los fallos silenciosos.
+// Este guardián nace de un fallo que no dio ningún error, y de un primer intento
+// de guardián que tampoco lo vio.
 //
-// Comprobarlo es leer el archivo: si una función se define y se usa en un botón
-// pero nunca se invoca al cargar, la pantalla nace muerta.
-import { readFileSync } from "node:fs";
+// Qué pasó: una edición dejó `pintarToken`, `pintarDiagnostico` y los dos
+// `addEventListener` de los botones metidos DENTRO del callback de otro botón,
+// dentro de un bucle. El archivo seguía siendo JavaScript válido —`node --check`
+// lo aprobaba— pero al abrir la pantalla el botón de guardar la clave no tenía
+// listener: pulsarlo no hacía absolutamente nada, sin un solo error a la vista.
+//
+// El primer guardián buscaba el TEXTO `pintarDiagnostico();` en el archivo. Ese
+// texto estaba —en la última línea, intacto— así que daba verde mientras el
+// usuario miraba una pantalla muerta. **Comprobar una cadena no es comprobar un
+// comportamiento.** Ahora se carga la pantalla contra un DOM de mentira y se
+// mira lo único que importa: que los botones queden enganchados y que lo que se
+// pinta al abrir, se pinte.
 
-const opciones = readFileSync(new URL("../src/opciones.js", import.meta.url), "utf8");
-for (const fn of ["pintar", "pintarToken", "pintarDiagnostico"]) {
-  const arranca = new RegExp(`^${fn}\\(\\);`, "m").test(opciones);
-  chk(arranca, `la pantalla de opciones llama a ${fn}() al abrirse`);
+function pantallaDeMentira() {
+  const nodos = new Map();
+  const nuevo = (id) => ({
+    id,
+    oyentes: [],
+    hijos: [],
+    textContent: "",
+    value: "",
+    className: "",
+    style: {},
+    addEventListener(ev, fn) { this.oyentes.push([ev, fn]); },
+    append(...h) { this.hijos.push(...h); },
+    replaceChildren(...h) { this.hijos = h; },
+    focus() {},
+  });
+  return {
+    nodos,
+    doc: {
+      getElementById(id) {
+        if (!nodos.has(id)) nodos.set(id, nuevo(id));
+        return nodos.get(id);
+      },
+      createElement: (tag) => nuevo("<" + tag + ">"),
+    },
+  };
 }
 
-const menu = readFileSync(new URL("../src/menu.js", import.meta.url), "utf8");
-for (const fn of ["pintar", "pintarResumen"]) {
-  const arranca = new RegExp(`^${fn}\\(\\);`, "m").test(menu);
-  chk(arranca, `el menú del icono llama a ${fn}() al abrirse`);
+/** Carga un módulo de pantalla con DOM falso y devuelve sus nodos. */
+async function abrirPantalla(ruta) {
+  const { nodos, doc } = pantallaDeMentira();
+  globalThis.document = doc;
+  // `fetch` se anula para que la prueba no dependa de que BtoDicta esté abierta:
+  // una prueba que pasa o falla según qué haya corriendo en la Mac no prueba nada.
+  globalThis.fetch = async () => { throw new Error("sin red en la prueba"); };
+  let fallo = null;
+  try {
+    // El sufijo hace que cada carga sea un módulo nuevo: sin él, la segunda
+    // pantalla reutilizaría la primera y el DOM falso no se volvería a usar.
+    await import(new URL(ruta, import.meta.url).href + "?prueba=" + ruta.length);
+    // Las funciones de arranque son asíncronas: hay que dejarlas terminar.
+    await new Promise((r) => setTimeout(r, 30));
+  } catch (e) {
+    fallo = e;
+  }
+  return { nodos, fallo };
 }
+
+const op = await abrirPantalla("../src/opciones.js");
+chk(!op.fallo, `la pantalla de opciones se abre sin reventar${op.fallo ? " — " + op.fallo.message : ""}`);
+for (const [id, ev] of [["guardarToken", "click"], ["revisar", "click"],
+                        ["anadir", "click"], ["dominio", "keydown"]]) {
+  const n = op.nodos.get(id);
+  chk(Boolean(n && n.oyentes.some(([e]) => e === ev)),
+      `el control «${id}» de opciones responde a ${ev}`);
+}
+// Que se haya PINTADO, no solo que la función exista.
+chk(Boolean(op.nodos.get("estadoToken")?.textContent),
+    "al abrir opciones se dice en qué estado está la clave");
+chk((op.nodos.get("diagnostico")?.hijos.length || 0) > 0,
+    "al abrir opciones el diagnóstico pinta algo (ni vacío ni mudo)");
+
+const mn = await abrirPantalla("../src/menu.js");
+chk(!mn.fallo, `el menú del icono se abre sin reventar${mn.fallo ? " — " + mn.fallo.message : ""}`);
+chk(Boolean(mn.nodos.get("opciones")?.oyentes.some(([e]) => e === "click")),
+    "el botón de opciones del menú responde a click");
+// Sin navegador de verdad el menú no puede consultar pestañas. Lo que se exige
+// no es que funcione, sino que NO se quede en blanco: un popup mudo parece una
+// extensión desinstalada y no deja nada que diagnosticar.
+chk(Boolean(mn.nodos.get("titulo")?.textContent),
+    "el menú nunca se queda en blanco: si falla, lo dice");
 
 console.log(mal === 0
   ? "EXTENSION TODO OK — no se lee lo que el usuario escribe, y lo excluido no se reporta"

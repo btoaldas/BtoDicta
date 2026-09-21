@@ -116,5 +116,17 @@ async function pintarResumen() {
 }
 
 $("opciones").addEventListener("click", () => api.runtime.openOptionsPage());
-pintar();
-pintarResumen();
+
+// Si algo revienta al abrir, el menú tiene que DECIRLO. Un popup en blanco es el
+// peor resultado posible: parece que la extensión no está instalada, y no hay
+// nada que copiar ni que buscar. Aquí se pinta el error literal, que es lo único
+// con lo que se puede diagnosticar después.
+function noPudo(e) {
+  const t = $("titulo"), d = $("detalle"), l = $("luz");
+  if (l) l.className = "luz muerta";
+  if (t) t.textContent = "El menú no pudo cargarse";
+  if (d) d.textContent = String(e && e.message ? e.message : e);
+}
+
+pintar().catch(noPudo);
+pintarResumen().catch(noPudo);
