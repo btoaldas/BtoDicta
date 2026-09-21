@@ -68,6 +68,17 @@ async function contar({ forzar = false } = {}) {
   }
 }
 
+/// Una página leída por el guion de contenido, camino de BtoDicta.
+async function contarPagina(msg) {
+  const foto = await fotografiar();
+  await enviar("/navegador", {
+    ...foto,
+    url: msg.url,
+    titulo: msg.titulo,
+    texto: msg.texto,
+  });
+}
+
 // Las escuchas solo se enganchan si hay un navegador de verdad detrás.
 //
 // Sin este guardián, importar este archivo en una prueba intentaría registrar
@@ -84,6 +95,11 @@ if (api?.tabs?.onActivated) {
     if ("audible" in cambios || "url" in cambios || "status" in cambios) contar();
   });
   api.tabs.onRemoved.addListener(() => contar());
+  api.runtime?.onMessage?.addListener((msg) => {
+    if (msg?.tipo === "pagina") contarPagina(msg);
+    // Sin `return true`: no se responde nada, y dejar el canal abierto sin
+    // necesidad solo mantiene vivo al trabajador de fondo.
+  });
   api.windows?.onFocusChanged?.addListener(() => contar());
 
   // Latido: en Manifest V3 el trabajador de fondo se duerme, así que el temporizador

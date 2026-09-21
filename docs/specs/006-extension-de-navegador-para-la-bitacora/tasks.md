@@ -8,6 +8,11 @@
 El orden no es el del valor visible, sino el del riesgo: lo que puede filtrar
 algo va primero, con su prueba negativa, antes de que exista quien lo envíe.
 
+**Desviación del orden (2026-09-20, a petición de Alberto):** T15 se adelanta a
+T13 y T14 para poder cargar la extensión y probarla en un navegador real antes de
+seguir. Las cerraduras (fases A y B) ya estaban hechas, así que adelantar el
+empaquetado no salta ninguna protección.
+
 ## Fase A — La puerta, antes de que nadie llame
 
 - [x] T01 (RF-01, RNF-01) Punto de entrada `POST /navegador` en la API local, con el token, el tope de cuerpo y el límite de peticiones que ya existen — `Sources/BtoDicta/ApiLocal.swift` — Evidencia esperada: `curl` sin token devuelve 401 y con token válido devuelve 200
@@ -45,7 +50,8 @@ algo va primero, con su prueba negativa, antes de que exista quien lo envíe.
 
 ## Fase D — Los cuatro navegadores
 
-- [ ] T15 (RF-06) Manifest V3 para Chromium y carga sin errores en Chrome, Edge y Brave — `extension/manifest.chromium.json` — Evidencia esperada: los tres cargan el mismo paquete y reportan estado
+- [x] T15 (RF-06) Manifest V3 para Chromium y carga sin errores en Chrome, Edge y Brave — `extension/manifest.chromium.json` — Evidencia esperada: los tres cargan el mismo paquete y reportan estado
+  - Evidencia (2026-09-20): `empaquetar.sh chromium` produce `dist/chromium` con 8 archivos; manifest_version 3, permisos `tabs, storage, alarms, scripting`, y cero archivos declarados que falten. Envío simulado de extremo a extremo: `{"recibido":2,"audibles":1,"texto_guardado":true}`. **Falta la carga real en los tres navegadores, que la hace Alberto**
 - [ ] T16 (RF-07) Capa de compatibilidad `chrome.*` / `browser.*` y manifiesto de Firefox — `extension/src/navegador.js`, `extension/manifest.firefox.json` — Evidencia esperada: Firefox reporta pestaña activa y audibles igual que Chrome
 - [ ] T17 (RF-06, RF-07) Empaquetado reproducible de los dos paquetes desde un solo código — `extension/empaquetar.sh` — Evidencia esperada: el script produce los dos archivos y `unzip -l` muestra el mismo código en ambos
 

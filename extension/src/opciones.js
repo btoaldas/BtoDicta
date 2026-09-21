@@ -7,6 +7,7 @@
 // página que no quiere uno que se guarde.
 
 import { leerExcluidos, excluir, dejarDeExcluir, normalizarDominio } from "./exclusiones.js";
+import { leerToken, guardarToken } from "./enviar.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -26,7 +27,21 @@ async function pintar() {
     quitar.textContent = "Volver a mirar";
     quitar.addEventListener("click", async () => {
       await dejarDeExcluir(d);
-      pintar();
+      async function pintarToken() {
+  const t = await leerToken();
+  $("estadoToken").textContent = t
+    ? "Clave guardada. La extensión ya puede hablar con BtoDicta."
+    : "Sin clave: la extensión no envía nada.";
+}
+
+$("guardarToken").addEventListener("click", async () => {
+  await guardarToken($("token").value);
+  $("token").value = "";
+  pintarToken();
+});
+
+pintar();
+pintarToken();
     });
     li.append(nombre, quitar);
     ul.append(li);
