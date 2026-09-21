@@ -183,6 +183,18 @@ parte del día— sin degradar nada de lo que ya funciona.
   - Cuando se pulsa el icono de la extensión
   - Entonces se ve si BtoDicta está viva y un botón que excluye ese dominio; si ya estaba excluido, el mismo botón lo devuelve
 
+### RF-11 — La extensión se pone al día sola
+
+- Actor: BtoDicta
+- Acción: mantiene una copia de la extensión en una ruta fija y la refresca cada vez que la aplicación se actualiza
+- Resultado: quien la cargó una vez desde esa ruta recibe las mejoras sin volver a exportar ni buscar nada; basta con que el navegador recoja los archivos
+- Medida: tras actualizar BtoDicta, los archivos de esa ruta corresponden a la versión nueva en menos de 10 s desde que la aplicación arranca
+- Prioridad: P1
+- Criterio de aceptación:
+  - Dado una extensión cargada desde la ruta fija con una versión anterior
+  - Cuando arranca una versión nueva de BtoDicta
+  - Entonces los archivos de esa ruta pasan a ser los nuevos, y el navegador los usa al recargar la extensión
+
 ## 5. Requerimientos no funcionales
 
 | ID | Dimensión | Requerimiento con cifra u observable | Cómo se mide |
@@ -237,6 +249,15 @@ parte del día— sin degradar nada de lo que ya funciona.
   espacio donde el usuario se pueda descargar desde la app a su escritorio o
   donde quiera la extensión con su manual claro de instalación» (decisión de
   Alberto). Nace **RF-09**.
+- P: ¿Puede el plugin actualizarse solo? → R: «el propio plugin se puede
+  autoactualizar para que se conecte bien a BtoDicta… porque si no BtoDicta no va
+  a saber si el plugin funciona y el plugin no va a saber si BtoDicta le escucha»
+  (petición de Alberto). Nace **RF-11**, con una aclaración técnica registrada: una
+  extensión cargada a mano **no puede** auto-actualizarse —el navegador lo impide
+  a propósito, porque una extensión sin firmar que se reescribe sola sería un
+  agujero—. Lo que sí se puede, y es lo que se hace: la aplicación mantiene la
+  extensión en una ruta fija y la refresca al actualizarse, de modo que quien la
+  cargó una vez desde ahí recibe las mejoras sin volver a exportar.
 - P: ¿Cómo se excluye una página sin abrir las opciones? → R: «sería genial que
   en el icono de BtoDicta del plugin se asomen opciones para activar, desactivar,
   agregar esa página o url o dominio, o quitarlo si ya está, y que dé un detalle

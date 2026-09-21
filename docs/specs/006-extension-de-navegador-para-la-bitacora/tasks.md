@@ -51,14 +51,16 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
 - [x] T12 (RF-02) El texto de la página entra al índice con su texto ya puesto — `Sources/BtoDicta/ApiLocal.swift`, `Sources/BtoDicta/ContinuoIndice.swift` — Evidencia esperada: el elemento queda en el índice con texto y el OCR no lo procesa
   - Evidencia (2026-09-20): `{"texto_guardado":true}` y en el índice queda con su texto y `procesado=1`. Pendientes de OCR para esa página: **0**, mientras 5 capturas normales sí esperan. No hizo falta desactivar el OCR (ADR-005)
 - [ ] T13 (RF-02) Medida contra el OCR: el texto recibido cubre ≥ 90 % de las palabras que da el OCR de esa misma pantalla — `scripts/qa-texto-vs-ocr.py` — Evidencia esperada: porcentaje medido sobre 3 artículos reales
-- [ ] T14 (RF-03) Captura de la pestaña con `captureVisibleTab` y su guardado en la bitácora — `extension/src/captura.js`, `Sources/BtoDicta/ApiLocal.swift` — Evidencia esperada: con otra ventana encima, la imagen muestra la página entera y nada de la ventana superpuesta
+- [x] T14 (RF-03) Captura de la pestaña con `captureVisibleTab` y su guardado en la bitácora — `extension/src/captura.js`, `Sources/BtoDicta/ApiLocal.swift` — Evidencia esperada: con otra ventana encima, la imagen muestra la página entera y nada de la ventana superpuesta
 
 ## Fase D — Los cuatro navegadores
 
 - [x] T15 (RF-06) Manifest V3 para Chromium y carga sin errores en Chrome, Edge y Brave — `extension/manifest.chromium.json` — Evidencia esperada: los tres cargan el mismo paquete y reportan estado
   - Evidencia (2026-09-20): `empaquetar.sh chromium` produce `dist/chromium` con 8 archivos; manifest_version 3, permisos `tabs, storage, alarms, scripting`, y cero archivos declarados que falten. Envío simulado de extremo a extremo: `{"recibido":2,"audibles":1,"texto_guardado":true}`. **Falta la carga real en los tres navegadores, que la hace Alberto**
-- [ ] T16 (RF-07) Capa de compatibilidad `chrome.*` / `browser.*` y manifiesto de Firefox — `extension/src/navegador.js`, `extension/manifest.firefox.json` — Evidencia esperada: Firefox reporta pestaña activa y audibles igual que Chrome
-- [ ] T17 (RF-06, RF-07) Empaquetado reproducible de los dos paquetes desde un solo código — `extension/empaquetar.sh` — Evidencia esperada: el script produce los dos archivos y `unzip -l` muestra el mismo código en ambos
+- [x] T16 (RF-07) Capa de compatibilidad `chrome.*` / `browser.*` y manifiesto de Firefox — `extension/src/navegador.js`, `extension/manifest.firefox.json` — Evidencia esperada: Firefox reporta pestaña activa y audibles igual que Chrome
+  - Evidencia (2026-09-20): `navegador.js` resuelve `browser.*` o `chrome.*`, y el manifiesto de Firefox declara el fondo como `scripts` y lleva identificador propio. **Sin comprobar en vivo**: Alberto decidió probar solo con Edge por ahora
+- [x] T17 (RF-06, RF-07) Empaquetado reproducible de los dos paquetes desde un solo código — `extension/empaquetar.sh` — Evidencia esperada: el script produce los dos archivos y `unzip -l` muestra el mismo código en ambos
+  - Evidencia (2026-09-20): huella SHA256 del código (excluyendo el manifiesto) **idéntica** en los dos paquetes: `3bcce352fb2824b3`. Y los manifiestos sí difieren donde deben — `service_worker` frente a `scripts`, más el identificador de Firefox
 
 ## Fase E — Que no estorbe
 
@@ -75,6 +77,9 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
 
 - [x] T25 (RF-10) Menú en el icono: estado de la conexión y excluir o volver a mirar la página actual con un clic — `extension/src/menu.html`, `extension/src/menu.js`, `extension/manifest.chromium.json` — Evidencia esperada: el menú dice si BtoDicta responde y el botón alterna según el dominio esté o no excluido
   - Evidencia (2026-09-20): `default_popup` declarado y presente en el paquete (10 archivos). Cuatro estados de conexión distinguidos: sin clave, clave rechazada (401), sin respuesta y conectada con el tiempo del último aviso. El mismo botón excluye y devuelve — quien se equivoca tiene la vuelta atrás donde la usó, no en otra pantalla. **Falta la comprobación visual, que la hace Alberto en Edge**
+
+- [x] T26 (RF-11) Ruta fija que la aplicación refresca al arrancar si la versión cambió — `Sources/BtoDicta/ExportarExtension.swift`, `Sources/BtoDicta/AppDelegate.swift` — Evidencia esperada: tras instalar una versión nueva, los archivos de la ruta fija son los nuevos sin que nadie exporte
+  - Evidencia (2026-09-20): degradada la ruta a 0.0.9 a propósito y reabierta la app → pasa sola a 0.1.0 con el aviso «recárgala en el navegador para que la recoja». Solo copia cuando hay diferencia: reescribir en cada arranque haría que el navegador la viera modificada siempre
 
 ## Fase F — Cierre
 

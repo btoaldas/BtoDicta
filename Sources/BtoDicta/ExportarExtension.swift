@@ -27,10 +27,10 @@ enum ExportarExtension {
     /// Copia la extensión a `destino/BtoDicta-extension`, con su manual dentro.
     ///
     /// Devuelve la carpeta creada, o el motivo por el que no se pudo.
-    static func exportar(a destino: URL) -> Result<URL, Motivo> {
+    static func exportar(a destino: URL, nombreCarpeta: String = "BtoDicta-extension") -> Result<URL, Motivo> {
         guard let origen else { return .failure(Motivo(texto: "Esta copia de BtoDicta no trae la extensión dentro.")) }
         let fm = FileManager.default
-        let carpeta = destino.appendingPathComponent("BtoDicta-extension", isDirectory: true)
+        let carpeta = destino.appendingPathComponent(nombreCarpeta, isDirectory: true)
 
         do {
             // Si ya existe, se reemplaza: lo que se quiere es la versión que
@@ -80,9 +80,20 @@ enum ExportarExtension {
 
         ## Instalarla en Edge, Chrome o Brave
 
+        **Cárgala desde esta ruta y no desde otra copia:**
+
+        ```
+        ~/.btodicta/extension
+        ```
+
+        Esa carpeta la mantiene BtoDicta al día sola. Si la cargas desde ahí,
+        cada vez que la aplicación se actualice los archivos se renuevan y el
+        navegador recoge las mejoras al recargar la extensión. Si la cargas desde
+        una copia en el Escritorio, esa copia se queda como está.
+
         1. Abre `edge://extensions` (o `chrome://extensions`, `brave://extensions`).
         2. Activa **«Modo de desarrollador»**.
-        3. Pulsa **«Cargar descomprimida»** y elige **esta misma carpeta**.
+        3. Pulsa **«Cargar descomprimida»** y elige esa carpeta.
         4. Entra en las **opciones** de la extensión y pega la clave de BtoDicta.
            La encuentras en *Ajustes → Dejar que otros programas transcriban*.
 
@@ -111,10 +122,19 @@ enum ExportarExtension {
 
         ## Cuando BtoDicta se actualice
 
-        Una extensión cargada a mano **no se actualiza sola**. Cuando la versión
-        de BtoDicta traiga una extensión más nueva, la aplicación te avisará. Para
-        ponerla al día: vuelve a sacarla desde Ajustes y pulsa **«Actualizar»** en
-        `edge://extensions`.
+        Una extensión cargada a mano **no se actualiza sola**: el navegador lo
+        impide a propósito, porque una extensión sin firmar que se reescribiera
+        sola sería un agujero. Solo se auto-actualizan las que vienen de una
+        tienda.
+
+        Lo que sí ocurre, si la cargaste desde `~/.btodicta/extension`: **los
+        archivos se ponen al día solos** en cuanto arranca la versión nueva de
+        BtoDicta. Para que el navegador los recoja, una de estas dos:
+
+        - Reiniciar el navegador, o
+        - Pulsar **«Actualizar»** en la tarjeta de la extensión.
+
+        La aplicación te avisa cuando toca, en Ajustes y en el menú del icono.
 
         ## Si algo no va
 
@@ -122,6 +142,55 @@ enum ExportarExtension {
         útiles: **«Errores»**, si el navegador rechazó algo, y **«Service
         worker»**, que abre la consola donde se vería un fallo de envío.
         """
+    }
+
+    /// La ruta FIJA desde la que conviene cargar la extensión (RF-11).
+    ///
+    /// Cargarla desde aquí y no desde el Escritorio tiene una consecuencia
+    /// práctica: la aplicación refresca estos archivos en cada actualización, así
+    /// que el navegador recoge las mejoras al recargar la extensión, sin que
+    /// nadie vuelva a exportar nada.
+    ///
+    /// **Lo que NO puede hacer, y conviene decirlo claro:** una extensión
+    /// cargada a mano no se actualiza sola. Eso lo impide el navegador a
+    /// propósito —una extensión sin firmar que se reescribiera sola sería un
+    /// agujero—, y solo lo hacen las que vienen de una tienda. Lo que se
+    /// consigue aquí es que los archivos estén al día; recogerlos es cosa del
+    /// navegador, al reiniciarse o al pulsar «Actualizar».
+    static var rutaFija: URL {
+        Config.dir.appendingPathComponent("extension", isDirectory: true)
+    }
+
+    /// Qué versión hay ahora mismo en la ruta fija.
+    static func versionEnRutaFija() -> String {
+        let m = rutaFija.appendingPathComponent("manifest.json")
+        guard let d = try? Data(contentsOf: m),
+              let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              let v = j["version"] as? String else { return "" }
+        return v
+    }
+
+    /// Pone al día la ruta fija si la versión cambió. Se llama al arrancar.
+    ///
+    /// Solo copia cuando hay diferencia: reescribir los archivos en cada arranque
+    /// haría que el navegador considerase modificada la extensión cada vez, y
+    /// eso son avisos que nadie pidió.
+    static func refrescarRutaFija() {
+        guard disponible else { return }
+        let traida = EstadoNavegadores.versionQueTraeLaApp()
+        let puesta = versionEnRutaFija()
+        guard !traida.isEmpty, traida != puesta else { return }
+
+        switch exportar(a: Config.dir, nombreCarpeta: "extension") {
+        case .success:
+            if puesta.isEmpty {
+                Log.log(.sistema, "extensión del navegador preparada en \(rutaFija.path)")
+            } else {
+                Log.log(.sistema, "extensión del navegador actualizada de la \(puesta) a la \(traida) — recárgala en el navegador para que la recoja")
+            }
+        case .failure(let m):
+            Log.log(.sistema, "no pude poner al día la extensión: \(m.texto)")
+        }
     }
 
     /// Pregunta dónde y exporta. Devuelve la carpeta creada.

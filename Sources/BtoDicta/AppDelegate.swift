@@ -433,6 +433,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func rssMBGlobal() -> Double { MemoriaProceso.huellaMB() }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // La extensión del navegador, al día en su ruta fija (spec 006, RF-11).
+        // En segundo plano: comparar dos versiones y copiar ocho archivos no
+        // debe retrasar el arranque de la aplicación ni un milisegundo.
+        DispatchQueue.global(qos: .utility).async { ExportarExtension.refrescarRutaFija() }
+
         // Cuerpos de subida que quedaran de una sesión anterior: un cierre
         // inesperado puede dejarlos, y son del tamaño del dictado que se estaba
         // enviando. Solo borra lo que crea esa función, en su propia carpeta.

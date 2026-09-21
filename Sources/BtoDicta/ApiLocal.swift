@@ -499,9 +499,31 @@ enum ApiLocal {
             }
         }
 
+        // La captura de la pestaña (RF-03), si la extensión la mandó.
+        //
+        // Se guarda junto al resto de la bitácora y se marca como YA PROCESADA:
+        // viene con el texto de su página, así que someterla a reconocimiento de
+        // imagen sería gastar por lo que ya se tiene.
+        var capturaGuardada = false
+        if Config.continuoActivo(),
+           let base64 = json["captura"] as? String,
+           let coma = base64.firstIndex(of: ","),
+           let datos = Data(base64Encoded: String(base64[base64.index(after: coma)...])),
+           datos.count > 1024 {
+            let carpeta = Config.continuoCarpeta().appendingPathComponent("navegador", isDirectory: true)
+            try? FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
+            let nombre = ContinuoAudio.sello(estado.instante) + "-pestana.jpg"
+            let ruta = carpeta.appendingPathComponent(nombre)
+            if (try? datos.write(to: ruta, options: .atomic)) != nil {
+                capturaGuardada = true
+                Log.log(.ia, "navegador: guardada la captura de la pestaña (\(datos.count / 1024) kB)")
+            }
+        }
+
         var respuesta: [String: Any] = ["recibido": estado.pestañas.count,
                                         "audibles": estado.audibles.count,
-                                        "texto_guardado": textoGuardado]
+                                        "texto_guardado": textoGuardado,
+                                        "captura_guardada": capturaGuardada]
         // La extensión recibe el aviso en su propia respuesta: así puede
         // enseñarlo donde el usuario ya está mirando, sin depender de que abra
         // los ajustes de la aplicación.

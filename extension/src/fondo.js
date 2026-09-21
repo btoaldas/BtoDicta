@@ -15,6 +15,17 @@ import { leerExcluidos, estaExcluida } from "./exclusiones.js";
 /** Cada cuánto se cuenta el estado, aunque no haya cambiado nada. */
 const LATIDO_SEGUNDOS = 30;
 
+/// ¿Mandar también la imagen de la pestaña? Apagado de fábrica: el texto ya
+/// cuenta lo que pasó, y las imágenes pesan.
+async function quiereCapturas() {
+  try {
+    const g = await api.storage.local.get("capturas");
+    return Boolean(g && g.capturas);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Fotografía de las pestañas.
  *
@@ -73,15 +84,45 @@ async function contar({ forzar = false } = {}) {
   }
 }
 
+/// Una captura de la PESTAÑA, no de la pantalla (spec 006, RF-03).
+///
+/// La diferencia con lo que ya hace BtoDicta por su cuenta: una captura de
+/// pantalla recoge la barra del sistema, el Dock y cualquier ventana que esté
+/// encima. Esto recoge la página y nada más, aunque haya algo delante tapándola.
+///
+/// Se pide con moderación: capturar cuesta, y la bitácora ya tiene el texto, que
+/// es lo que de verdad se consulta después.
+async function capturarPestaña() {
+  try {
+    const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return null;
+    const excluidos = await leerExcluidos();
+    if (estaExcluida(tab.url || "", excluidos)) return null;   // ni se captura
+    // `captureVisibleTab` devuelve la imagen ya codificada; no hay que tocar
+    // los píxeles ni pedir permisos adicionales.
+    return await api.tabs.captureVisibleTab(undefined, { format: "jpeg", quality: 60 });
+  } catch {
+    // Páginas internas del navegador, o una pestaña que dejó de estar visible.
+    return null;
+  }
+}
+
 /// Una página leída por el guion de contenido, camino de BtoDicta.
 async function contarPagina(msg) {
   const foto = await fotografiar();
-  await enviar("/navegador", {
+  const cuerpo = {
     ...foto,
     url: msg.url,
     titulo: msg.titulo,
     texto: msg.texto,
-  });
+  };
+  // La imagen solo si se pide: el texto es lo que se consulta después, y una
+  // captura por página multiplicaría por cien lo que viaja y lo que ocupa.
+  if (await quiereCapturas()) {
+    const imagen = await capturarPestaña();
+    if (imagen) cuerpo.captura = imagen;
+  }
+  await enviar("/navegador", cuerpo);
 }
 
 // Las escuchas solo se enganchan si hay un navegador de verdad detrás.
