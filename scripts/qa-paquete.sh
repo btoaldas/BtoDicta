@@ -166,6 +166,8 @@ else
   ejecutar "huella_modelos_memoria" "BTODICTA_HUELLAMEMTEST" "1" 180
   # Leer por trozos no sirve de nada si no se suelta cada trozo: llegó a
   # retener 4,9 GB en cada arranque por comprobar la huella de los modelos.
+  # El texto de la extensión frente al OCR: se omite solo si no hay con qué comparar.
+  estatica "texto_vs_ocr" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-texto-vs-ocr.py"
   # La extensión no lee lo que el usuario escribe, y lo excluido no se reporta.
   estatica "extension_no_ve_de_mas" /usr/bin/env node "${REPO:-$QA_DIR/../..}/extension/pruebas/correr.mjs"
   # La extensión sale de la aplicación con su manual y avisa si envejece.

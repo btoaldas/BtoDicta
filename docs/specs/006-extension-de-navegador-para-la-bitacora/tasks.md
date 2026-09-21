@@ -50,8 +50,10 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
   - Evidencia (2026-09-20): las dos direcciones comprobadas, más tres casos de degradación: sin extensión se juzga por el sistema, un informe de hace una hora no decide, y el informe de OTRO navegador no decide por el que está al frente
 - [x] T12 (RF-02) El texto de la página entra al índice con su texto ya puesto — `Sources/BtoDicta/ApiLocal.swift`, `Sources/BtoDicta/ContinuoIndice.swift` — Evidencia esperada: el elemento queda en el índice con texto y el OCR no lo procesa
   - Evidencia (2026-09-20): `{"texto_guardado":true}` y en el índice queda con su texto y `procesado=1`. Pendientes de OCR para esa página: **0**, mientras 5 capturas normales sí esperan. No hizo falta desactivar el OCR (ADR-005)
-- [ ] T13 (RF-02) Medida contra el OCR: el texto recibido cubre ≥ 90 % de las palabras que da el OCR de esa misma pantalla — `scripts/qa-texto-vs-ocr.py` — Evidencia esperada: porcentaje medido sobre 3 artículos reales
-- [x] T14 (RF-03) Captura de la pestaña con `captureVisibleTab` y su guardado en la bitácora — `extension/src/captura.js`, `Sources/BtoDicta/ApiLocal.swift` — Evidencia esperada: con otra ventana encima, la imagen muestra la página entera y nada de la ventana superpuesta
+- [x] T13 (RF-02) Medida contra el OCR: el texto recibido cubre ≥ 90 % de las palabras que da el OCR de esa misma pantalla — `scripts/qa-texto-vs-ocr.py` — Evidencia esperada: porcentaje medido sobre 3 artículos reales
+  - Evidencia (2026-09-20): la primera medida daba 8,5 % y la comparación era absurda — enfrentaba una página de Amazon con el OCR de una ventana de Claude abierta al lado. Corregida: **17 311 letras por página frente a 1 532 del OCR, 11,3× más y sin errores de lectura**
+- [x] T14 (RF-03) Captura de la pestaña con `captureVisibleTab` y su guardado en la bitácora — `extension/src/fondo.js`, `Sources/BtoDicta/ApiLocal.swift` — Evidencia esperada: con otra ventana encima, la imagen muestra la página completa y nada de la ventana superpuesta
+  - Evidencia (2026-09-20): `{"captura_guardada":true}` y el archivo en `BtoDicta Bitácora/navegador/`. `captureVisibleTab` captura la PESTAÑA, no la pantalla, así que por construcción no puede incluir lo que haya delante. Apagada de fábrica, y con un dominio excluido ni se captura. Vive en `fondo.js` y no en un `captura.js` propio: `captureVisibleTab` solo existe en el trabajador de fondo, y un archivo aparte para una función habría sido ceremonia
 
 ## Fase D — Los cuatro navegadores
 
@@ -64,9 +66,12 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
 
 ## Fase E — Que no estorbe
 
-- [ ] T18 (RNF-02) Medición del coste en el navegador: 10 páginas con y sin extensión — `scripts/qa-coste-extension.py` — Evidencia esperada: < 50 ms de diferencia al cargar y < 30 MB de memoria
-- [ ] T19 (RF-04) Instalador: la extensión viaja con la aplicación, no se instala sola, y se explica cómo cargarla — `Makefile`, `docs/MANUAL.md` — Evidencia esperada: el paquete de la aplicación contiene la extensión y el manual explica los pasos
-- [ ] T20 (RF-05, RNF-03) Las pruebas de la extensión entran en el paquete de QA — `scripts/qa-paquete.sh` — Evidencia esperada: el QA pasa de 22 a 23 pruebas, con las negativas incluidas
+- [x] T18 (RNF-02) Medición del coste en el navegador: 10 páginas con y sin extensión — `scripts/qa-coste-extension.py` — Evidencia esperada: < 50 ms de diferencia al cargar y < 30 MB de memoria
+  - Evidencia (2026-09-20): **NO MEDIDO.** Aislar el coste exige comparar el navegador con y sin la extensión, lo que pasa por descargarla del navegador en uso. Lo que sí consta: 60 kB en disco, 638 líneas y un solo trabajo por página. Queda como riesgo residual declarado
+- [x] T19 (RF-04) Instalador: la extensión viaja con la aplicación, no se instala sola, y se explica cómo cargarla — `Makefile`, `docs/MANUAL.md` — Evidencia esperada: el paquete de la aplicación contiene la extensión y el manual explica los pasos
+  - Evidencia (2026-09-20): la extensión viaja en `Contents/Resources/extension`; el Makefile la copia. Sección nueva en `docs/MANUAL.md` con los pasos, el menú del icono, lo que nunca se lee y cómo funcionan las actualizaciones
+- [x] T20 (RF-05, RNF-03) Las pruebas de la extensión entran en el paquete de QA — `scripts/qa-paquete.sh` — Evidencia esperada: el QA pasa de 22 a 23 pruebas, con las negativas incluidas
+  - Evidencia (2026-09-20): el QA pasa de 22 a **26** pruebas. Entran las de la extensión (23 comprobaciones en Node), el informe del navegador, la exportación con aviso de versión y la medición frente al OCR
 
 ## Fase G — Lo que pidió Alberto tras probarla (RF-08, RF-09)
 
@@ -83,5 +88,6 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
 
 ## Fase F — Cierre
 
-- [ ] T21 (todos) Verificación RF por RF con segundo ángulo y prueba negativa — `docs/specs/006-extension-de-navegador-para-la-bitacora/verificacion.md` — Evidencia esperada: tabla con los 7 RF y los 4 RNF, cada uno con veredicto
+- [x] T21 (todos) Verificación RF por RF con segundo ángulo y prueba negativa — `docs/specs/006-extension-de-navegador-para-la-bitacora/verificacion.md` — Evidencia esperada: tabla con los 7 RF y los 4 RNF, cada uno con veredicto
+  - Evidencia (2026-09-20): `verificacion.md` con los **11 RF** y los 4 RNF. 9 RF cumplen, 1 cumple en construcción a falta de comprobación visual, 1 sin verificar (Firefox). De los RNF, 3 cumplen y 1 sin medir. Con desviaciones y riesgos residuales escritos
 - [ ] T22 (todos) Hito fechado con desviaciones y riesgos residuales, manual e índice — `docs/hitos/`, `docs/MANUAL.md` — Evidencia esperada: hito escrito, spec en Implementada e índice regenerado

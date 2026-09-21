@@ -1109,6 +1109,52 @@ cualquier hilo y no siempre quedaba puesto, así que el apagado ocurría a ratos
 
 Ajustable con `embeddings_apagar_tras_minutos` (10 por omisión).
 
+### La extensión del navegador (0.76.0)
+
+La bitácora no puede saber, desde fuera, **qué pestaña está sonando**. El sistema
+no lo expone: preguntarlo devuelve un error. Y sin ese dato, un vídeo de fondo
+acaba anotado como trabajo.
+
+La extensión lo resuelve, y de paso aporta el **texto real de las páginas** en
+vez de un reconocimiento de la imagen. Medido con páginas reales: **11 veces más
+texto y sin errores de lectura**.
+
+Es **opcional**: BtoDicta funciona igual sin ella.
+
+**Instalarla**
+
+1. *Ajustes → Dejar que otros programas transcriban → «Sacarla a una carpeta…»*,
+   o directamente desde `~/.btodicta/extension`.
+2. En `edge://extensions` (o `chrome://`, `brave://`), activa **«Modo de
+   desarrollador»** y pulsa **«Cargar descomprimida»**.
+3. **Elige `~/.btodicta/extension`**, no una copia. Esa carpeta la mantiene
+   BtoDicta al día sola.
+4. En las opciones de la extensión, pega la clave de la API local.
+
+Sin la clave, la extensión no envía absolutamente nada.
+
+**El menú del icono**
+
+Pulsando su icono se ve si BtoDicta responde, hace cuánto llegó el último aviso,
+y un botón que **excluye con un clic** el dominio que tienes delante. El mismo
+botón lo devuelve si te arrepientes.
+
+**Lo que nunca lee**
+
+Nada que escribas: campos de texto, contraseñas, áreas de edición. No es
+configurable, porque no hay ningún caso en el que la bitácora necesite la
+contraseña que acabas de teclear.
+
+Los dominios que excluyas en la extensión **no salen del navegador**: no es que
+BtoDicta los descarte después, es que nunca los recibe.
+
+**Actualizaciones**
+
+Una extensión cargada a mano **no se actualiza sola** — el navegador lo impide a
+propósito. Pero si la cargaste desde `~/.btodicta/extension`, los archivos se
+renuevan solos al actualizar BtoDicta; basta reiniciar el navegador o pulsar
+«Actualizar» en su tarjeta. La aplicación avisa cuando toca.
+
 ### Qué motor conviene, medido (0.73.0)
 
 Con 275 palabras de voz sintética en español, todos con el mismo audio:
