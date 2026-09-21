@@ -165,6 +165,30 @@ try { await enviarDeVerdad("/navegador", { x: 1 }); } catch { lanzo = true; }
 chk(!lanzo, "un envío imposible no lanza: un sensor no puede tumbar el navegador");
 chk(esperaRestante() >= 0, "y queda un tiempo de espera medible antes del siguiente intento");
 
+// ---------- Que las pantallas ARRANQUEN ----------
+//
+// Este guardián nace de un fallo que no dio ningún error: la pantalla de
+// opciones tenía sus funciones escritas y sus botones enganchados, pero NADIE
+// llamaba a dos de ellas al abrirla. La sección del diagnóstico salía vacía, sin
+// mensaje, sin nada que copiar — un fallo silencioso dentro del panel que existe
+// precisamente para acabar con los fallos silenciosos.
+//
+// Comprobarlo es leer el archivo: si una función se define y se usa en un botón
+// pero nunca se invoca al cargar, la pantalla nace muerta.
+import { readFileSync } from "node:fs";
+
+const opciones = readFileSync(new URL("../src/opciones.js", import.meta.url), "utf8");
+for (const fn of ["pintar", "pintarToken", "pintarDiagnostico"]) {
+  const arranca = new RegExp(`^${fn}\\(\\);`, "m").test(opciones);
+  chk(arranca, `la pantalla de opciones llama a ${fn}() al abrirse`);
+}
+
+const menu = readFileSync(new URL("../src/menu.js", import.meta.url), "utf8");
+for (const fn of ["pintar", "pintarResumen"]) {
+  const arranca = new RegExp(`^${fn}\\(\\);`, "m").test(menu);
+  chk(arranca, `el menú del icono llama a ${fn}() al abrirse`);
+}
+
 console.log(mal === 0
   ? "EXTENSION TODO OK — no se lee lo que el usuario escribe, y lo excluido no se reporta"
   : `EXTENSION FALLA (${mal})`);

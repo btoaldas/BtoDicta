@@ -120,4 +120,13 @@ $("anadir").addEventListener("click", anadir);
 // Enter añade: un clic menos en la acción que más se repite.
 $("dominio").addEventListener("keydown", (e) => { if (e.key === "Enter") anadir(); });
 
+// Las tres, al abrir la pantalla.
+//
+// Faltaban las dos últimas: una sustitución al editar este archivo no coincidió
+// y nadie lo comprobó. El resultado era el peor posible para diagnosticar — la
+// sección del diagnóstico salía VACÍA y sin ningún error, porque no fallaba
+// nada: simplemente no se llamaba. Un fallo silencioso dentro del panel que
+// existe para acabar con los fallos silenciosos.
 pintar();
+pintarToken();
+pintarDiagnostico();
