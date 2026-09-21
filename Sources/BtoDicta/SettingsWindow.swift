@@ -741,24 +741,29 @@ struct SettingsView: View {
                     Text("Solo puede leer audios de las carpetas de Descargas, Documentos y la temporal del sistema; nada más del disco.")
                         .font(.caption2).foregroundStyle(.secondary)
 
-                    // La extensión del navegador vive detrás de esta misma puerta:
-                    // sin la API abierta no tendría con quién hablar, así que
-                    // ofrecerla aparte solo confundiría.
-                    Divider().padding(.vertical, 4)
-                    HStack {
-                        Text("Extensión para el navegador").font(.caption).bold()
-                        Spacer()
-                        Button("Sacarla a una carpeta…") { ExportarExtension.exportarPreguntando() }
-                            .disabled(!ExportarExtension.disponible)
-                    }
-                    Text("Le cuenta a la bitácora qué pestaña estás mirando y cuál está sonando — eso el sistema no puede verlo solo, y sin ese dato un vídeo de fondo acaba anotado como trabajo. Se copia donde elijas, con un manual de instalación. Es opcional: BtoDicta funciona igual sin ella.")
-                        .font(.caption2).foregroundStyle(.secondary)
-                    if !m.avisoExtension.isEmpty {
-                        Text(m.avisoExtension)
-                            .font(.caption2).foregroundStyle(.orange)
-                    }
+                }
                 }
 
+                Divider().padding(.vertical, 6)
+                // FUERA del bloque de la API a propósito.
+                //
+                // Antes vivía dentro, y con la puerta apagada —que es como viene
+                // de fábrica— la extensión era invisible: no había forma de
+                // descubrir que existe. Ahora se ve siempre, y si la puerta está
+                // cerrada el propio aviso lo dice al exportar.
+                Divider().padding(.vertical, 4)
+                HStack {
+                    Text("Extensión para el navegador").font(.caption).bold()
+                    Spacer()
+                    Button("Sacarla a una carpeta…") { ExportarExtension.exportarPreguntando() }
+                        .disabled(!ExportarExtension.disponible)
+                }
+                Text("Le cuenta a la bitácora qué pestaña estás mirando y cuál está sonando — eso el sistema no puede verlo solo, y sin ese dato un vídeo de fondo acaba anotado como trabajo. Se copia donde elijas, con un manual de instalación. Es opcional: BtoDicta funciona igual sin ella.")
+                    .font(.caption2).foregroundStyle(.secondary)
+                if !m.avisoExtension.isEmpty {
+                    Text(m.avisoExtension)
+                        .font(.caption2).foregroundStyle(.orange)
+    
                 Divider().padding(.vertical, 6)
                 Toggle("Guardar el texto dictado en el registro", isOn: $m.registroTexto)
                 Text("El registro es local, rota cada semana y no sale de tu equipo; a cambio es lo único que permite reconstruir después qué dictaste y qué devolvió cada motor —así se ve, por ejemplo, que un pulido te recortó el texto—. Apágalo si compartes pantalla a menudo o dictas datos de terceros: las líneas siguen, con la medida en vez del contenido.")

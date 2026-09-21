@@ -8,11 +8,18 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.75.0"
+    static let numero = "0.76.0"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.76.0", "2026-09-20", [
+            "EXTENSIÓN PARA EL NAVEGADOR, opcional. La bitácora no puede saber desde fuera qué pestaña está sonando —el sistema no lo deja ver— y sin ese dato un vídeo de fondo acaba anotado como si fuera trabajo. La extensión se lo cuenta, y de paso aporta el texto real de las páginas en vez del reconocimiento de la imagen: medido, once veces más texto y sin errores de lectura",
+            "SE SACA DESDE AJUSTES y la clave se copia sola: al pulsar «Sacarla a una carpeta…» ya la llevas en el portapapeles, con los pasos a la vista. Antes había que encender la puerta local, buscar el token y recordar dónde pegarlo",
+            "SE MANTIENE AL DÍA SOLA en ~/.btodicta/extension. Una extensión cargada a mano no puede autoactualizarse —eso lo impide el navegador— pero si la cargas desde ahí, los archivos se renuevan con cada versión y basta recargarla",
+            "UN MENÚ EN SU ICONO dice si BtoDicta responde y excluye con UN clic el sitio que tengas delante. El mismo botón lo devuelve si te arrepientes",
+            "Nunca lee lo que escribes: ni campos de texto, ni contraseñas, ni editores. No es configurable, porque no hay ningún caso en que la bitácora necesite la contraseña que acabas de teclear",
+        ]),
         ("0.75.0", "2026-09-20", [
             "EL FILTRO DEL NAVEGADOR MIRA LA PESTAÑA, NO LA VENTANA. Un navegador no trabaja por ventanas: en la misma conviven un vídeo y el correo. Ahora se lee la dirección de la pestaña que tienes delante, así que mirando YouTube no se graba, y escribiendo un correo con un vídeo sonando detrás SÍ se graba",
             "Usar la dirección en vez del título evita confusiones: un artículo que HABLA de YouTube ya no se toma por un vídeo de YouTube",

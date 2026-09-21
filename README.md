@@ -34,6 +34,15 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.76.0
+
+- **Extensión de navegador opcional**: le cuenta a la bitácora qué pestaña suena
+  —lo que el sistema no deja ver— y aporta el texto real de las páginas (**11×
+  más que el OCR**, sin errores de lectura).
+- Se saca desde Ajustes con la clave ya copiada, se mantiene al día sola, y su
+  icono trae un menú que excluye un sitio con un clic.
+- Nunca lee lo que escribes. No es configurable.
+
 ### Novedades 0.75.0
 
 - **El filtro del navegador mira la pestaña activa**, por su dirección: mirando

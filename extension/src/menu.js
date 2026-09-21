@@ -23,7 +23,14 @@ const API = "http://127.0.0.1:8787";
 /** ¿Está BtoDicta viva y nos acepta? */
 async function comprobar() {
   const token = await leerToken();
-  if (!token) return { luz: "avisa", titulo: "Falta la clave", detalle: "Pégala en las opciones para empezar." };
+  if (!token) {
+    return {
+      luz: "avisa",
+      titulo: "Falta la clave",
+      // Decir «falta la clave» sin decir dónde está deja al usuario buscando.
+      detalle: "BtoDicta → Ajustes → «Dejar que otros programas transcriban» → Copiar.",
+    };
+  }
   try {
     const r = await fetch(API + "/navegador", { headers: { Authorization: "Bearer " + token } });
     if (r.status === 401) {

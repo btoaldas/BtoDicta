@@ -94,8 +94,23 @@ enum ExportarExtension {
         1. Abre `edge://extensions` (o `chrome://extensions`, `brave://extensions`).
         2. Activa **«Modo de desarrollador»**.
         3. Pulsa **«Cargar descomprimida»** y elige esa carpeta.
-        4. Entra en las **opciones** de la extensión y pega la clave de BtoDicta.
-           La encuentras en *Ajustes → Dejar que otros programas transcriban*.
+        4. Entra en las **opciones** de la extensión y **pega la clave**.
+
+        ### ¿De dónde sale la clave?
+
+        Si llegaste aquí pulsando «Sacarla a una carpeta…» en BtoDicta, **ya la
+        tienes copiada**: en el paso 4 basta con pegar (⌘V).
+
+        Si no, o si la perdiste:
+
+        1. En BtoDicta, abre **Ajustes**.
+        2. Busca **«Dejar que otros programas de este Mac transcriban»**.
+        3. Enciende **«Abrir la puerta local»** si estaba apagada — viene apagada
+           de fábrica, y sin ella la extensión no tiene con quién hablar.
+        4. Aparece el campo **Token** con un botón **«Copiar»**.
+
+        Es una contraseña: quien la tenga puede pedirle transcripciones a tu
+        BtoDicta. No la publiques ni la mandes por chat.
 
         Sin la clave pegada, la extensión no envía absolutamente nada.
 
@@ -208,7 +223,38 @@ enum ExportarExtension {
         switch exportar(a: destino) {
         case .success(let carpeta):
             Log.log(.sistema, "extensión exportada a \(carpeta.path)")
+
+            // La clave, ya en el portapapeles.
+            //
+            // Sin esto, instalar la extensión obligaba a una búsqueda del tipo
+            // «¿y de dónde saco el token?»: encender la puerta local, encontrar
+            // el campo, copiarlo, y recordar dónde pegarlo. Cuatro pasos entre
+            // dos aplicaciones distintas, y ninguno evidente. Ahora el que
+            // exporta ya lleva la clave encima y solo tiene que pegar.
+            let token = ApiLocal.token()
+            if !token.isEmpty {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(token, forType: .string)
+            }
+
             NSWorkspace.shared.activateFileViewerSelecting([carpeta])
+
+            let a = NSAlert()
+            a.messageText = "Extensión lista en \(carpeta.lastPathComponent)"
+            var pasos = """
+            1. Abre edge://extensions (o chrome://, brave://)
+            2. Activa «Modo de desarrollador»
+            3. «Cargar descomprimida» → elige la carpeta que acaba de abrirse
+            4. En las opciones de la extensión, pega la clave
+            """
+            if token.isEmpty {
+                pasos += "\n\nLa puerta local está apagada, así que todavía no hay clave. Enciéndela aquí arriba y vuelve a copiarla."
+            } else {
+                pasos += "\n\nLa clave ya está copiada: en el paso 4 solo tienes que pegar."
+            }
+            a.informativeText = pasos
+            a.addButton(withTitle: "Entendido")
+            a.runModal()
             return carpeta
         case .failure(let motivo):
             let a = NSAlert()
