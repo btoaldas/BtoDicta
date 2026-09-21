@@ -852,6 +852,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             return
         }
+        // La bitácora no puede robarle el micrófono al dictado que arranca.
+        // BTODICTA_CARRERAMICROTEST=1
+        //
+        // El fallo que vigila, del 2026-09-21: el usuario pulsaba, el registro
+        // decía «doble pulsación reconocida — iniciar», la bitácora soltaba el
+        // micrófono... y lo recuperaba en el mismo segundo. No se grababa nada y
+        // no había ningún error.
+        //
+        // La causa era una rendija de dos líneas: `iniciandoDictado` se ponía a
+        // false ANTES de `startDictationAhora()`. En ese punto la bitácora ya
+        // había soltado el dispositivo y el grabador aún no lo había abierto, así
+        // que `activacionVozOcupada` era falso y cualquier reconciliación
+        // —suspender el listener ya es una— llamaba a `recuperarMicrofono()`.
+        //
+        // Aquí se fuerza esa reconciliación a propósito y sin parar durante el
+        // arranque, que es lo que convierte una carrera en una prueba fiable: no
+        // se espera a que coincida, se provoca.
+        if ProcessInfo.processInfo.environment["BTODICTA_CARRERAMICROTEST"] == "1" {
+            Config.set("continuo_activo", to: true)
+            Config.set("continuo_audio_modo", to: "siempre")
+            ContinuoBitacora.arrancar()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                guard let self else { exit(2) }
+                // Machacar la reconciliación mientras el dictado arranca.
+                let acoso = Timer(timeInterval: 0.02, repeats: true) { [weak self] _ in
+                    self?.reconciliarActivacionVoz()
+                }
+                RunLoop.main.add(acoso, forMode: .common)
+
+                self.startDictation()
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                    acoso.invalidate()
+                    guard let self else { exit(2) }
+                    let grabando = self.recorder.isRecording
+                    let buffers = self.recorder.buffersRecibidos
+                    // Grabando NO basta: el dispositivo puede estar abierto y
+                    // mudo si otro lo tiene. Lo que demuestra que el dictado
+                    // tiene el micrófono es que ENTREN buffers.
+                    let ok = grabando && buffers > 0
+                    print("CARRERAMICRO grabando=\(grabando) buffers=\(buffers) → \(ok ? "TODO OK — el dictado conserva el micrófono" : "FALLA — la bitácora se lo llevó")")
+                    fflush(stdout)
+                    exit(ok ? 0 : 1)
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+                print("CARRERAMICRO FALLA timeout"); fflush(stdout); exit(4)
+            }
+            return
+        }
         // Prueba pura del detector de doble pulsación (sin abrir micrófono/UI).
         if ProcessInfo.processInfo.environment["BTODICTA_DOBLEFNTEST"] == "1" {
             var g = DoublePressGate()
@@ -6039,7 +6090,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ContinuoBitacora.cederMicrofono {
             ActivacionVoz.shared.suspender { [weak self] in
                 guard let self else { return }
-                self.iniciandoDictado = false
+                // `iniciandoDictado` se mantiene EN ALTO hasta que el grabador
+                // tenga de verdad el micrófono. Lo limpia `startDictationAhora`,
+                // por todos sus caminos de salida.
+                //
+                // Estuvo aquí, una línea antes de `startDictationAhora()`, y
+                // abría una rendija: en ese punto la bitácora ya había soltado
+                // el dispositivo, el grabador todavía no lo había abierto, y
+                // `activacionVozOcupada` era falso porque `recorder.isRecording`
+                // seguía a false. `reconciliarActivacionVoz` —que se dispara al
+                // cambiar el estado del micrófono, y suspender el listener ES un
+                // cambio— llamaba a `recuperarMicrofono()` y la bitácora se lo
+                // llevaba. El dictado abría después un dispositivo ya ocupado.
+                //
+                // La rendija no era teórica ni estrecha: entre esas dos líneas
+                // `startDictationAhora` monta el panel, calienta la red, precarga
+                // el motor de embeddings y pide la URL del navegador por
+                // AppleScript. Y falla de la peor forma: la tecla responde, el
+                // registro dice «iniciar», y no se graba nada.
                 self.startDictationAhora()
             }
         }
@@ -6057,7 +6125,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func startDictationAhora() {
-        guard !recorder.isRecording else { return }   // no re-arrancar (carreras push-to-talk)
+        // La bandera se suelta por TODOS los caminos de salida. Si se quedara en
+        // alto, `activacionVozOcupada` sería cierto para siempre y la bitácora no
+        // volvería a grabar nunca — un fallo peor que el que se está corrigiendo.
+        guard !recorder.isRecording else { iniciandoDictado = false; return }
         // Una confirmación de archivo terminado permanece hasta que el usuario
         // actúa o inicia un nuevo dictado; el nuevo turno tiene prioridad.
         panel.closeCaptureResult()
@@ -6185,6 +6256,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         vivoReiniciarVigia()
         do {
             try recorder.start(preloadPCM: despertarActual?.audioPrevio ?? Data())
+            // AQUÍ, y no antes: a partir de este punto `recorder.isRecording` ya
+            // sostiene por sí solo «el micrófono está ocupado».
+            iniciandoDictado = false
             armEsc()
             media.dictationStarted()
             playSound("Tink")
@@ -6225,6 +6299,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             iniciarConfirmacionModoPorPausa(sesion: sesion)
             activacionAcuseTextoPendiente = nil
         } catch {
+            // El micrófono no abrió: hay que soltar la bandera igual, o el
+            // dictado quedaría marcado «arrancando» para siempre y la bitácora
+            // no volvería a grabar.
+            iniciandoDictado = false
             ModoVivo.cancelar(sesion: sesion)
             modoVivoSesion = nil; ctxDictado = nil
             if esContinuacionDictadoAsistido { limpiarContinuacionDictadoAsistido() }

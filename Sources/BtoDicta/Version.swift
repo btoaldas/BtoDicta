@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.78.0"
+    static let numero = "0.78.1"
     static let fecha = "2026-09-21"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.78.1", "2026-09-21", [
+            "EL DICTADO VOLVÍA A NO GRABAR. La tecla respondía, el registro decía «iniciar», y no se grababa nada: la bitácora soltaba el micrófono y se lo llevaba de vuelta en el mismo segundo. El dictado abría después un dispositivo ya ocupado, y no daba ningún error — que es la peor forma de fallar",
+            "Causa: entre soltar el micrófono y abrirlo había una rendija en la que nadie figuraba como dueño. En ese hueco la aplicación monta el panel, calienta la red y pregunta al navegador por su dirección, así que era ancha. Ahora el dictado consta como dueño hasta que el grabador tiene el micrófono de verdad",
+            "Con su prueba: fuerza esa carrera a propósito y comprueba que ENTREN buffers, no solo que el grabador diga que está grabando — un dispositivo puede estar abierto y mudo si otro lo tiene",
+        ]),
         ("0.78.0", "2026-09-21", [
             "LA EXTENSIÓN YA NO SE ESCONDE. Vivía en ~/.btodicta/extension, y una carpeta que empieza por punto está OCULTA en el Finder: el selector de carpetas de los navegadores no la enseña ni escribiendo la ruta, así que cargar la extensión era pelearse con el explorador de archivos. Ahora está en «BtoDicta Extensión», en tu carpeta de usuario y al lado de «BtoDicta Bitácora». Se sigue manteniendo al día sola, igual que antes",
             "La copia anterior NO se borra: si la tenías cargada sigue funcionando. Deja de actualizarse, eso sí, y el registro lo avisa",
