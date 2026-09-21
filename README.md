@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.77.1
+
+- **El gestor de contraseñas del navegador pisaba el campo de la clave**: era
+  `type="password"`. Ahora es texto normal sin autocompletado.
+- Si la pantalla de la extensión revienta al cargar, lo dice en la propia página
+  en vez de quedarse en blanco.
+
 ### Novedades 0.77.0
 
 - **Se instala desde `~/.btodicta/extension`**, no desde una copia: el botón abre

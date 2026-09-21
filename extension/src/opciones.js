@@ -36,7 +36,17 @@ async function pintar() {
   cargando.textContent = "Comprobando…";
   caja.append(cargando);
 
-  const pasos = await revisar();
+  let pasos;
+  try {
+    pasos = await revisar();
+  } catch (e) {
+    caja.replaceChildren();
+    const err = document.createElement("div");
+    err.className = "chk mal";
+    err.textContent = "✗ No se pudo revisar: " + (e && e.message ? e.message : e);
+    caja.append(err);
+    return;
+  }
   caja.replaceChildren();
   for (const p of pasos) {
     const fila = document.createElement("div");
@@ -69,8 +79,11 @@ $("revisar").addEventListener("click", pintarDiagnostico);
 
 async function pintarToken() {
   const t = await leerToken();
+  // Se enseña el principio y el final: es lo que permite comprobar de un vistazo
+  // que lo guardado es lo que uno creía pegar. Decir solo «guardada» fue lo que
+  // dejó pasar un campo autocompletado por el navegador con otra cosa.
   $("estadoToken").textContent = t
-    ? "Clave guardada. La extensión ya puede hablar con BtoDicta."
+    ? `Guardada: ${t.slice(0, 4)}…${t.slice(-4)} (${t.length} caracteres)`
     : "Sin clave: la extensión no envía nada.";
 }
 

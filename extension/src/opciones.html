@@ -36,10 +36,33 @@
 </style>
 </head>
 <body>
+  <div id="fallo" style="display:none;background:rgba(209,83,74,.18);border:1px solid #d1534a;
+       border-radius:7px;padding:10px 12px;margin-bottom:14px;font-size:12px;
+       white-space:pre-wrap;word-break:break-word"></div>
+  <script>
+    // Sin módulos y lo primero de todo, a propósito: si el guion de la página
+    // revienta al cargarse, no queda nadie para contarlo y el panel se queda en
+    // blanco — que es exactamente lo que pasó y costó una tarde de diagnóstico.
+    (function () {
+      function mostrar(txt) {
+        var c = document.getElementById("fallo");
+        if (!c) return;
+        c.style.display = "block";
+        c.textContent = "La extensión falló al cargar:\n" + txt +
+          "\n\nCopia esto tal cual: dice exactamente qué se rompió.";
+      }
+      window.addEventListener("error", function (e) {
+        mostrar((e.message || "error") + (e.filename ? "\n" + e.filename + ":" + e.lineno : ""));
+      });
+      window.addEventListener("unhandledrejection", function (e) {
+        mostrar("promesa sin atender: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
+      });
+    })();
+  </script>
   <h1>BtoDicta en el navegador</h1>
   <p class="sub">Pega aquí la clave que muestra BtoDicta en Ajustes. Sin ella, la extensión no envía nada.</p>
   <div class="fila">
-    <input type="password" id="token" placeholder="clave de BtoDicta">
+    <input type="text" id="token" placeholder="pega aquí la clave" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="font-family:ui-monospace,monospace">
     <button id="guardarToken">Guardar</button>
   </div>
   <p class="sub" id="estadoToken"></p>

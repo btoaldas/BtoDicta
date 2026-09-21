@@ -77,8 +77,12 @@ async function pintar() {
   }
 
   const boton = $("alternar");
-  if (!dominio) {
-    // Una página interna del navegador no se puede excluir ni hace falta.
+  // Las páginas internas —las del propio navegador y las de las extensiones—
+  // no son sitios que la bitácora vaya a anotar, y ofrecer excluirlas llevaba a
+  // un botón absurdo: «No mirar ochiafiebobidkcleflmhlfegpaoblgc», que es el
+  // identificador de esta misma extensión.
+  const interna = !dominio || /^(chrome|edge|brave|about|moz-extension|chrome-extension|extension):/i.test(url);
+  if (interna) {
     $("pagina").textContent = "Esta pestaña no es una página web.";
     boton.style.display = "none";
     return;

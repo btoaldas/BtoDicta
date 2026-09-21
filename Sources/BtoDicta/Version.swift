@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.77.0"
+    static let numero = "0.77.1"
     static let fecha = "2026-09-14"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.77.1", "2026-09-20", [
+            "EL CAMPO DE LA CLAVE YA NO LO PISA EL NAVEGADOR. Era un campo de contraseña, y el gestor de contraseñas lo rellenaba solo con otra cosa: se veían puntos, parecía que la clave estaba puesta, y no lo estaba. Ahora es un campo normal, sin autocompletado, y al guardar se enseña el principio y el final de lo guardado para poder compararlo",
+            "Y si la pantalla de la extensión falla al cargarse, lo DICE en vez de quedarse en blanco. Antes un error dejaba la página muda y sin botones que respondieran, sin forma de saber por qué",
+            "El menú tampoco ofrece ya excluir sus propias páginas internas",
+        ]),
         ("0.77.0", "2026-09-20", [
             "LA EXTENSIÓN SE INSTALA DESDE SU CARPETA, no desde una copia. El botón de Ajustes ahora ABRE ~/.btodicta/extension y copia la clave, en vez de dejar una copia donde eligieras. Una copia no se actualiza nunca, y mantenerla al día era justo el objetivo: así que ofrecer las dos opciones invitaba a elegir la que no funciona",
             "Y cuando algo falla, el diagnóstico enseña el principio y el final de la clave que tiene guardada, más el error literal del navegador. Antes decía «la clave está mal» sin dejar ver SI la guardada era la que creías haber pegado",

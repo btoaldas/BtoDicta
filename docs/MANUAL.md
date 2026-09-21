@@ -1133,6 +1133,14 @@ Es **opcional**: BtoDicta funciona igual sin ella.
 
 Sin la clave, la extensión no envía absolutamente nada.
 
+**Si el panel aparece vacío** (0.77.1): significa que su guion falló al
+cargarse. Ahora eso sale escrito en rojo arriba del todo, con el error literal;
+antes la página se quedaba en blanco y sin botones que respondieran.
+
+**El campo de la clave no es de contraseña** y no se autocompleta. Lo era, y el
+gestor del navegador lo rellenaba solo con otra cosa: se veían puntos, parecía
+puesta, y no lo estaba.
+
 **Si algo no funciona, la extensión te lo dice** (0.76.1)
 
 Su pantalla de configuración comprueba seis cosas en orden y, cuando algo falla,
