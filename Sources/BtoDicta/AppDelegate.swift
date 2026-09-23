@@ -4893,6 +4893,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         probarMenuRapidoSiSePidio()
         probarIconoOcultoSiSePidio()
         probarTripleFnSiSePidio()
+        probarRafagaMicrofonoSiSePidio()
 
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
         registerHotKey()
@@ -10647,5 +10648,70 @@ extension AppDelegate {
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 60) { print("TRIPLE FALLA timeout"); fflush(stdout); exit(4) }
+    }
+}
+
+// MARK: - Prueba: la bitácora no pide el micrófono en ráfaga tras un fallo
+extension AppDelegate {
+
+    /// BTODICTA_RAFAGATEST=1 — reproduce el bucle del 2026-09-23: el montaje del
+    /// micrófono falla y, mientras tanto, llegan pedidos por cambio de estado cada
+    /// 100 ms, como los que provocaba cada fallo. Cuenta cuántas veces se intentó
+    /// montar. Después deja de fallar y comprueba que, tras un dictado, la
+    /// bitácora vuelve al momento. Solo con carpeta aislada.
+    fileprivate func probarRafagaMicrofonoSiSePidio() {
+        guard ProcessInfo.processInfo.environment["BTODICTA_RAFAGATEST"] == "1" else { return }
+        guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+            print("RAFAGA FALLA — se niega a correr sin BTODICTA_DIR"); exit(2)
+        }
+        let raiz = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
+        try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        Config.set("continuo_activo", to: true)
+        Config.set("continuo_carpeta", to: raiz.path)
+        Config.set("continuo_audio_modo", to: "siempre")
+        Config.set("continuo_pantalla_activa", to: false)
+        Config.set("continuo_sistema_activo", to: false)
+        let registro = URL(fileURLWithPath: dir).appendingPathComponent("btodicta.log")
+        func cuenta(_ que: String) -> Int {
+            Log.vaciar()
+            return ((try? String(contentsOf: registro, encoding: .utf8)) ?? "")
+                .components(separatedBy: "\n").filter { $0.contains(que) }.count
+        }
+        var mal = 0
+        func chk(_ ok: Bool, _ q: String) { print("RAFAGA \(ok ? "✓" : "✗") \(q)"); fflush(stdout); if !ok { mal += 1 } }
+
+        ContinuoAudio.shared.simularFallo = true
+        ContinuoAudio.shared.arrancar()
+        // Seis segundos de pedidos cada 100 ms: 60 pedidos.
+        var pedidos = 0
+        let t = Timer(timeInterval: 0.1, repeats: true) { tm in
+            pedidos += 1
+            ContinuoBitacora.recuperarMicrofono()
+            if pedidos >= 60 { tm.invalidate() }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.5) {
+            let intentos = cuenta("no arrancó (simulado")
+            print("RAFAGA medida: \(pedidos) pedidos en 6 s → \(intentos) intentos de montar el micrófono")
+            // El primero, y el reintento de los 2,5 s. El de los 5 s más cae a los 7,5.
+            chk(intentos >= 1 && intentos <= 3, "tras un fallo, los pedidos no vuelven a montar el micrófono antes de su espera")
+            // Deja de fallar. Un dictado toma el micrófono y lo devuelve: la
+            // bitácora tiene que volver al momento, no al final de la espera.
+            ContinuoAudio.shared.simularFallo = false
+            let antes = cuenta("bitácora: audio en marcha")
+            ContinuoBitacora.cederMicrofono {
+                ContinuoBitacora.recuperarMicrofono()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    chk(cuenta("bitácora: audio en marcha") > antes,
+                        "tras un dictado, la bitácora vuelve al momento aunque venía de fallar")
+                    ContinuoAudio.shared.detener()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        print("RAFAGA \(mal == 0 ? "OK — sin ráfaga tras un fallo, y vuelve tras un dictado" : "FALLA (\(mal))")")
+                        fflush(stdout); exit(mal == 0 ? 0 : 1)
+                    }
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { print("RAFAGA FALLA timeout"); fflush(stdout); exit(4) }
     }
 }

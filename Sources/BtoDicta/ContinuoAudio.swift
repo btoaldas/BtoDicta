@@ -47,8 +47,14 @@ final class ContinuoAudio {
     private var generacion: UInt64 = 0
     /// Evita que dos arranques concurrentes se pisen el trozo abierto.
     private var montando = false
-    /// Intentos de arranque encadenados (micrófono ocupado).
-    private var intentos = 0
+    /// Espera tras un arranque fallido. Todo pedido del micrófono pasa por aquí:
+    /// sin ella, cada fallo provocaba un cambio de estado que volvía a pedir el
+    /// micrófono al instante, y la espera creciente no servía de nada.
+    private var espera = EsperaMicrofono()
+    /// Hay un intento aplazado al final del enfriamiento: no se apila otro.
+    private var aplazado = false
+    /// Solo el arnés `BTODICTA_RAFAGATEST`: el montaje falla a propósito.
+    var simularFallo = false
     /// Arranques que montaron el motor pero no entregaron un solo buffer. Se
     /// cuentan APARTE de los intentos de montaje: el motor «arranca» siempre,
     /// así que reiniciar el contador al montar dejaba un bucle infinito de
@@ -79,7 +85,8 @@ final class ContinuoAudio {
     /// Enciende la bitácora si el ajuste lo permite. Idempotente.
     func arrancar() {
         guard Config.continuoActivo(), Config.continuoAudioModo() != "manual" else { return }
-        cola.async { [weak self] in self?.arrancarEnCola() }
+        // Encenderla es una orden explícita: no espera a un fallo anterior.
+        cola.async { [weak self] in self?.espera.reiniciar(); self?.arrancarEnCola() }
     }
 
     func detener() {
@@ -138,6 +145,10 @@ final class ContinuoAudio {
         cola.async { [weak self] in
             guard let self else { DispatchQueue.main.async { completion() }; return }
             self.detenerEnCola(cerrandoTrozo: true)
+            // El micrófono cambia de dueño: al volver, otra situación. Sin esto,
+            // tras un dictado la bitácora esperaría a un reintento que la cesión
+            // acaba de invalidar.
+            self.espera.reiniciar()
             DispatchQueue.main.async { completion() }
         }
     }
@@ -150,7 +161,7 @@ final class ContinuoAudio {
         cola.async { [weak self] in
             guard let self else { return }
             guard Config.continuoActivo(), Config.continuoAudioModo() != "manual" else { return }
-            self.arrancarEnCola()
+            self.pedirMicrofono()
         }
     }
 
@@ -158,6 +169,30 @@ final class ContinuoAudio {
     private var estaCedido: Bool {
         candadoCesion.lock(); defer { candadoCesion.unlock() }
         return cedido
+    }
+
+    /// Un pedido que no viene de un reintento programado: un cambio de estado, el
+    /// fin de un dictado. Pasa por la espera.
+    private func pedirMicrofono() {
+        switch espera.pedido(en: Date()) {
+        case .arrancar:
+            arrancarEnCola()
+        case .descartar:
+            // Ya hay un reintento en camino. Este pedido es justo la ráfaga.
+            break
+        case .aplazar(let falta):
+            guard !aplazado else { return }
+            aplazado = true
+            candadoCesion.lock(); let gen = generacion; candadoCesion.unlock()
+            Log.debug("bitácora: pedido del micrófono aplazado \(Int(falta)) s — enfriando tras varios fallos")
+            cola.asyncAfter(deadline: .now() + falta) { [weak self] in
+                guard let self else { return }
+                self.aplazado = false
+                self.candadoCesion.lock(); let vigente = self.generacion; self.candadoCesion.unlock()
+                guard vigente == gen, Config.continuoActivo() else { return }
+                self.arrancarEnCola()
+            }
+        }
     }
 
     // MARK: Arranque real
@@ -218,7 +253,7 @@ final class ContinuoAudio {
                 if self.arranquesMudos == 4 {
                     Log.log(.sistema, "bitácora: el micrófono no entrega audio tras \(self.arranquesMudos) intentos — sigo intentando cada minuto (revisa si otra app lo está usando)")
                 }
-                self.intentos = 0
+                self.espera.reiniciar()
                 self.cola.asyncAfter(deadline: .now() + 60) { [weak self] in
                     guard let self, Config.continuoActivo() else { return }
                     Log.debug("bitácora: reintento lento del micrófono (\(self.arranquesMudos) arranques mudos)")
@@ -237,30 +272,36 @@ final class ContinuoAudio {
     /// con espera creciente y se abandona tras varios intentos para no dejar un
     /// bucle eterno pidiendo un micrófono que otro tiene.
     private func reintentar() {
-        intentos += 1
-        guard intentos <= 6 else {
-            Log.log(.sistema, "bitácora: el micrófono sigue ocupado tras \(intentos) intentos — lo dejo hasta el próximo cambio de estado")
-            intentos = 0
+        let espera: TimeInterval
+        switch self.espera.fallo(en: Date()) {
+        case .enfriar(let tras, let durante):
+            Log.log(.sistema, "bitácora: el micrófono sigue ocupado tras \(tras) intentos — lo dejo descansar \(Int(durante)) s; después, vuelvo a probar al siguiente cambio de estado")
             return
+        case .reintentar(let numero, let en):
+            // Espera creciente de verdad: 2,5 s, 5 s, 10 s, 20 s… Con incrementos
+            // lineales una app que retiene el micrófono nos tenía preguntando
+            // cada dos segundos y medio durante minutos.
+            espera = en
+            Log.log(.sistema, "bitácora: micrófono ocupado, reintento \(numero) en \(en) s")
         }
-        // Espera creciente de verdad: 2,5 s, 5 s, 10 s, 20 s… Con incrementos
-        // lineales una app que retiene el micrófono nos tenía preguntando cada
-        // dos segundos y medio durante minutos.
-        let espera = min(60.0, 2.5 * pow(2.0, Double(intentos - 1)))
         candadoCesion.lock(); let gen = generacion; candadoCesion.unlock()
-        Log.log(.sistema, "bitácora: micrófono ocupado, reintento \(intentos) en \(espera) s")
         cola.asyncAfter(deadline: .now() + espera) { [weak self] in
             guard let self else { return }
             // Si entre medias el dictado pidió el micrófono, este reintento es
             // de una generación anterior y no debe tomarlo.
             self.candadoCesion.lock(); let vigente = self.generacion; self.candadoCesion.unlock()
             guard vigente == gen else { return }
+            self.espera.reintentoLlega()
             self.arrancarEnCola()
         }
     }
 
     /// Monta el motor de captura. SOLO desde el hilo principal.
     private func montarEnMain() -> Bool {
+        if simularFallo {
+            Log.log(.sistema, "bitácora: el motor de audio no arrancó (simulado por la prueba)")
+            return false
+        }
         let motor = AVAudioEngine()
         let entrada = motor.inputNode
         entrada.removeTap(onBus: 0)
@@ -322,7 +363,7 @@ final class ContinuoAudio {
             self.buffersVistos += 1
             if self.buffersVistos == 1 {
                 // Audio real: aquí sí se limpian los contadores de reintento.
-                self.cola.async { self.intentos = 0; self.arranquesMudos = 0 }
+                self.cola.async { self.espera.reiniciar(); self.arranquesMudos = 0 }
                 Log.log(.sistema, "bitácora: el micrófono entrega audio (\(buffer.frameLength) marcos por buffer)")
             } else if self.buffersVistos % 600 == 0 {
                 Log.debug("bitácora: tap #\(self.buffersVistos)")

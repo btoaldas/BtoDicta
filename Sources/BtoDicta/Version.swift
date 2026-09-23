@@ -8,11 +8,14 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.81.1"
+    static let numero = "0.81.2"
     static let fecha = "2026-09-23"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.81.2", "2026-09-23", [
+            "LA BITÁCORA YA NO PIDE EL MICRÓFONO EN RÁFAGA cuando falla. Esperaba 2,5 s, 5, 10… entre reintentos, pero cada fallo provocaba un cambio de estado que le volvía a pedir el micrófono al instante y se saltaba la espera: seis reintentos y la rendición en el mismo segundo, una y otra vez, cargando la aplicación. Ahora todo pedido pasa por la espera. Medido: con el micrófono fallando y un pedido cada 100 ms, 3 intentos en 6 s en vez de 91. Y tras un dictado vuelve al momento, aunque viniera de fallar",
+        ]),
         ("0.81.1", "2026-09-23", [
             "CON LOS AIRPODS EN UNA LLAMADA, BTODICTA NO GRABABA. Durante la llamada macOS pone el micrófono de los AirPods a 24 000 Hz; BtoDicta fija el micrófono integrado, que va a 48 000, y el motor de audio se quedaba con la frecuencia vieja y no arrancaba (error -10868). El dictado no grababa nada y la bitácora reintentaba sin parar, cargando la aplicación. Ahora, al cambiar de micrófono, se ajusta la frecuencia a la del micrófono elegido. Comprobado en plena reunión: el dictado graba y la bitácora arranca sin un solo error",
         ]),

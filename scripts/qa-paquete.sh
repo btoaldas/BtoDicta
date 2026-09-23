@@ -174,7 +174,7 @@ ejecutar() {
   # aparte. Confiar en que restauren al terminar ya falló una vez: una sección
   # añadida al final volvió a machacar y `exit()` no ejecuta ningún `defer`.
   case "$id" in
-    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|menu_rapido|triple_fn)
+    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|menu_rapido|triple_fn|rafaga_microfono)
       desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id") ;;
   esac
   local bin="$BIN"
@@ -273,6 +273,9 @@ else
   # La bitácora no puede robarle el micrófono al dictado que arranca. Provoca la
   # reconciliación sin parar durante el arranque: una carrera no se espera, se fuerza.
   ejecutar "carrera_microfono" "BTODICTA_CARRERAMICROTEST" "1" 60
+  # Tras un fallo del micrófono, la bitácora no lo vuelve a pedir en ráfaga: cada
+  # fallo provocaba un cambio de estado que lo pedía otra vez al instante.
+  ejecutar "rafaga_microfono" "BTODICTA_RAFAGATEST" "1" 60
   # El catálogo de exclusiones propuestas, comprobado sobre el paquete construido.
   # Aquí y no en las pruebas de Swift: allí `Bundle.main` no trae el recurso y la
   # prueba se salta sola, así que nadie miraría el archivo que de verdad viaja.
