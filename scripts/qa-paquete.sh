@@ -136,12 +136,22 @@ ejecutar() {
   # aparte. Confiar en que restauren al terminar ya falló una vez: una sección
   # añadida al final volvió a machacar y `exit()` no ejecuta ningún `defer`.
   case "$id" in
-    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta)
+    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|icono_estados|menu_rapido)
       desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id") ;;
+  esac
+  # Las pruebas del icono necesitan el paquete .app: un binario suelto no recibe
+  # icono en la barra de menús, y la prueba se negaría a correr.
+  local bin="$BIN"
+  case "$id" in
+    icono_estados)
+      for candidato in "$REPO/build/BtoDicta.app/Contents/MacOS/BtoDicta" \
+                       "/Applications/BtoDicta.app/Contents/MacOS/BtoDicta"; do
+        [[ -x "$candidato" ]] && { bin="$candidato"; break; }
+      done ;;
   esac
   inicio="$(/bin/date +%s)"
   /usr/bin/perl -e 'alarm shift; exec @ARGV' "$limite" \
-    /usr/bin/env "$variable=$valor" "${desvio[@]}" "$BIN" > "$log" 2>&1
+    /usr/bin/env "$variable=$valor" "${desvio[@]}" "$bin" > "$log" 2>&1
   codigo=$?
   fin="$(/bin/date +%s)"
   total=$((total + 1))
@@ -218,6 +228,10 @@ else
   ejecutar "pausa_bitacora" "BTODICTA_PAUSATEST" "1" 150
   # El modo reunión no corta un dictado en curso, y quitarlo no lo cierra de golpe.
   ejecutar "reunion_no_corta" "BTODICTA_REUNIONTEST" "1" 70
+  # El icono dice el estado sin abrir el menú, y sigue siendo plantilla.
+  ejecutar "icono_estados" "BTODICTA_ICONTEST" "1" 60
+  # El menú del icono: pulsa sus elementos de verdad y comprueba lo que enseña.
+  ejecutar "menu_rapido" "BTODICTA_MENUTEST" "1" 60
   # Desde FUERA: el modo no toca los ajustes del usuario, y la pausa vence a su
   # hora aunque la aplicación se cierre y se vuelva a abrir (spec 010, T08 y T13).
   estatica "modo_rapido" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-modo-rapido.py"

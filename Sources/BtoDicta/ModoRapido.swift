@@ -97,6 +97,10 @@ enum ModoRapido {
         Config.set(clavePausa, to: aGuardar(hasta: hasta, ahora: ahora))
         ContinuoBitacora.detener()
         Log.log(.sistema, "bitácora: en pausa hasta las \(horaLegible(hasta)) — no se graba audio ni pantalla")
+        // Avisa al EMPEZAR, no solo al volver: quien pulsó sin querer tiene que
+        // enterarse en el acto de que se dejó de mirar.
+        avisarUsuario(titulo: "Bitácora en pausa",
+                      cuerpo: "No se graba audio ni pantalla hasta las \(horaLegible(hasta)). Vuelve sola.")
         vigilar()
         avisarCambio()
     }
@@ -185,6 +189,20 @@ enum ModoRapido {
         c.body = cuerpo
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: "pausa-\(UUID().uuidString)", content: c, trigger: nil))
+    }
+
+    /// «● Grabando 12:34 · 18,3 MB por transcribir» (spec 010, RF-07). Pura, para
+    /// poder probar una sesión de veinte horas sin grabar veinte horas.
+    static func textoGrabacion(segundos: Int, bytes: Int, reunion: Bool) -> String {
+        let s = max(segundos, 0)
+        let reloj = s >= 3600
+            ? String(format: "%d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60)
+            : String(format: "%d:%02d", s / 60, s % 60)
+        let mb = Double(max(bytes, 0)) / 1_048_576
+        // Coma decimal: se lee en español.
+        let cifra = String(format: "%.1f", locale: Locale(identifier: "es_EC"), mb)
+        return "● Grabando \(reloj) · \(cifra) MB por transcribir"
+            + (reunion ? " · modo reunión" : "")
     }
 
     static func horaLegible(_ d: Date) -> String {

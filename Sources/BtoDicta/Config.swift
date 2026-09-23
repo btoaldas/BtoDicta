@@ -111,6 +111,13 @@ struct Config {
         min(max((json()["dictado_tope_espera_seg"] as? Double) ?? 30, 5), 300)
     }
 
+    /// Duraciones que ofrece «No mirar durante…» en el menú del icono, en
+    /// minutos (spec 010). Parametrizable; se descartan las no positivas.
+    static func opcionesPausaMin() -> [Double] {
+        let v = ((json()["pausa_opciones_min"] as? [Double]) ?? [15, 30, 60, 120]).filter { $0 > 0 }
+        return v.isEmpty ? [15, 30, 60, 120] : v
+    }
+
     /// Tope absoluto de un dictado, en minutos. 0 = sin tope.
     ///
     /// El corte por silencio no basta: cualquier ruido por encima del umbral

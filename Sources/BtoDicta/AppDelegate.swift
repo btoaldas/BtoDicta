@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        refrescarControlesRapidos(menu)
         menu.items.first(where: { $0.tag == 84 })?.isHidden = Updater.disponibleAlArrancar == nil
         if let detener = menu.items.first(where: { $0.tag == 86 }) {
             detener.isHidden = !CapturaMac.grabacionContinuaEnCurso
@@ -4753,6 +4754,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         detenerPantalla.tag = 86
         detenerPantalla.isHidden = true
         menu.addItem(detenerPantalla)
+        // Controles rápidos (spec 010). Arriba del todo a propósito: son los que
+        // se buscan con prisa, en mitad de una reunión o antes de una llamada.
+        // Lo que cuesta ir a Ajustes, no se hace.
+        menu.addItem(NSMenuItem.separator())
+        let grabacionEnCurso = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        grabacionEnCurso.tag = AppDelegate.tagGrabacionEnCurso
+        grabacionEnCurso.isHidden = true
+        grabacionEnCurso.isEnabled = false
+        menu.addItem(grabacionEnCurso)
+        let reunionItem = NSMenuItem(title: "Modo reunión — no cortar el dictado",
+                                     action: #selector(alternarModoReunion), keyEquivalent: "")
+        reunionItem.target = self
+        reunionItem.tag = AppDelegate.tagModoReunion
+        reunionItem.toolTip = "Mientras esté puesto, el dictado no se cierra por silencio ni por duración. Se puede poner con el dictado ya empezado."
+        menu.addItem(reunionItem)
+        let pausaItem = NSMenuItem(title: "No mirar durante…", action: nil, keyEquivalent: "")
+        pausaItem.tag = AppDelegate.tagPausaBitacora
+        let pausaMenu = NSMenu()
+        for minutos in Config.opcionesPausaMin() {
+            let titulo = minutos >= 60 && minutos.truncatingRemainder(dividingBy: 60) == 0
+                ? (minutos == 60 ? "1 hora" : "\(Int(minutos / 60)) horas")
+                : "\(Int(minutos)) minutos"
+            let it = NSMenuItem(title: titulo, action: #selector(pausarBitacora(_:)), keyEquivalent: "")
+            it.target = self
+            it.representedObject = minutos
+            pausaMenu.addItem(it)
+        }
+        let manana = NSMenuItem(title: "Hasta mañana a las 8:00", action: #selector(pausarBitacoraHastaManana),
+                                keyEquivalent: "")
+        manana.target = self
+        pausaMenu.addItem(manana)
+        pausaMenu.addItem(NSMenuItem.separator())
+        let reanudarItem = NSMenuItem(title: "Reanudar ya", action: #selector(reanudarBitacora), keyEquivalent: "")
+        reanudarItem.target = self
+        reanudarItem.tag = AppDelegate.tagReanudarBitacora
+        pausaMenu.addItem(reanudarItem)
+        pausaItem.submenu = pausaMenu
+        menu.addItem(pausaItem)
+        menu.addItem(NSMenuItem.separator())
         let correo = NSMenuItem(title: "Enviar resumen por correo", action: nil, keyEquivalent: "")
         correo.submenu = NSMenu()
         for p in ResumenCorreo.Periodo.allCases {
@@ -4816,7 +4856,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.appMenu = menu   // el mismo menú se ofrece en el Dock
         if statusItem != nil { iniciarVigilanciaIcono() }
 
+        // Modo reunión y pausa cambian el icono al instante, incluida la vuelta
+        // automática de la pausa, que llega desde el vigía sin que nadie toque nada.
+        NotificationCenter.default.addObserver(forName: ModoRapido.cambio, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.setIcono(self.estadoIconoActual)
+        }
         probarIconosBarraSiSePidio()
+        probarMenuRapidoSiSePidio()
 
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
         registerHotKey()
@@ -5292,13 +5339,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         btn.imageScaling = .scaleProportionallyDown
         btn.title = ""
         aplicarTinteIcono(btn)
+        // Los controles rápidos (spec 010, RF-03) se ven SIN abrir el menú.
+        //
+        // Con FORMA y no con color: el icono tiene que ser plantilla, sin tinte
+        // propio, para leerse sobre cualquier barra — lo vigila BTODICTA_ICONTEST.
+        //
+        // Prioridad (D-5, precisada al implementar): mientras se DICTA manda el
+        // estado del dictado, porque la pausa no lo toca (D-7) y ocultar «estoy
+        // grabando» sería peor que ocultar la pausa. En reposo, la pausa gana a
+        // la reunión: es la que apaga la captura.
+        let reunion = ModoRapido.enReunion
+        let pausadaHasta = ModoRapido.pausaVigente() ? ModoRapido.pausadaHasta : nil
         switch e {
         case .reposo:
-            btn.image = Self.iconoReposo()
-            btn.toolTip = "BtoDicta — listo para dictar"
+            if let h = pausadaHasta {
+                btn.image = Self.simbolo("pause.circle.fill") ?? Self.iconoReposo()
+                btn.toolTip = "BtoDicta — bitácora en pausa hasta las \(ModoRapido.horaLegible(h))"
+                    + (reunion ? " · modo reunión puesto" : "")
+            } else if reunion {
+                btn.image = Self.simbolo("person.2.fill") ?? Self.iconoReposo()
+                btn.toolTip = "BtoDicta — modo reunión puesto: el dictado no se cortará"
+            } else {
+                btn.image = Self.iconoReposo()
+                btn.toolTip = "BtoDicta — listo para dictar"
+            }
         case .grabando:
-            btn.image = Self.simbolo("waveform") ?? Self.iconoReposo()
-            btn.toolTip = "BtoDicta — grabando"
+            if reunion {
+                btn.image = Self.simbolo("person.2.wave.2.fill") ?? Self.simbolo("waveform") ?? Self.iconoReposo()
+                btn.toolTip = "BtoDicta — grabando en modo reunión (no se cortará)"
+            } else {
+                btn.image = Self.simbolo("waveform") ?? Self.iconoReposo()
+                btn.toolTip = "BtoDicta — grabando"
+            }
             latir(btn)
         case .procesando:
             // El cerebro es el estado visual histórico de BtoDicta mientras
@@ -5341,6 +5413,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let reposoOK = statusItem?.button?.toolTip == "BtoDicta — listo para dictar"
         todoOK = todoOK && reposoOK
         print("ICONTEST \(reposoOK ? "OK" : "FALLA") retorno al micrófono")
+
+        // Spec 010, RF-03: modo reunión y pausa se ven SIN abrir el menú.
+        // Solo con carpeta aislada: esto pone el modo y pausa la bitácora.
+        if let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty {
+            let base = URL(fileURLWithPath: dir)
+            let imagenReposo = statusItem?.button?.image?.tiffRepresentation
+            /// Guarda el icono tal cual para poder MIRARLO, no solo comprobarlo.
+            func guardar(_ nombre: String) {
+                guard let img = statusItem?.button?.image else { return }
+                let lienzo = NSImage(size: NSSize(width: 64, height: 64))
+                lienzo.lockFocus()
+                NSColor.white.setFill(); NSRect(x: 0, y: 0, width: 64, height: 64).fill()
+                img.draw(in: NSRect(x: 8, y: 8, width: 48, height: 48))
+                lienzo.unlockFocus()
+                if let t = lienzo.tiffRepresentation, let r = NSBitmapImageRep(data: t),
+                   let png = r.representation(using: .png, properties: [:]) {
+                    try? png.write(to: base.appendingPathComponent("icono-\(nombre).png"))
+                }
+            }
+            func caso(_ nombre: String, _ estado: EstadoIcono, contiene: String, distintoDeReposo: Bool) {
+                setIcono(estado)
+                let b = statusItem?.button
+                let base = b?.image?.isTemplate == true && b?.contentTintColor == nil
+                let texto = b?.toolTip?.contains(contiene) == true
+                let forma = !distintoDeReposo || b?.image?.tiffRepresentation != imagenReposo
+                let ok = base && texto && forma
+                todoOK = todoOK && ok
+                print("ICONTEST \(ok ? "OK" : "FALLA") \(nombre) — «\(b?.toolTip ?? "")»\(forma ? "" : " (MISMA forma que el reposo)")")
+                guardar(nombre)
+            }
+            guardar("normal")
+            ModoRapido.ponerReunion(true)
+            caso("reunion-reposo", .reposo, contiene: "modo reunión puesto", distintoDeReposo: true)
+            caso("reunion-grabando", .grabando, contiene: "grabando en modo reunión", distintoDeReposo: true)
+            ModoRapido.pausar(hasta: Date().addingTimeInterval(600))
+            caso("pausa-gana-en-reposo", .reposo, contiene: "bitácora en pausa", distintoDeReposo: true)
+            // Dictando, manda el dictado: la pausa no lo toca (D-7).
+            caso("dictado-gana-a-la-pausa", .grabando, contiene: "grabando en modo reunión", distintoDeReposo: true)
+            ModoRapido.reanudar(motivo: "prueba")
+            ModoRapido.ponerReunion(false)
+            caso("vuelta-a-normal", .reposo, contiene: "listo para dictar", distintoDeReposo: false)
+        }
         // Segundo ángulo: simula la invalidación que se observó tras varias
         // compilaciones. Debe aparecer una referencia NUEVA, con menú e imagen.
         if let viejo = statusItem {
@@ -9905,5 +10019,188 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             panel.updateForzado(pegar ? "✓ " + text : "✓ Copiado: " + text)
             panel.hide(after: 1.8)
         }
+    }
+}
+
+// MARK: - Controles rápidos del icono (spec 010)
+//
+// Modo reunión y pausa de la bitácora, desde el menú del icono. La lógica vive en
+// `ModoRapido`; aquí solo se enseña y se pulsa. Los elementos se crean una vez y
+// se refrescan al abrir el menú, igual que «Actualización disponible» (D-6).
+extension AppDelegate {
+
+    static let tagModoReunion = 90
+    static let tagPausaBitacora = 91
+    static let tagReanudarBitacora = 92
+    static let tagGrabacionEnCurso = 93
+
+    /// Pone al día los controles rápidos. Se llama desde `menuWillOpen`.
+    fileprivate func refrescarControlesRapidos(_ menu: NSMenu) {
+        if let r = menu.items.first(where: { $0.tag == AppDelegate.tagModoReunion }) {
+            r.state = ModoRapido.enReunion ? .on : .off
+        }
+        if let p = menu.items.first(where: { $0.tag == AppDelegate.tagPausaBitacora }) {
+            // Sin bitácora encendida no hay nada que pausar: se oculta en vez de
+            // ofrecer un botón que no hace nada.
+            p.isHidden = !Config.continuoActivo()
+            if ModoRapido.pausaVigente(), let h = ModoRapido.pausadaHasta {
+                p.title = "⏸ Bitácora en pausa hasta las \(ModoRapido.horaLegible(h))"
+            } else {
+                p.title = "No mirar durante…"
+            }
+            p.submenu?.items.first(where: { $0.tag == AppDelegate.tagReanudarBitacora })?.isEnabled =
+                ModoRapido.pausaVigente()
+        }
+        if let g = menu.items.first(where: { $0.tag == AppDelegate.tagGrabacionEnCurso }) {
+            g.isHidden = !recorder.isRecording
+            if recorder.isRecording { g.title = textoGrabacionEnCurso() }
+        }
+    }
+
+    /// «● Grabando 12:34 · 18,3 MB por transcribir» (spec 010, RF-07).
+    ///
+    /// Es lo único que hace visible el coste de una sesión larga ANTES de soltar,
+    /// mientras no exista la transcripción por tramos (spec 011). Veinte horas de
+    /// dictado son del orden de 2 GB de audio, y se transcriben de una vez.
+    fileprivate func textoGrabacionEnCurso() -> String {
+        ModoRapido.textoGrabacion(segundos: Int(Date().timeIntervalSince(inicioDictado)),
+                                  bytes: recorder.bytesGrabados,
+                                  reunion: ModoRapido.enReunion)
+    }
+
+    /// Da la respuesta donde se está mirando: en el notch. Si hay un dictado en
+    /// curso, sin taparlo.
+    fileprivate func confirmarControlRapido(_ texto: String) {
+        if recorder.isRecording { panel.update(texto) }
+        else { panel.show(texto); panel.hide(after: 2.5) }
+    }
+
+    @objc func alternarModoReunion() {
+        let ahora = !ModoRapido.enReunion
+        ModoRapido.ponerReunion(ahora)
+        confirmarControlRapido(ahora
+            ? "👥 Modo reunión — el dictado no se cortará"
+            : "Modo reunión quitado — vuelve el corte por silencio")
+    }
+
+    @objc func pausarBitacora(_ sender: NSMenuItem) {
+        guard let minutos = sender.representedObject as? Double else { return }
+        ModoRapido.pausar(minutos: minutos)
+        if let h = ModoRapido.pausadaHasta {
+            confirmarControlRapido("⏸ Bitácora en pausa hasta las \(ModoRapido.horaLegible(h))")
+        }
+    }
+
+    @objc func pausarBitacoraHastaManana() {
+        let h = ModoRapido.hastaManana(desde: Date())
+        ModoRapido.pausar(hasta: h)
+        confirmarControlRapido("⏸ Bitácora en pausa hasta \(ModoRapido.horaLegible(h))")
+    }
+
+    @objc func reanudarBitacora() {
+        ModoRapido.reanudar(motivo: "a mano")
+        confirmarControlRapido("▶︎ La bitácora vuelve a mirar")
+    }
+}
+
+// MARK: - Prueba del menú de controles rápidos (spec 010, T10–T12)
+extension AppDelegate {
+
+    /// BTODICTA_MENUTEST=1 — abre el menú como lo abriría el usuario, PULSA sus
+    /// elementos (por su acción y su destino, no llamando a las funciones por
+    /// detrás) y comprueba lo que el menú enseña después.
+    ///
+    /// Solo con carpeta aislada: pone el modo reunión, pausa la bitácora y abre
+    /// un dictado de verdad.
+    fileprivate func probarMenuRapidoSiSePidio() {
+        guard ProcessInfo.processInfo.environment["BTODICTA_MENUTEST"] == "1" else { return }
+        guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+            print("MENU FALLA — se niega a correr sin BTODICTA_DIR"); exit(2)
+        }
+        guard let menu = appMenu else { print("MENU FALLA — no hay menú del icono"); exit(3) }
+        let raiz = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
+        try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        Config.set("continuo_activo", to: true)            // para que se ofrezca la pausa
+        Config.set("continuo_carpeta", to: raiz.path)      // y que nunca toque la de verdad
+        Config.set("continuo_audio_modo", to: "manual")
+        Config.set("continuo_pantalla_activa", to: false)
+        Config.set("continuo_sistema_activo", to: false)
+        Config.set("silencio_max_seg", to: 0.0)            // que el dictado de prueba no se corte
+
+        var mal = 0
+        func chk(_ ok: Bool, _ q: String) { print("MENU \(ok ? "✓" : "✗") \(q)"); fflush(stdout); if !ok { mal += 1 } }
+        func abrir() { menuWillOpen(menu) }
+        func item(_ tag: Int) -> NSMenuItem? { menu.items.first { $0.tag == tag } }
+        func pulsar(_ it: NSMenuItem?) {
+            guard let it, let accion = it.action else { chk(false, "elemento sin acción"); return }
+            NSApp.sendAction(accion, to: it.target, from: it)
+        }
+
+        abrir()
+        // T10 — modo reunión
+        let reunion = item(AppDelegate.tagModoReunion)
+        chk(reunion != nil && reunion?.state == .off, "T10: el menú ofrece «\(reunion?.title ?? "—")», apagado de fábrica")
+        chk(reunion.map { menu.items.contains($0) } == true && reunion?.isHidden == false,
+            "RNF-01: está en el PRIMER nivel: abrir el menú y pulsar, dos interacciones")
+        pulsar(reunion); abrir()
+        chk(ModoRapido.enReunion && reunion?.state == .on, "T10: pulsarlo lo pone, y el menú lo marca")
+        pulsar(reunion); abrir()
+        chk(!ModoRapido.enReunion && reunion?.state == .off, "T10: pulsarlo otra vez lo quita")
+
+        // T11 — pausa
+        let pausa = item(AppDelegate.tagPausaBitacora)
+        let opciones = pausa?.submenu?.items.filter { $0.representedObject is Double } ?? []
+        let reanudar = pausa?.submenu?.items.first { $0.tag == AppDelegate.tagReanudarBitacora }
+        chk(pausa?.isHidden == false && pausa?.title == "No mirar durante…",
+            "T11: el menú ofrece «No mirar durante…»")
+        chk(opciones.count == Config.opcionesPausaMin().count,
+            "T11: con las duraciones configuradas: \(opciones.map(\.title).joined(separator: ", ")) + hasta mañana")
+        chk(reanudar?.isEnabled == false, "T11: «Reanudar ya» apagado mientras no hay pausa")
+        let treinta = opciones.first { ($0.representedObject as? Double) == 30 }
+        let esperada = ModoRapido.horaLegible(Date().addingTimeInterval(30 * 60))
+        pulsar(treinta); abrir()
+        chk(ModoRapido.pausaVigente() && (pausa?.title.contains("hasta las \(esperada)") ?? false),
+            "T11: «30 minutos» pausa, y el propio menú dice hasta cuándo: «\(pausa?.title ?? "")»")
+        chk(reanudar?.isEnabled == true, "T11: con la pausa puesta, «Reanudar ya» se enciende")
+        pulsar(reanudar); abrir()
+        chk(!ModoRapido.pausaVigente() && pausa?.title == "No mirar durante…",
+            "T11: «Reanudar ya» la quita en el acto")
+
+        // T12 — lo que se está grabando
+        let grabacion = item(AppDelegate.tagGrabacionEnCurso)
+        chk(grabacion?.isHidden == true, "T12: sin dictado, no hay línea de grabación")
+        startDictation()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+            guard let self else { exit(2) }
+            abrir()
+            let titulo = grabacion?.title ?? ""
+            let bytes = self.recorder.bytesGrabados
+            let enDisco = self.recorder.archivoEnCurso.flatMap {
+                (try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? Int) ?? nil
+            } ?? -1
+            chk(grabacion?.isHidden == false && titulo.hasPrefix("● Grabando 0:0"),
+                "T12: con un dictado abierto, el menú dice «\(titulo)»")
+            // Lo que dice el menú tiene que ser lo que hay en disco. Tolerancia:
+            // la cabecera del archivo y lo que entra entre una lectura y otra.
+            let mbMenu = Double(titulo.components(separatedBy: " · ").dropFirst().first?
+                .replacingOccurrences(of: " MB por transcribir", with: "")
+                .replacingOccurrences(of: ".", with: "")
+                .replacingOccurrences(of: ",", with: ".") ?? "") ?? -1
+            let mbDisco = Double(enDisco) / 1_048_576
+            // El menú redondea a una décima de MB: esa es toda la precisión que se
+            // le puede exigir, más lo que entra entre una lectura y otra.
+            chk(abs(mbMenu - mbDisco) <= 0.1 && enDisco > 0,
+                "T12: la cifra del menú coincide con el disco a su precisión (menú \(String(format: "%.2f", mbMenu)) MB · disco \(String(format: "%.2f", mbDisco)) MB)")
+            // Segundo ángulo, exacto: los bytes que usa el menú son los del archivo,
+            // descontada solo la cabecera WAV y un trozo en vuelo.
+            let diferencia = enDisco - bytes
+            chk(diferencia >= 0 && diferencia <= 44 + 16_384,
+                "T12: los bytes que cuenta el menú son los del archivo (\(bytes) contados · \(enDisco) en disco · diferencia \(diferencia))")
+            self.cancelDictation(silencioso: true)
+            print("MENU \(mal == 0 ? "TODO OK — el menú pone y quita el modo, pausa y reanuda, y dice lo que se graba" : "FALLA (\(mal))")")
+            fflush(stdout)
+            exit(mal == 0 ? 0 : 1)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 40) { print("MENU FALLA timeout"); fflush(stdout); exit(4) }
     }
 }

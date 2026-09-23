@@ -86,29 +86,33 @@ puede fallar en silencio es lo de debajo.
 
 ## Fase C — El icono y el menú
 
-- [ ] T09 (RF-03, RNF-03) El icono con sus tres estados
+- [x] T09 (RF-03, RNF-03) El icono con sus tres estados
   - Archivos: `Sources/BtoDicta/AppDelegate.swift`
   - Normal, reunión y bitácora pausada, con la prioridad del plan (D-5).
   - Evidencia esperada: captura de la barra en los tres estados.
+  - Evidencia (2026-09-22): `BTODICTA_ICONTEST` ampliado: los cuatro estados siguen siendo plantilla sin tinte (regla previa del proyecto: se leen en cualquier barra), con forma distinta del reposo y descripción propia. Los iconos se guardaron como imagen y se miraron: micrófono · dos personas · dos personas con ondas · pausa. Prioridad precisada al implementar: dictando manda el dictado (la pausa no lo toca, D-7); en reposo la pausa gana a la reunión. La captura del menú REAL no se pudo tomar —el icono queda oculto tras la muesca y el clic automático no llega—: pendiente de comprobación visual de Alberto.
 
-- [ ] T10 (RF-01, RNF-01) Menú: activar y quitar el modo reunión
+- [x] T10 (RF-01, RNF-01) Menú: activar y quitar el modo reunión
   - Archivos: `Sources/BtoDicta/AppDelegate.swift`
   - Elemento con `tag`, refrescado en `menuWillOpen` (D-6), con la marca de
     activado.
   - Evidencia esperada: dos interacciones desde cualquier aplicación.
+  - Evidencia (2026-09-22): `BTODICTA_MENUTEST` pulsa el elemento por su acción y destino, como el usuario: aparece apagado, pulsarlo lo pone y el menú lo marca, pulsarlo otra vez lo quita. Está en el primer nivel: dos interacciones (RNF-01).
 
-- [ ] T11 (RF-04) Menú: pausar la bitácora
+- [x] T11 (RF-04) Menú: pausar la bitácora
   - Archivos: `Sources/BtoDicta/AppDelegate.swift`
   - «No mirar durante…» con 15 min, 30 min, 1 h, hasta mañana y «Reanudar ya».
     Mientras está pausada, el propio menú dice hasta qué hora.
   - Evidencia esperada: captura del submenú con la hora de vuelta visible.
+  - Evidencia (2026-09-22): Mismo arnés: ofrece 15 min, 30 min, 1 h, 2 h (lista configurable `pausa_opciones_min`) y «Hasta mañana a las 8:00»; «30 minutos» pausa y el propio menú dice «⏸ Bitácora en pausa hasta las 22:11»; «Reanudar ya» solo se enciende con pausa y la quita en el acto. Sabotaje (desconectar el refresco del menú) → 5 ROJOS.
 
-- [ ] T12 (RF-07) Minutos y tamaño pendiente, en el menú
+- [x] T12 (RF-07) Minutos y tamaño pendiente, en el menú
   - Archivos: `Sources/BtoDicta/AppDelegate.swift`, `Sources/BtoDicta/Recorder.swift`
   - Con un dictado largo en curso, el menú enseña minutos grabados y megabytes
     que se transcribirán al soltar.
   - Evidencia esperada: con un dictado de más de diez minutos, el menú muestra
     ambas cifras y coinciden con el archivo en disco.
+  - Evidencia (2026-09-22): Mismo arnés con un dictado de verdad: «● Grabando 0:08 · 0,3 MB por transcribir»; los bytes que usa el menú coinciden con el archivo en disco salvo exactamente 44 (la cabecera WAV). Las sesiones largas se prueban sobre el texto puro: 10 min → 18,3 MB; 3 h → 333,4 MB; 20 h → 2.197,3 MB. Se desvía del criterio literal («más de diez minutos» en vivo): el formato largo se prueba en pruebas unitarias en vez de grabar diez minutos.
 
 ## Fase D — Medidas y cierre
 

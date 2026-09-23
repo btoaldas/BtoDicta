@@ -85,6 +85,37 @@ final class ModoRapidoTests: XCTestCase {
         XCTAssertEqual(c.minute, 0)
     }
 
+    // MARK: Lo que enseña el menú durante un dictado largo (RF-07)
+
+    /// A 16 kHz, mono y 16 bits el dictado ocupa 32 000 bytes por segundo. Se
+    /// comprueba con esa cifra y no con números al azar: así la prueba dice
+    /// también cuánto pesa de verdad una sesión larga.
+    private let porSegundo = 32_000
+
+    func testDiezMinutos() {
+        XCTAssertEqual(ModoRapido.textoGrabacion(segundos: 600, bytes: 600 * porSegundo, reunion: false),
+                       "● Grabando 10:00 · 18,3 MB por transcribir")
+    }
+
+    func testTresHorasEnModoReunion() {
+        XCTAssertEqual(ModoRapido.textoGrabacion(segundos: 3 * 3600 + 125, bytes: (3 * 3600 + 125) * porSegundo,
+                                                 reunion: true),
+                       "● Grabando 3:02:05 · 333,4 MB por transcribir · modo reunión")
+    }
+
+    /// Veinte horas: lo que se pidió que fuera posible. Unos 2,1 GB que se
+    /// transcriben de golpe al soltar, mientras no exista la spec 011.
+    func testVeinteHoras() {
+        let s = 20 * 3600
+        let t = ModoRapido.textoGrabacion(segundos: s, bytes: s * porSegundo, reunion: true)
+        XCTAssertTrue(t.hasPrefix("● Grabando 20:00:00 · 2.197,3 MB"), t)
+    }
+
+    func testValoresRarosNoRompenElTexto() {
+        XCTAssertEqual(ModoRapido.textoGrabacion(segundos: -5, bytes: -1, reunion: false),
+                       "● Grabando 0:00 · 0,0 MB por transcribir")
+    }
+
     /// Solo esas dos claves: es lo que el QA excluye al comprobar que no se tocan
     /// los ajustes del usuario.
     func testSoloDosClavesDeEstado() {
