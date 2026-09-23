@@ -101,7 +101,7 @@ reunión que no interrumpe nunca, y una pausa de la bitácora con vuelta automá
 - Medida: durante la pausa, 0 anotaciones nuevas en la bitácora
 - Prioridad: P1
 - Criterio de aceptación:
-  - Dada una pausa de 30 minutos recién activada
+  - Dado que se activó una pausa de 30 minutos
   - Cuando pasan 10 minutos
   - Entonces no hay ni una anotación nueva de audio ni de pantalla
 
@@ -113,7 +113,7 @@ reunión que no interrumpe nunca, y una pausa de la bitácora con vuelta automá
 - Medida: al vencer el plazo se reanuda en menos de 60 s, con aviso
 - Prioridad: P1
 - Criterio de aceptación:
-  - Dada una pausa vencida
+  - Dado que la pausa venció
   - Cuando pasa un minuto desde el vencimiento
   - Entonces la bitácora está grabando otra vez y hubo un aviso
 - Nota: una pausa que no vuelve no es una pausa, es un apagado disfrazado — y no
@@ -127,7 +127,7 @@ reunión que no interrumpe nunca, y una pausa de la bitácora con vuelta automá
 - Medida: tras reiniciar durante una pausa, sigue pausada y vence a su hora
 - Prioridad: P2
 - Criterio de aceptación:
-  - Dada una pausa de una hora activada hace diez minutos
+  - Dado que se activó una pausa de una hora hace diez minutos
   - Cuando la aplicación se reinicia
   - Entonces sigue pausada y le quedan unos cincuenta minutos
 
