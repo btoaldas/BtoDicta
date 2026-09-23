@@ -216,6 +216,11 @@ else
   # La pausa de la bitácora (spec 010): calla, aguanta un dictado y vuelve sola.
   # Siempre contra carpeta aislada: medir una pausa es dejar de grabar.
   ejecutar "pausa_bitacora" "BTODICTA_PAUSATEST" "1" 150
+  # El modo reunión no corta un dictado en curso, y quitarlo no lo cierra de golpe.
+  ejecutar "reunion_no_corta" "BTODICTA_REUNIONTEST" "1" 70
+  # Desde FUERA: el modo no toca los ajustes del usuario, y la pausa vence a su
+  # hora aunque la aplicación se cierre y se vuelva a abrir (spec 010, T08 y T13).
+  estatica "modo_rapido" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-modo-rapido.py"
   # La bitácora no puede robarle el micrófono al dictado que arranca. Provoca la
   # reconciliación sin parar durante el arranque: una carrera no se espera, se fuerza.
   ejecutar "carrera_microfono" "BTODICTA_CARRERAMICROTEST" "1" 60

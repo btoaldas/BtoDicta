@@ -935,6 +935,153 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             return
         }
+        // Piezas que conduce `scripts/qa-modo-rapido.py` desde fuera.
+        // BTODICTA_MODORAPIDOTEST=conmutar|pausar_y_salir|esperar_vuelta
+        //
+        // El script es el que decide si algo va bien: aquí solo se hace lo que un
+        // usuario haría y se deja constancia en archivos. Así la comprobación no
+        // depende del mismo código que comprueba.
+        if let paso = ProcessInfo.processInfo.environment["BTODICTA_MODORAPIDOTEST"] {
+            guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+                print("MODORAPIDO FALLA — se niega a correr sin BTODICTA_DIR"); exit(2)
+            }
+            let base = URL(fileURLWithPath: dir)
+            let config = Config.dir.appendingPathComponent("config.json")
+            func foto(_ nombre: String) {
+                try? FileManager.default.removeItem(at: base.appendingPathComponent(nombre))
+                try? FileManager.default.copyItem(at: config, to: base.appendingPathComponent(nombre))
+            }
+            switch paso {
+            case "conmutar":
+                // T08: todo lo que el usuario puede hacer desde el menú, seguido.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    foto("antes.json")
+                    ModoRapido.ponerReunion(true)
+                    ModoRapido.ponerReunion(false)
+                    ModoRapido.pausar(minutos: 30)
+                    ModoRapido.pausar(minutos: 15)
+                    ModoRapido.reanudar(motivo: "prueba")
+                    ModoRapido.ponerReunion(true)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        foto("despues.json")
+                        print("MODORAPIDO conmutado"); fflush(stdout); exit(0)
+                    }
+                }
+            case "pausar_y_salir":
+                // T13, primer arranque: pausa y la aplicación «se cierra».
+                let seg = Double(ProcessInfo.processInfo.environment["BTODICTA_PAUSA_SEG"] ?? "40") ?? 40
+                ModoRapido.pausar(hasta: Date().addingTimeInterval(seg))
+                let vence = ModoRapido.pausadaHasta?.timeIntervalSince1970 ?? 0
+                try? String(vence).write(to: base.appendingPathComponent("vence.txt"),
+                                          atomically: true, encoding: .utf8)
+                print("MODORAPIDO pausada hasta \(vence)"); fflush(stdout)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { exit(0) }
+            case "esperar_vuelta":
+                // T13, segundo arranque: lo mismo que hace la aplicación al abrirse.
+                ContinuoBitacora.arrancar()
+                ModoRapido.vigilar()
+                let t = Timer(timeInterval: 0.25, repeats: true) { _ in
+                    if ModoRapido.pausadaHasta == nil {
+                        try? String(Date().timeIntervalSince1970)
+                            .write(to: base.appendingPathComponent("volvio.txt"), atomically: true, encoding: .utf8)
+                        print("MODORAPIDO volvió"); fflush(stdout)
+                        ContinuoBitacora.detener()
+                        exit(0)
+                    }
+                }
+                RunLoop.main.add(t, forMode: .common)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 150) {
+                    print("MODORAPIDO FALLA — la pausa no volvió"); fflush(stdout); exit(1)
+                }
+            default:
+                print("MODORAPIDO FALLA — paso desconocido: \(paso)"); exit(2)
+            }
+            return
+        }
+        // El modo reunión no corta un dictado en curso. BTODICTA_REUNIONTEST=1
+        //
+        // Reproduce la reunión del 2026-09-22 con el reloj acelerado: un corte
+        // por silencio de 4 s y un umbral de voz imposible, para que NADA cuente
+        // como voz y el corte salte con toda seguridad si nadie lo impide.
+        //
+        //   T06/T07  a punto de cortarse, se activa el modo: no se corta, y el
+        //            audio sigue entrando en la MISMA grabación
+        //   RF-08    al quitarlo, no se cierra en el acto —la ventana de
+        //            silencio empieza entonces— y luego se cierra como siempre
+        if ProcessInfo.processInfo.environment["BTODICTA_REUNIONTEST"] == "1" {
+            guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+                print("REUNION FALLA — se niega a correr sin BTODICTA_DIR"); exit(2)
+            }
+            _ = dir
+            Config.set("silencio_max_seg", to: 4.0)
+            Config.set("dictado_umbral_voz", to: 0.5)     // nada cuenta como voz
+            Config.set("dictado_max_min", to: 0.0)
+            Config.set("dictado_aviso_min", to: 0.0)
+            Config.set("continuo_activo", to: false)
+            Config.set(ModoRapido.claveReunion, to: false)
+
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("REUNION \(ok ? "✓" : "✗") \(q)"); fflush(stdout); if !ok { mal += 1 } }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self else { exit(2) }
+                self.startDictation()
+                // A 2,5 s: el corte está a 4 s y el aviso previo ya salió.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                    guard let self else { exit(2) }
+                    chk(self.recorder.isRecording, "control: el dictado está abierto antes de activar el modo")
+                    let archivo = self.recorder.archivoEnCurso
+                    let b1 = self.recorder.bytesGrabados
+                    ModoRapido.ponerReunion(true)
+
+                    // Tres veces el límite de silencio.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+                        guard let self else { exit(2) }
+                        let b2 = self.recorder.bytesGrabados
+                        chk(self.recorder.isRecording,
+                            "T06/T07: con el modo puesto, 12 s sin voz (límite 4) y el dictado sigue abierto")
+                        chk(self.recorder.archivoEnCurso == archivo && archivo != nil,
+                            "T07: sigue siendo la MISMA grabación, no una nueva")
+                        chk(b2 > b1, "T07: el audio sigue entrando (\(b2 - b1) bytes desde que se activó)")
+
+                        // RF-08 — se quita el modo tras «una reunión larga».
+                        //
+                        // El temporizador del dictado late cada 5 s, así que mirar a
+                        // un tiempo fijo no prueba nada: podría no haber pasado por
+                        // ahí todavía. Se espera a la PRIMERA vuelta tras quitarlo —la
+                        // que registra la transición— y se comprueba en ese instante,
+                        // que es cuando un `lastVoice` de hace horas cerraría el
+                        // dictado de golpe.
+                        ModoRapido.ponerReunion(false)
+                        let quitado = Date()
+                        var vistaLaVuelta = false
+                        let mira = Timer(timeInterval: 0.1, repeats: true) { [weak self] m in
+                            guard let self, !vistaLaVuelta, !self.reunionAntes else { return }
+                            vistaLaVuelta = true
+                            m.invalidate()
+                            chk(self.recorder.isRecording,
+                                "RF-08: en la primera vuelta tras quitar el modo (\(String(format: "%.1f", Date().timeIntervalSince(quitado))) s) NO se cierra de golpe")
+                            // Después: límite 4 s + una vuelta de 5 s de margen.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+                                guard let self else { exit(2) }
+                                chk(!self.recorder.isRecording,
+                                    "T06: sin el modo, el corte por silencio vuelve y cierra como siempre")
+                                chk((Config.json0("silencio_max_seg") as? Double) == 4.0,
+                                    "RF-08: el ajuste del usuario sigue intacto (4 s)")
+                                print("REUNION \(mal == 0 ? "TODO OK — el modo reunión no corta, y quitarlo devuelve lo de siempre" : "FALLA (\(mal))")")
+                                fflush(stdout)
+                                exit(mal == 0 ? 0 : 1)
+                            }
+                        }
+                        RunLoop.main.add(mira, forMode: .common)
+                    }
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 60) {
+                print("REUNION FALLA timeout"); fflush(stdout); exit(4)
+            }
+            return
+        }
         // La pausa de la bitácora, de punta a punta. BTODICTA_PAUSATEST=1
         //
         // Corre SIEMPRE contra una carpeta aislada (lo exige: sin BTODICTA_DIR no
@@ -4926,6 +5073,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
             ContinuoBitacora.arrancar()
             ContinuoBitacora.purgaAutomaticaSiCorresponde()
+            // Siempre, aunque la bitácora esté apagada: si una pausa venció con la
+            // aplicación cerrada, se da por terminada y se avisa; si sigue vigente,
+            // queda vigilada hasta su hora (spec 010, RF-06).
+            ModoRapido.vigilar()
         }
         // Y se vuelve a mirar cada seis horas. La purga solo corría al arrancar,
         // así que una sesión de varios días —esta aplicación se deja abierta—
@@ -6327,7 +6478,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if r == .alertFirstButtonReturn {
             // Sigue: se reinicia la cuenta para volver a preguntar dentro de otro
             // tope, no para dejar de preguntar nunca más.
-            inicioDictado = Date()
+            inicioTope = Date()
             avisosGrabandoDados = 0
             Log.log(.sistema, "dictado: sigue grabando por decisión del usuario — la cuenta vuelve a empezar")
             panel.update("🔴 Sigo grabando")
@@ -6444,7 +6595,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.avisarSiLibre("🎙️ El micrófono no entregó audio — revisa qué app lo está usando o cámbialo en Ajustes")
                 return
             }
-            let llevaSeg = Date().timeIntervalSince(self.inicioDictado)
+            // MODO REUNIÓN (spec 010, RF-01): ninguno de los tres frenos actúa
+            // —recordatorio, tope, corte por silencio— mientras esté puesto. Se
+            // SALTAN; los valores del usuario no se tocan (D-4, RF-08).
+            let enReunion = ModoRapido.enReunion
+            if enReunion != self.reunionAntes {
+                if !enReunion {
+                    // Recién QUITADO con un dictado abierto. Sin esto, tras una
+                    // reunión de horas `lastVoice` tendría horas de antigüedad y el
+                    // corte por silencio saltaría EN EL ACTO, sin aviso — justo lo
+                    // contrario de «vuelve el comportamiento de siempre». Se da una
+                    // ventana nueva, contada desde que se quitó.
+                    self.lastVoice = Date()
+                    self.inicioTope = Date()
+                    self.avisosGrabandoDados = 0
+                    self.avisadoDeCierreCercano = false
+                    Log.log(.sistema, "dictado: modo reunión quitado con el dictado en curso — silencio y tope cuentan desde ahora")
+                }
+                self.reunionAntes = enReunion
+            }
+            if enReunion { return }
+
+            let llevaSeg = Date().timeIntervalSince(self.inicioTope)
 
             // Recordatorio periódico: el borde de la pantalla late. El contador
             // del notch ya existía y no evitó ocho minutos grabando en silencio,
@@ -6455,8 +6627,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if toca > self.avisosGrabandoDados {
                     self.avisosGrabandoDados = toca
                     AvisoGrabando.shared.latir()
-                    self.panel.update("🔴 Llevas \(Int(llevaSeg / 60)) min grabando")
-                    Log.log(.sistema, "dictado: aviso de los \(Int(llevaSeg / 60)) min")
+                    // Los minutos que se DICEN son los reales, desde el comienzo; el
+                    // ancla del tope solo decide cuándo toca avisar.
+                    let reales = Int(Date().timeIntervalSince(self.inicioDictado) / 60)
+                    self.panel.update("🔴 Llevas \(reales) min grabando")
+                    Log.log(.sistema, "dictado: aviso de los \(reales) min")
                 }
             }
 
@@ -6680,6 +6855,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var vivoRelanzado = 0
     /// Cuándo empezó el dictado en curso (para el vigía de micrófono mudo).
     private var inicioDictado = Date()
+    /// Desde cuándo cuentan el tope y los recordatorios. Normalmente es el
+    /// inicio del dictado; se mueve cuando el usuario dice «sigo grabando» o
+    /// quita el modo reunión. No se mueve `inicioDictado`, que es el comienzo
+    /// real y del que dependen otras cosas (el vigía del micrófono mudo).
+    private var inicioTope = Date()
+    /// Si el modo reunión estaba puesto la última vez que se miró, para saber
+    /// cuándo lo acaban de QUITAR con un dictado en curso.
+    private var reunionAntes = false
     /// Tramos que quedaron SIN texto y no se pudieron rescatar en caliente.
     /// Un dictado largo puede romperse varias veces; se reparan todos al
     /// cerrar, cada uno con su ventana de audio, nunca el dictado entero.
@@ -6706,6 +6889,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         vivoUltimoCrecimiento = Date(); vivoCongelado = false; vivoRelanzado = 0
         vivoHuecos = []; vivoRelanzosSecos = 0
         inicioDictado = Date()
+        inicioTope = inicioDictado
+        reunionAntes = ModoRapido.enReunion
     }
 
     /// ¿El motor en vivo lleva demasiado callado teniendo voz que transcribir?

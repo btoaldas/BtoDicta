@@ -30,6 +30,21 @@ final class Recorder {
     private var convertidorDesde: AVAudioFormat?
     /// El formato con el que se está escuchando. Lo usa la prueba propia.
     var formatoEntradaQA: AVAudioFormat? { convertidorDesde }
+
+    /// Bytes de audio escritos en el dictado en curso: lo que se transcribirá al
+    /// soltar. Lo enseña el menú mientras se graba (spec 010, RF-07), para que el
+    /// coste de una sesión larga se vea ANTES de pagarlo.
+    var bytesGrabados: Int {
+        candado.lock(); defer { candado.unlock() }
+        return bytesPCM
+    }
+
+    /// El archivo del dictado en curso. Lo usa la prueba del modo reunión para
+    /// comprobar que activarlo a mitad no abre una grabación nueva.
+    var archivoEnCurso: URL? {
+        candado.lock(); defer { candado.unlock() }
+        return urlSalida
+    }
     /// Frecuencia INTERNA de la app. El micrófono de cada equipo entrega la
     /// suya —44 100, 48 000, 96 000 Hz…— y el conversor la lleva siempre aquí,
     /// así que nada del resto del código depende del hardware de turno.

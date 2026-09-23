@@ -60,26 +60,29 @@ puede fallar en silencio es lo de debajo.
 
 ## Fase B — El modo reunión
 
-- [ ] T06 (RF-01, RF-08) Los tres frenos consultan el modo
+- [x] T06 (RF-01, RF-08) Los tres frenos consultan el modo
   - Archivos: `Sources/BtoDicta/AppDelegate.swift`
   - Aviso periódico, tope de duración y corte por silencio se **saltan** con el
     modo puesto. Los valores del usuario no se tocan (D-4).
   - Evidencia esperada: con el modo puesto, un dictado sin voz sigue abierto pasado
     el límite de silencio; sin él, se cierra como siempre.
+  - Evidencia (2026-09-22): Un único punto de corte, justo antes de los tres frenos: con `ModoRapido.enReunion` se salta el recordatorio, el tope y el corte por silencio; los valores del usuario no se tocan. Arnés `BTODICTA_REUNIONTEST`: con el modo, 12 s sin voz y límite 4 → sigue abierto; sin él, el corte vuelve y cierra. Sabotaje (quitar el punto de corte) → se corta a los 4 s, ROJO.
 
-- [ ] T07 (RF-02) Activarlo con el dictado en curso no lo corta
+- [x] T07 (RF-02) Activarlo con el dictado en curso no lo corta
   - Archivos: `Sources/BtoDicta/AppDelegate.swift`
   - Arnés `BTODICTA_REUNIONTEST`: abre un dictado, espera hasta rozar el límite de
     silencio, activa el modo, y comprueba que no se cierra y que el audio previo
     sigue en la misma grabación.
   - Evidencia esperada: el arnés en verde, y en rojo con el modo sin conectar.
+  - Evidencia (2026-09-22): Mismo arnés: activado a 2,5 s de un corte de 4, el dictado sigue en la MISMA grabación (`archivoEnCurso` igual) y entran 403 308 bytes más. Al quitarlo, en la primera vuelta del temporizador (4,8 s) NO se cierra de golpe. Sabotaje (no reiniciar la ventana de silencio al quitarlo) → se cierra de golpe, ROJO. Hallazgo: el temporizador del dictado late cada 5 s, no cada 0,5; la primera versión de la prueba miraba a un tiempo fijo y pasaba por casualidad.
 
-- [ ] T08 (RNF-04, RF-08) Ninguna clave preexistente cambia [P]
+- [x] T08 (RNF-04, RF-08) Ninguna clave preexistente cambia [P]
   - Archivos: `scripts/qa-modo-rapido.py`, `scripts/qa-paquete.sh`
   - Compara todas las claves del `config.json` menos las dos de estado, antes y
     después de activar y quitar el modo. Es la medida precisada en el §5 del plan.
   - Evidencia esperada: verde en uso normal; rojo si el modo escribe en
     `silencio_max_seg`.
+  - Evidencia (2026-09-22): `scripts/qa-modo-rapido.py t08`, desde fuera: fotos del `config.json` justo antes y después de poner y quitar el modo, pausar dos veces y reanudar. 8 claves preexistentes comparadas, 0 cambios. Exige además que `modo_reunion` sí quede escrito, para que «no tocó nada» no signifique «no hizo nada». Sabotaje (el modo pone el corte a 0) → `silencio_max_seg: 15.0 → 0`, ROJO.
 
 ## Fase C — El icono y el menú
 
@@ -109,10 +112,11 @@ puede fallar en silencio es lo de debajo.
 
 ## Fase D — Medidas y cierre
 
-- [ ] T13 (RNF-02) La pausa vence con error menor de 60 s, también tras reiniciar
+- [x] T13 (RNF-02) La pausa vence con error menor de 60 s, también tras reiniciar
   - Archivos: `scripts/qa-modo-rapido.py`
   - Evidencia esperada: pausa de dos minutos con un reinicio en medio; se reanuda
     dentro de los 60 s siguientes al vencimiento.
+  - Evidencia (2026-09-22): `scripts/qa-modo-rapido.py t13` con el vigía REAL de 15 s: pausa de 40 s, la aplicación se cierra 5 s y se vuelve a abrir; vuelve **+11,4 s** después del vencimiento (límite 60). Sabotaje (vigía que no arranca) → la pausa no vuelve nunca, ROJO. El primer intento de este sabotaje NO rompió nada: un `return` suelto en Swift se une a la línea siguiente y el vigía seguía ejecutándose. Un sabotaje que no rompe nada no prueba la prueba.
 
 - [ ] T14 (RF-05, RF-04) Los dos ADR
   - Archivos: `docs/adr/013-instante-frente-a-cuenta-atras.md`,
