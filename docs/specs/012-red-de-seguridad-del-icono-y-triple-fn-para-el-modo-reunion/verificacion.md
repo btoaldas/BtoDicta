@@ -23,6 +23,10 @@
   la reunión. La última comprobación («devuelto, vuelve a verse») no se pudo medir:
   se había vuelto al juego y la barra ya no estaba. El arnés ahora espera hasta 30 s
   a que la barra vuelva antes de mirar, y si no vuelve lo dice en vez de fallar.
+- **Pasada completa a las 01:24**, con la barra un minuto seguido en pantalla: visible
+  sin aviso; escondido en (-1845, 949), aviso a los 5,2 s, uno solo; 2 recordatorios
+  con la reunión y ninguno al quitarla; devuelto → visible en (1137, 949). **ICONOOCULTO
+  OK.** Lista de la barra: ninguna fila ajena alberga el icono.
 - **BtoDicta se cerró a las 00:44:41** con un cierre normal —pasó por
   `applicationWillTerminate`, que apaga la bitácora—, no por un fallo ni por el
   actualizador. Fue tres segundos después de que la barra volviera a verse; no hay

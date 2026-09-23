@@ -46,7 +46,8 @@ registró «no se sabe: la barra no está en pantalla» y no avisó. Sin la comp
 de la barra habría sido un aviso en falso.
 
 QA 36 de 38 —`texto_vs_ocr`, ajena y ya roja antes; `icono_oculto`, sin barra que
-medir en esa pasada y pasada aparte—; suite Swift de 50 a 70.
+medir en esa pasada y pasada entera aparte el 2026-09-23 a las 01:24, con la barra
+a la vista—; suite Swift de 50 a 70.
 
 ## Riesgos residuales
 
