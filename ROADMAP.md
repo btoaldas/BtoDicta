@@ -68,6 +68,7 @@ una rama que sobrevive a la sesión diverge y acaba perdiendo trabajo.
 | 009 | Buscar por palabras en la bitácora | Aprobada | X | funcionalidad | 2026-09-21 | Alberto — 2026-09-21 — «resuelve aprobado te doy» | ninguna | Lista para tareas |
 | 010 | Controles rápidos desde el icono de la barra | Implementada | P | funcionalidad | 2026-09-22 | Alberto — 2026-09-22 — «si» (a «¿Apruebo la spec y paso al plan?») | ninguna | Especificando |
 | 011 | Corrección: El icono de la barra no puede quedar a nombre de otra aplicación | Implementada | P | correccion | 2026-09-22 | Alberto — 2026-09-22 — «todo si bajo goal y loop hasta resolver y que funcione todo bien» (a «¿Apruebo la spec 011 y paso al plan?») | ninguna (corrige una explicación equivocada de la spec 010, ver §9) | Especificando |
+| 012 | Red de seguridad del icono y triple fn para el modo reunión | Implementada | P | funcionalidad | 2026-09-22 | Alberto — 2026-09-22 — «todo si bajo goal y loop hasta resolver y que funcione todo bien y si red de seguridad y funcionalidad» | ninguna (complementa la 010 y la 011) | Especificando |
 
 <!-- sdd:indice:fin -->
 

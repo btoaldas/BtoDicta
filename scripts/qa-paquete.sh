@@ -147,12 +147,17 @@ ejecutar_por_sistema() {
   : > "$log"                      # `--stdout` añade: se vacía antes
   /bin/mkdir -p "$dir"
   inicio="$(/bin/date +%s)"
+  # `-g`: en segundo plano. Sin él, abrir la prueba le quita el foco a lo que el
+  # usuario tenga delante, incluida una aplicación a pantalla completa.
   /usr/bin/perl -e 'alarm shift; exec @ARGV' "$limite" \
-    /usr/bin/open -W -n --env "$variable=1" --env "BTODICTA_DIR=$dir" \
+    /usr/bin/open -g -W -n --env "$variable=1" --env "BTODICTA_DIR=$dir" \
       --stdout "$log" --stderr "$log" "$app" 2>>"$log"
   fin="$(/bin/date +%s)"
   total=$((total + 1))
-  if /usr/bin/grep -q "^$marca OK" "$log" && ! /usr/bin/grep -q "^$marca FALLA" "$log"; then
+  if /usr/bin/grep -q "^$marca OMITIDA" "$log" && ! /usr/bin/grep -q "^$marca FALLA" "$log"; then
+    # La prueba no pudo medir por el entorno (p. ej., pantalla completa) y lo dice.
+    estado="OMITIDA"; omitidas=$((omitidas + 1))
+  elif /usr/bin/grep -q "^$marca OK" "$log" && ! /usr/bin/grep -q "^$marca FALLA" "$log"; then
     estado="PASA"
   else
     estado="FALLA"; fallos=$((fallos + 1))
@@ -169,7 +174,7 @@ ejecutar() {
   # aparte. Confiar en que restauren al terminar ya falló una vez: una sección
   # añadida al final volvió a machacar y `exit()` no ejecuta ningún `defer`.
   case "$id" in
-    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|menu_rapido)
+    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|menu_rapido|triple_fn)
       desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id") ;;
   esac
   local bin="$BIN"
@@ -254,6 +259,12 @@ else
   ejecutar "reunion_no_corta" "BTODICTA_REUNIONTEST" "1" 70
   # El icono dice el estado sin abrir el menú, y sigue siendo plantilla.
   ejecutar_por_sistema "icono_estados" "BTODICTA_ICONTEST" "ICONTEST" 60
+  # Red de seguridad del icono (spec 012): se esconde de verdad el propio icono y
+  # el vigía real tiene que decirlo una vez, y recordar el modo reunión.
+  ejecutar_por_sistema "icono_oculto" "BTODICTA_ICONOOCULTOTEST" "ICONOOCULTO" 130
+  # fn fn fn cambia el modo reunión sin parar el dictado; lo tardío detiene; el
+  # doble no cambia. Eventos sintéticos por el manejador real, sin tocar el teclado.
+  ejecutar "triple_fn" "BTODICTA_TRIPLEFNTEST" "1" 90
   # El menú del icono: pulsa sus elementos de verdad y comprueba lo que enseña.
   ejecutar "menu_rapido" "BTODICTA_MENUTEST" "1" 60
   # Desde FUERA: el modo no toca los ajustes del usuario, y la pausa vence a su

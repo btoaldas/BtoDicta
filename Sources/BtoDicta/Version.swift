@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.80.1"
+    static let numero = "0.81.0"
     static let fecha = "2026-09-22"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.81.0", "2026-09-22", [
+            "FN FN FN PONE O QUITA EL MODO REUNIÓN, sin buscar ningún menú. Las dos primeras arrancan el dictado como siempre —la segunda no espera a ver si llega una tercera— y la tercera, si llega enseguida, cambia el modo sin cortar la grabación. El notch lo confirma. Si pulsas fn para parar en menos de medio segundo después de arrancar, pondrás el modo reunión: otra fn detiene como siempre",
+            "SI EL ICONO DE LA BARRA NO SE VE, BTODICTA TE LO DICE. Una vez, con la forma de arreglarlo y un botón «No volver a avisar». Mira dónde está el icono: fuera de la barra o bajo la muesca cuenta como escondido; con una aplicación a pantalla completa no se sabe, y no avisa. Espera 30 segundos seguidos antes de decir nada, y nunca te interrumpe en mitad de un dictado",
+            "CON EL MODO REUNIÓN PUESTO Y EL ICONO ESCONDIDO, un recordatorio cada 30 minutos: sin icono no habría otra forma de saber que el dictado no se va a cortar. Todo parametrizable, incluido apagarlo (`icono_oculto_gracia_seg`, `icono_oculto_recordatorio_min`, `icono_oculto_no_avisar`)",
+        ]),
         ("0.80.1", "2026-09-22", [
             "EL ICONO DE LA BARRA YA NO DESAPARECE. Lo que dijimos en la 0.80.0 —que se escondía porque la barra estaba llena— era FALSO: quedaba sitio de sobra. macOS apunta el icono a nombre de quien lanza la aplicación, y las pruebas de BtoDicta la ejecutaban desde una terminal que tienes bloqueada en la barra. El icono quedaba escondido, también en los arranques normales, hasta repararlo a mano",
             "Ahora BtoDicta solo pone su icono si la abre el sistema —Dock, Finder, Spotlight, al iniciar sesión o al actualizarse—. Si la lanza otro programa, funciona sin icono y deja escrito por qué, así ninguna herramienta puede volver a esconderlo. Comprobado con veinte arranques de ese tipo: ninguno lo envenenó",

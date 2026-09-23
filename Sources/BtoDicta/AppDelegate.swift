@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Carbon.HIToolbox
 import ServiceManagement
+import UserNotifications
 
 // MARK: - App
 
@@ -210,6 +211,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var iniciandoDictado = false
     /// El motivo de no registrar el icono ya se escribió en el registro (spec 011).
     private var iconoNoRegistradoDicho = false
+    /// Red de seguridad del icono (spec 012): si se ve, cuándo avisar y recordar.
+    fileprivate var vigiaIconoOculto = VigiaIconoOculto(gracia: 30, intervaloRecordatorio: 1800)
+    fileprivate var ultimaVisibilidadIcono: VisibilidadIcono?
+    /// El aviso salió del vigía pero se espera a que no se esté dictando.
+    fileprivate var avisoIconoOcultoPendiente: VisibilidadIcono?
+    /// fn fn fn (spec 012): la tercera se arma al soltar la segunda que arrancó.
+    fileprivate var terceraPulsacion = DoublePressGate()
+    fileprivate var comboEsTercera = false
+    /// El manejador del monitor de fn, para que su arnés lo alimente con eventos
+    /// sintéticos sin tocar el teclado del sistema (spec 012, T07).
+    fileprivate var manejadorFlags: ((NSEvent) -> Void)?
+    /// Solo el arnés de la triple fn: detener descarta en vez de transcribir, para
+    /// no mandar audio a un motor de pago desde una prueba.
+    fileprivate var pruebaDetenerSinTranscribir = false
 
     /// Suelo de ruido estimado de la sesión actual, para decidir qué es voz.
     ///
@@ -4876,6 +4891,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         probarIconosBarraSiSePidio()
         probarMenuRapidoSiSePidio()
+        probarIconoOcultoSiSePidio()
+        probarTripleFnSiSePidio()
 
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
         registerHotKey()
@@ -5287,6 +5304,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         iconoVigilante?.invalidate()
         let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
             guard let self else { return }
+            // Spec 012: reparar no basta si macOS lo esconde; al menos, decirlo.
+            self.vigilarVisibilidadIcono()
             guard let item = self.statusItem, let btn = item.button else {
                 self.recuperarStatusItem(origen: "referencia_ausente")
                 return
@@ -6024,6 +6043,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             resolverConfirmacion(acepta: true, origen: "hotkey_carbon")
             return
         }
+        // Spec 012: fn fn fn. Antes de mirar si se graba: el arranque del dictado
+        // es asíncrono y una tercera rápida puede llegar antes que la grabación.
+        if terceraPulsacion.consumirSiCorresponde(en: Date(), ventana: Config.doblePulsacionVentana()) {
+            doblePulsacion.reiniciar()
+            Log.write("hotkey: triple pulsación — modo reunión (Carbon)")
+            alternarModoReunion()
+            return
+        }
         if recorder.isRecording {
             doblePulsacion.reiniciar()
             toggle()
@@ -6036,6 +6063,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let ahora = Date()
         if doblePulsacion.consumirSiCorresponde(en: ahora, ventana: Config.doblePulsacionVentana()) {
             Log.write("hotkey: doble pulsación reconocida — iniciar")
+            // Carbon solo ve bajadas: la tercera se mide desde esta.
+            if TriplePulsacionPolicy.armarAlSoltar(activoPorDoble: true, usadoConTecla: false,
+                                                   pushToTalk: Config.pushToTalk()) {
+                terceraPulsacion.armar(en: ahora)
+            }
             toggle()
         } else {
             doblePulsacion.armar(en: ahora)
@@ -6070,6 +6102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.comboUsedWithKey = false
                 self.comboActivadoPorDoble = false
                 self.comboConfirmacionConsumida = false
+                self.comboEsTercera = false
                 self.comboInicioGrabando = self.recorder.isRecording
 
                 // Detener una grabación de pantalla siempre requiere una sola
@@ -6091,6 +6124,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     DispatchQueue.main.async {
                         self.resolverConfirmacion(acepta: true, origen: "hotkey_bajar")
                     }
+                    return
+                }
+
+                // Spec 012: fn fn fn. Antes de mirar si se graba: el arranque del
+                // dictado es asíncrono, y una tercera rápida puede llegar antes que
+                // la grabación y tomarse por una primera pulsación suelta.
+                if self.terceraPulsacion.consumirSiCorresponde(en: Date(), ventana: Config.doblePulsacionVentana()) {
+                    self.comboEsTercera = true
+                    self.doblePulsacion.reiniciar()
+                    Log.write("hotkey: triple pulsación — modo reunión")
                     return
                 }
 
@@ -6126,6 +6169,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.doblePulsacion.reiniciar()
                     return
                 }
+                if self.comboEsTercera {
+                    // La tercera cambia el modo reunión y el dictado sigue. Si fn se
+                    // usó como modificador (fn+flecha), no hace nada.
+                    self.comboEsTercera = false
+                    if !usadoConTecla { DispatchQueue.main.async { self.alternarModoReunion() } }
+                    return
+                }
                 // La pregunta pudo aparecer entre BAJAR y SOLTAR esta misma fn.
                 // Esa única pulsación confirma, salvo que comenzó deteniendo una
                 // grabación (la detención nunca confirma su propio resultado).
@@ -6141,6 +6191,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         self.resolverConfirmacion(acepta: true, origen: "hotkey_soltar_race")
                     }
                     return
+                }
+                // La segunda que arrancó el dictado arma la tercera (spec 012).
+                if TriplePulsacionPolicy.armarAlSoltar(activoPorDoble: activoPorDoble,
+                                                       usadoConTecla: usadoConTecla,
+                                                       pushToTalk: Config.pushToTalk()) {
+                    self.terceraPulsacion.armar()
                 }
                 if Config.pushToTalk() {
                     if Config.doblePulsacionActivar() {
@@ -6197,6 +6253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
 
+        manejadorFlags = flagsHandler
         NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: flagsHandler)
         NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: keyHandler)
         NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
@@ -6488,6 +6545,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         if recorder.isRecording {
+            if pruebaDetenerSinTranscribir {
+                Log.write("prueba: detener sin transcribir")
+                cancelDictation(silencioso: true)
+                return
+            }
             stopAndTranscribe()
         } else {
             // BARGE-IN: si el agente está pensando/hablando, FN lo INTERRUMPE de raíz y
@@ -10236,5 +10298,342 @@ extension AppDelegate {
             exit(mal == 0 ? 0 : 1)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 40) { print("MENU FALLA timeout"); fflush(stdout); exit(4) }
+    }
+}
+
+// MARK: - Red de seguridad del icono (spec 012)
+extension AppDelegate {
+
+    /// Las pantallas tal como las ve AppKit, reducidas a rectángulos.
+    fileprivate static func pantallasDeLaBarra() -> [PantallaBarra] {
+        NSScreen.screens.map {
+            PantallaBarra(marco: $0.frame, visible: $0.visibleFrame,
+                          muescaIzquierda: $0.auxiliaryTopLeftArea,
+                          muescaDerecha: $0.auxiliaryTopRightArea)
+        }
+    }
+
+    /// ¿Está la barra de menús dibujada ahora? Con una aplicación a pantalla
+    /// completa no lo está, y entonces no se puede saber nada del icono (RF-02).
+    ///
+    /// Dos señales: la ventana de la barra (nivel del menú principal) en pantalla,
+    /// y ninguna ventana normal ocupando una pantalla entera.
+    fileprivate static func barraDeMenusEnPantalla() -> Bool {
+        guard let lista = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                     kCGNullWindowID) as? [[String: Any]] else { return true }
+        let nivelBarra = Int(CGWindowLevelForKey(.mainMenuWindow))
+        var hayBarra = false
+        let tamanos = NSScreen.screens.map { $0.frame.size }
+        for w in lista {
+            let capa = w[kCGWindowLayer as String] as? Int ?? -1
+            if capa == nivelBarra { hayBarra = true; continue }
+            guard capa == 0, let b = w[kCGWindowBounds as String] as? [String: Any],
+                  let ancho = (b["Width"] as? NSNumber)?.doubleValue,
+                  let alto = (b["Height"] as? NSNumber)?.doubleValue else { continue }
+            if tamanos.contains(where: { Double($0.width) == ancho && Double($0.height) == alto }) { return false }
+        }
+        return hayBarra
+    }
+
+    /// Cada 2 s, desde el vigía del icono.
+    fileprivate func vigilarVisibilidadIcono() {
+        vigiaIconoOculto.gracia = Config.iconoOcultoGraciaSeg()
+        vigiaIconoOculto.intervaloRecordatorio = Config.iconoOcultoRecordatorioMin() * 60
+        let v = IconoBarra.visibilidad(ventana: statusItem?.button?.window?.frame,
+                                       pantallas: Self.pantallasDeLaBarra(),
+                                       barraEnPantalla: Self.barraDeMenusEnPantalla())
+        if v != ultimaVisibilidadIcono {
+            Log.write("icono barra: \(v.texto)")
+            ultimaVisibilidadIcono = v
+        }
+        for e in vigiaIconoOculto.observar(v, reunion: ModoRapido.enReunion,
+                                           noVolverAAvisar: Config.iconoOcultoNoAvisar(), en: Date()) {
+            switch e {
+            case .avisar: avisoIconoOcultoPendiente = v
+            case .recordar: recordarReunionConIconoOculto()
+            }
+        }
+        guard let pendiente = avisoIconoOcultoPendiente else { return }
+        if v == .visible {
+            // Volvió a verse mientras se esperaba: ya no hace falta, y si se vuelve
+            // a esconder, que pueda avisar.
+            avisoIconoOcultoPendiente = nil
+            vigiaIconoOculto.rearmarAviso()
+            Log.write("icono barra: el aviso ya no hace falta — volvió a verse")
+            return
+        }
+        // Una alerta en mitad de un dictado robaría el foco: espera.
+        guard !recorder.isRecording, !iniciandoDictado, !hayConfirmacion else { return }
+        avisoIconoOcultoPendiente = nil
+        avisarIconoOculto(pendiente)
+    }
+
+    /// Ni alertas ni notificaciones en una carpeta aislada: son pruebas.
+    fileprivate var avisosDeVerdad: Bool {
+        ProcessInfo.processInfo.environment["BTODICTA_DIR"] == nil
+    }
+
+    /// RF-01: una vez, con «no volver a avisar».
+    fileprivate func avisarIconoOculto(_ v: VisibilidadIcono) {
+        let t = IconoBarra.textoAviso(v, enDock: Config.showInDock())
+        Log.log(.sistema, "icono barra: AVISO — \(t.titulo) (\(v.texto))")
+        guard avisosDeVerdad else { return }
+        let alerta = NSAlert()
+        alerta.alertStyle = .warning
+        alerta.messageText = t.titulo
+        alerta.informativeText = t.cuerpo
+        alerta.addButton(withTitle: "Entendido")
+        alerta.addButton(withTitle: "No volver a avisar")
+        NSApp.activate(ignoringOtherApps: true)
+        if alerta.runModal() == .alertSecondButtonReturn {
+            Config.set("icono_oculto_no_avisar", to: true)
+            Log.log(.sistema, "icono barra: el usuario pidió no volver a avisar")
+        }
+    }
+
+    /// RF-06: el modo reunión sigue puesto con el icono escondido.
+    fileprivate func recordarReunionConIconoOculto() {
+        let t = IconoBarra.textoRecordatorio(enDock: Config.showInDock())
+        Log.log(.sistema, "icono barra: RECORDATORIO — \(t.titulo)")
+        guard avisosDeVerdad, Bundle.main.bundleIdentifier != nil else { return }
+        let c = UNMutableNotificationContent()
+        c.title = t.titulo
+        c.body = t.cuerpo
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "reunion-icono-oculto-\(UUID().uuidString)", content: c, trigger: nil))
+    }
+}
+
+// MARK: - Pruebas de la red de seguridad del icono y de la triple fn (spec 012)
+extension AppDelegate {
+
+    /// BTODICTA_ICONOOCULTOTEST=1 — esconde de verdad el propio icono y deja
+    /// trabajar al vigía REAL. Solo lanzada por el sistema (`open`), porque sin
+    /// icono no hay nada que esconder (spec 011), y con carpeta aislada.
+    ///
+    /// Marca: ICONOOCULTO. Las alertas y notificaciones no salen en carpeta
+    /// aislada: se juzga por las líneas del registro.
+    fileprivate func probarIconoOcultoSiSePidio() {
+        guard ProcessInfo.processInfo.environment["BTODICTA_ICONOOCULTOTEST"] == "1" else { return }
+        func fin(_ ok: Bool, _ texto: String) -> Never {
+            print("ICONOOCULTO \(ok ? "OK" : "FALLA") — \(texto)"); Log.vaciar(); fflush(stdout); exit(ok ? 0 : 1)
+        }
+        guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+            fin(false, "se niega a correr sin BTODICTA_DIR")
+        }
+        guard let item = statusItem else {
+            fin(false, "no hay icono. Esta prueba necesita que la lance el sistema: `open -W -n --env BTODICTA_ICONOOCULTOTEST=1 BtoDicta.app` (spec 011)")
+        }
+        let registro = URL(fileURLWithPath: dir).appendingPathComponent("btodicta.log")
+        func lineas(_ que: String) -> Int {
+            Log.vaciar()
+            let t = (try? String(contentsOf: registro, encoding: .utf8)) ?? ""
+            return t.components(separatedBy: "\n").filter { $0.contains(que) }.count
+        }
+        var mal = 0
+        func chk(_ ok: Bool, _ q: String) { print("ICONOOCULTO \(ok ? "✓" : "✗") \(q)"); fflush(stdout); if !ok { mal += 1 } }
+        func medida(_ nombre: String) -> VisibilidadIcono {
+            let marco = item.button?.window?.frame
+            let v = IconoBarra.visibilidad(ventana: marco, pantallas: Self.pantallasDeLaBarra(),
+                                           barraEnPantalla: Self.barraDeMenusEnPantalla())
+            print("ICONOOCULTO medida \(nombre): ventana \(marco.map { NSStringFromRect($0) } ?? "ninguna") · "
+                  + "oclusión \(item.button?.window?.occlusionState.contains(.visible) == true ? "visible" : "no visible") · "
+                  + "barra en pantalla \(Self.barraDeMenusEnPantalla()) → \(v.texto)")
+            return v
+        }
+        // Gracia corta y recordatorio cada 6 s: la lógica es la misma; el reloj,
+        // el de la prueba. El vigía real late cada 2 s.
+        Config.set("icono_oculto_gracia_seg", to: 4.0)
+        Config.set("icono_oculto_recordatorio_min", to: 0.1)
+        Config.set("icono_oculto_no_avisar", to: false)
+        ModoRapido.ponerReunion(false)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self else { exit(2) }
+            let antes = medida("a la vista")
+            if case .noSeSabe(let m) = antes {
+                // Una aplicación a pantalla completa: no hay barra en la que mirar.
+                // No es un fallo del vigía —es justo el caso en que no debe avisar—,
+                // pero aquí no se puede medir nada.
+                print("ICONOOCULTO OMITIDA — no se sabe (\(m)): con la barra fuera de pantalla no hay nada que medir")
+                Log.vaciar(); fflush(stdout); exit(0)
+            }
+            guard antes == .visible else {
+                fin(false, "el icono de la prueba no está a la vista antes de esconderlo (\(antes.texto)): no se puede medir nada")
+            }
+            chk(lineas("icono barra: AVISO") == 0, "RF-02: visible durante 3 s, ningún aviso")
+            // Escondido de verdad: tan largo que no cabe en la barra. macOS lo aparta.
+            item.length = 3000
+            let escondidoEn = Date()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                let v = medida("escondido")
+                if case .oculto = v {} else { chk(false, "escondido de verdad, la posición no lo delata: \(v.texto)") }
+            }
+            // RNF-02: el aviso, en menos de 2 min (aquí la gracia es 4 s + un latido).
+            func esperarAviso(_ intentos: Int) {
+                if lineas("icono barra: AVISO") > 0 {
+                    let tardo = Date().timeIntervalSince(escondidoEn)
+                    chk(tardo < 120, String(format: "RF-01/RNF-02: avisó a los %.1f s de esconderse (gracia 4 s)", tardo))
+                    // Una sola vez, aunque siga escondido.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+                        chk(lineas("icono barra: AVISO") == 1, "RF-01: 8 s más escondido, sigue siendo un solo aviso (\(lineas("icono barra: AVISO")))")
+                        // RF-06: con la reunión puesta, recordatorio cada 6 s.
+                        ModoRapido.ponerReunion(true)
+                        let desde = lineas("icono barra: RECORDATORIO")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+                            let n = lineas("icono barra: RECORDATORIO") - desde
+                            chk(n >= 1 && n <= 3, "RF-06: con la reunión puesta y el icono escondido, \(n) recordatorio(s) en 15 s (cada 6 s)")
+                            ModoRapido.ponerReunion(false)
+                            let sinReunion = lineas("icono barra: RECORDATORIO")
+                            // De vuelta a su tamaño: vuelve a verse.
+                            item.length = 18
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+                                let v = medida("devuelto")
+                                chk(v == .visible, "devuelto a su tamaño, vuelve a verse (\(v.texto))")
+                                chk(lineas("icono barra: RECORDATORIO") == sinReunion,
+                                    "RF-06: sin la reunión, ningún recordatorio más")
+                                chk(lineas("icono barra: AVISO") == 1, "RF-01: un solo aviso en toda la sesión")
+                                if mal == 0 { fin(true, "el vigía ve el icono escondido, avisa una vez y recuerda la reunión") }
+                                fin(false, "\(mal) comprobación(es) fallida(s)")
+                            }
+                        }
+                    }
+                    return
+                }
+                guard intentos > 0 else { fin(false, "RF-01: escondido 60 s y ningún aviso") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { esperarAviso(intentos - 1) }
+            }
+            esperarAviso(120)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 110) { fin(false, "tiempo agotado") }
+    }
+
+    /// BTODICTA_TRIPLEFNTEST=1 — fn fn fn, con eventos sintéticos por el MISMO
+    /// manejador que usa el monitor de fn. No toca el teclado del sistema: la
+    /// copia de BtoDicta que el usuario tenga abierta no se entera.
+    ///
+    /// Solo con carpeta aislada: abre dictados de verdad y pone el modo reunión.
+    /// Detener descarta el audio en vez de transcribirlo.
+    fileprivate func probarTripleFnSiSePidio() {
+        guard ProcessInfo.processInfo.environment["BTODICTA_TRIPLEFNTEST"] == "1" else { return }
+        guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+            print("TRIPLE FALLA — se niega a correr sin BTODICTA_DIR"); exit(2)
+        }
+        _ = dir
+        Config.set("tecla", to: "fn")
+        Config.set("doble_pulsacion_activar", to: true)
+        Config.set("doble_pulsacion_ventana", to: 0.45)
+        Config.set("hold_para_hablar", to: false)
+        Config.set("silencio_max_seg", to: 0.0)           // que el dictado de prueba no se corte
+        Config.set("continuo_activo", to: false)
+        ModoRapido.ponerReunion(false)
+        pruebaDetenerSinTranscribir = true
+
+        var mal = 0
+        func chk(_ ok: Bool, _ q: String) { print("TRIPLE \(ok ? "✓" : "✗") \(q)"); fflush(stdout); if !ok { mal += 1 } }
+        func fn(_ abajo: Bool) {
+            // Un flagsChanged de fn, como el que manda el teclado. Se construye; no se publica.
+            guard let cg = CGEvent(keyboardEventSource: nil, virtualKey: 63, keyDown: abajo) else { return }
+            cg.type = .flagsChanged
+            cg.flags = abajo ? .maskSecondaryFn : []
+            guard let e = NSEvent(cgEvent: cg) else { return }
+            manejadorFlags?(e)
+        }
+        /// Pulsaciones en los instantes dados (bajar, soltar), desde ahora.
+        func secuencia(_ pulsos: [(Double, Double)], y luego: @escaping () -> Void) {
+            let t0 = DispatchTime.now()
+            for (b, s) in pulsos {
+                DispatchQueue.main.asyncAfter(deadline: t0 + b) { fn(true) }
+                DispatchQueue.main.asyncAfter(deadline: t0 + s) { fn(false) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: t0 + (pulsos.last?.1 ?? 0) + 1.2) { luego() }
+        }
+        /// Cuánto tarda en grabar desde la bajada de la segunda (RF-04).
+        var bajadaSegunda: Date?
+        var grabandoEn: Date?
+        func vigilarArranque() {
+            let t = Timer(timeInterval: 0.005, repeats: true) { [weak self] tm in
+                guard let self else { return }
+                if self.recorder.isRecording, grabandoEn == nil { grabandoEn = Date(); tm.invalidate() }
+            }
+            RunLoop.main.add(t, forMode: .common)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self else { exit(2) }
+            guard self.manejadorFlags != nil, self.comboMods == ["fn"] else {
+                print("TRIPLE FALLA — el monitor de fn no está instalado (atajo \(self.comboMods))"); exit(3)
+            }
+            // 1) fn fn fn desde reposo: arranca, pone el modo, y sigue grabando.
+            vigilarArranque()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) { bajadaSegunda = Date() }
+            secuencia([(0.00, 0.08), (0.20, 0.28), (0.40, 0.48)]) {
+                var lat: Double?
+                if let b = bajadaSegunda, let g = grabandoEn { lat = g.timeIntervalSince(b) * 1000 }
+                chk(ModoRapido.enReunion, "RF-03: fn fn fn pone el modo reunión")
+                chk(self.recorder.isRecording, "RF-03: y el dictado sigue grabando")
+                print("TRIPLE medida: de bajar la segunda a grabar, \(lat.map { String(format: "%.0f ms", $0) } ?? "no grabó")")
+                // 2) Una pulsación tardía detiene, y no toca el modo.
+                secuencia([(0.00, 0.08)]) {
+                    chk(!self.recorder.isRecording, "RF-05: una pulsación pasada la ventana detiene el dictado")
+                    chk(ModoRapido.enReunion, "RF-05: y el modo reunión sigue como estaba")
+                    // 3) fn fn fn otra vez: lo quita.
+                    secuencia([(0.60, 0.68), (0.80, 0.88), (1.00, 1.08)]) {
+                        chk(!ModoRapido.enReunion, "RF-03: fn fn fn otra vez lo quita")
+                        chk(self.recorder.isRecording, "RF-03: y el dictado sigue grabando")
+                        secuencia([(0.00, 0.08)]) {
+                            chk(!self.recorder.isRecording, "detener tras quitarlo")
+                            // 4) Tres lentas: doble arranca, la tercera (fuera de ventana) detiene.
+                            secuencia([(0.60, 0.68), (0.80, 0.88), (1.60, 1.68)]) {
+                                chk(!self.recorder.isRecording, "RF-05: tres pulsaciones lentas son arrancar y detener")
+                                chk(!ModoRapido.enReunion, "RF-05: y no cambian el modo")
+                                // 5) Solo doble: arranca y no cambia el modo (RF-04).
+                                secuencia([(0.60, 0.68), (0.80, 0.88)]) {
+                                    chk(self.recorder.isRecording && !ModoRapido.enReunion,
+                                        "RF-04: fn fn arranca como siempre y no toca el modo")
+                                    self.cancelDictation(silencioso: true)
+                                    // 6) La tercera ANTES de que la grabación empiece (D-7). Arrancar
+                                    // es asíncrono: se fuerza la carrera mandando segunda y tercera
+                                    // en el mismo turno, antes de que el arranque llegue a correr.
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { fn(true); fn(false) }
+                                    var grabandoAlBajarTercera = true
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                                        fn(true); fn(false)
+                                        fn(true); grabandoAlBajarTercera = self.recorder.isRecording; fn(false)
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                        print("TRIPLE medida: al bajar la tercera, ¿grabando ya? \(grabandoAlBajarTercera ? "sí — la carrera no se forzó" : "no")")
+                                        chk(!grabandoAlBajarTercera, "D-7: la tercera llegó antes que la grabación (carrera forzada)")
+                                        chk(ModoRapido.enReunion, "D-7: y aun así pone el modo reunión")
+                                        chk(self.recorder.isRecording, "D-7: y el dictado arranca y sigue")
+                                        self.cancelDictation(silencioso: true)
+                                        ModoRapido.ponerReunion(false)
+                                    // 7) El camino Carbon (F1-F12 o combinaciones): solo ve bajadas.
+                                    let c0 = DispatchTime.now()
+                                    for t in [0.5, 0.7, 0.9] {
+                                        DispatchQueue.main.asyncAfter(deadline: c0 + t) { self.pulsarAtajoCarbon() }
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: c0 + 2.0) {
+                                        chk(ModoRapido.enReunion && self.recorder.isRecording,
+                                            "Carbon: tres pulsaciones ponen el modo y el dictado sigue")
+                                        self.pulsarAtajoCarbon()
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                        chk(!self.recorder.isRecording && ModoRapido.enReunion,
+                                            "Carbon: una tardía detiene y no toca el modo")
+                                        ModoRapido.ponerReunion(false)
+                                    print("TRIPLE \(mal == 0 ? "OK — fn fn fn cambia el modo sin parar; lo tardío detiene; el doble no cambia" : "FALLA (\(mal))")")
+                                    fflush(stdout)
+                                    exit(mal == 0 ? 0 : 1)
+                                        }
+                                    }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60) { print("TRIPLE FALLA timeout"); fflush(stdout); exit(4) }
     }
 }

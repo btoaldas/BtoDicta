@@ -118,6 +118,21 @@ struct Config {
         return v.isEmpty ? [15, 30, 60, 120] : v
     }
 
+    /// Red de seguridad del icono (spec 012). «No volver a avisar» de que el
+    /// icono no se ve: lo pone el botón del propio aviso.
+    static func iconoOcultoNoAvisar() -> Bool { (json()["icono_oculto_no_avisar"] as? Bool) ?? false }
+    /// Segundos oculto sin interrupción antes de avisar. La barra se reconstruye
+    /// un instante al arrancar o al cambiar de pantalla: eso no es un fallo.
+    static func iconoOcultoGraciaSeg() -> Double {
+        min(max((json()["icono_oculto_gracia_seg"] as? Double) ?? 30, 2), 600)
+    }
+    /// Cada cuántos minutos recordar que el modo reunión sigue puesto con el
+    /// icono escondido. 0 = nunca.
+    static func iconoOcultoRecordatorioMin() -> Double {
+        let v = (json()["icono_oculto_recordatorio_min"] as? Double) ?? 30
+        return v <= 0 ? 0 : min(max(v, 0.05), 24 * 60)
+    }
+
     /// Tope absoluto de un dictado, en minutos. 0 = sin tope.
     ///
     /// El corte por silencio no basta: cualquier ruido por encima del umbral

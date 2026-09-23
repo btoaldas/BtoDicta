@@ -42,3 +42,17 @@ enum ConfirmacionFnPolicy {
         !confirmacionConsumidaAlBajar && hayConfirmacionAhora && !inicioGrabando
     }
 }
+
+/// fn fn fn pone o quita el modo reunión (spec 012).
+///
+/// La tercera pulsación se ARMA al soltar la segunda —la que arrancó el dictado— y
+/// se consume al bajar la siguiente, con la misma ventana que el doble. Así la
+/// segunda sigue arrancando al instante: nadie espera a ver si llega una tercera.
+///
+/// Solo en modo toque con doble fn. En «mantener para hablar», soltar la segunda
+/// termina el dictado; con el doble apagado, fn fn fn es arrancar-parar-arrancar.
+enum TriplePulsacionPolicy {
+    static func armarAlSoltar(activoPorDoble: Bool, usadoConTecla: Bool, pushToTalk: Bool) -> Bool {
+        activoPorDoble && !usadoConTecla && !pushToTalk
+    }
+}
