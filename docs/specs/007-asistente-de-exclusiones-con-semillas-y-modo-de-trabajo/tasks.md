@@ -146,9 +146,9 @@ el material que no se grabó.
     estimados.
 
 - [ ] T18 (RF-03, RF-09) Los tres ADR
-  - Archivos: `docs/adr/006-comparacion-por-subcadena.md`,
-    `docs/adr/007-alcance-lista-contenido-adulto.md`,
-    `docs/adr/008-dos-formas-de-comparar.md`
+  - Archivos: `docs/adr/010-comparacion-por-subcadena.md`,
+    `docs/adr/011-alcance-lista-contenido-adulto.md`,
+    `docs/adr/012-dos-formas-de-comparar.md`
   - Evidencia esperada: los tres archivos con su alternativa descartada.
 
 - [ ] T19 (todos) Verificación RF por RF

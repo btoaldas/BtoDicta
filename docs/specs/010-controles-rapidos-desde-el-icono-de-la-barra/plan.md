@@ -1,9 +1,9 @@
 # Plan técnico 010 — Controles rápidos desde el icono de la barra
 
-- Estado: Borrador
+- Estado: Aprobado
 - Fecha: 2026-09-22
 - Spec: `spec.md` (Aprobada 2026-09-22, nivel P)
-- Aprobado por: PENDIENTE
+- Aprobado por: Alberto — 2026-09-22 — «si» (a «¿Apruebo el plan y paso a las tareas?»)
 
 ## 1. Lo que hay hoy, mirado antes de planificar
 
