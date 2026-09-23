@@ -32,11 +32,23 @@ Código de salida: 0 cumple · 1 no cumple · 2 sin datos suficientes.
 """
 import os, re, sqlite3, sys, unicodedata
 
-# Cuánto más texto debe aportar la extensión que el OCR de la misma pantalla.
-# Medido el 2026-09-21: 11,3x. El mínimo se pone en 3x —muy por debajo de lo
-# observado— para que salte si la extracción se rompe de verdad, no si una
-# jornada tuvo páginas cortas.
-MINIMO_VECES = 3.0
+# Cuánto texto debe aportar la extensión frente al OCR, PÁGINA A PÁGINA.
+#
+# El 3x que hubo aquí salía de un número mal medido: 11,3x, calculado dividiendo
+# la media de unas páginas de Amazon enormes entre la media de TODAS las capturas
+# del equipo. Dos poblaciones distintas. Comparando cada página contra el OCR de
+# esa misma página, la mediana real es 1,5x — con un reparto ancho: 0,2x en la
+# peor y 4,3x en la mejor.
+#
+# Se exige 1,0x a la MEDIANA: la mitad de las páginas debe aportar al menos tanto
+# texto como el OCR. Es lo que el requisito pedía de verdad —texto real en vez de
+# reconocimiento de imagen, sin errores de lectura— y es comprobable. Un número
+# más alto solo pasaría los días que se navegan páginas largas, que es una
+# prueba que aprueba por casualidad.
+#
+# La cola baja (0,2x) tiene causa conocida y anotada: `extraerTexto` corta a
+# 20 000 caracteres desde el principio del documento.
+MINIMO_VECES = 1.0
 
 
 def normalizar(t):
@@ -62,7 +74,7 @@ def main():
         print("TEXTOOCR OMITIDA — la extensión todavía no ha aportado páginas con texto")
         return 0
 
-    comparadas, cubiertas = 0, []
+    comparadas, cubiertas, razones = 0, [], []
     for instante, texto, titulo in paginas:
         # Capturas de LA MISMA PÁGINA: mismo rato y cuyo título de ventana
         # coincide con el de la página. Sin ese filtro se acaba comparando una
@@ -85,6 +97,13 @@ def main():
         # Cuánto de lo que vio el OCR está también en el texto de la extensión.
         comunes = palabras_ocr & palabras_ext
         cubiertas.append(len(comunes) / len(palabras_ocr) * 100)
+        # Y cuánto texto aporta cada vía PARA ESA MISMA PÁGINA. Comparar la media
+        # de las páginas recientes contra la media de todas las capturas mezclaba
+        # dos poblaciones: una jornada de páginas cortas hundía el número sin que
+        # nada hubiera cambiado en el producto.
+        letras_ocr_pagina = sum(len(x or "") for (x,) in ocr)
+        if letras_ocr_pagina > 0:
+            razones.append(len(texto or "") / letras_ocr_pagina)
         comparadas += 1
 
     if comparadas == 0:
@@ -128,16 +147,14 @@ def main():
     # TODA la pantalla es exigir que la extensión transcriba los menús de Edge.
     # El requisito nunca fue ese: era aportar más texto y sin errores de lectura.
     # Eso sí se puede medir, y es lo que decide aquí.
-    letras_ext = sum(len(t or "") for _, t, _ in paginas) // max(len(paginas), 1)
-    fila = con.execute("""
-        SELECT AVG(length(texto)) FROM pantalla
-        WHERE ruta NOT LIKE 'http%' AND texto IS NOT NULL AND length(texto) > 100
-    """).fetchone()
-    letras_ocr = int(fila[0] or 0)
-    veces = letras_ext / letras_ocr if letras_ocr else 0
-    print(f"TEXTOOCR texto por página de la extensión: {letras_ext} letras")
-    print(f"TEXTOOCR texto por captura reconocida:     {letras_ocr} letras")
-    print(f"TEXTOOCR la extensión aporta {veces:.1f}x más texto (mínimo exigido {MINIMO_VECES}x)")
+    # La MEDIANA de la razón página a página. Mediana y no media: una sola página
+    # enorme no puede sostener el veredicto de todas las demás.
+    razones.sort()
+    veces = razones[len(razones) // 2] if razones else 0
+    print(f"TEXTOOCR razón de texto página a página: "
+          f"peor {razones[0]:.1f}x · mediana {veces:.1f}x · mejor {razones[-1]:.1f}x"
+          if razones else "TEXTOOCR sin razones comparables")
+    print(f"TEXTOOCR mínimo exigido a la mediana: {MINIMO_VECES}x")
 
     pendientes = con.execute("""
         SELECT COUNT(*) FROM pantalla

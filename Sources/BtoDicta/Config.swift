@@ -58,9 +58,29 @@ struct Config {
     /// Subirlo hace falta oficina ruidosa; bajarlo, si se habla muy flojo. Un
     /// valor demasiado bajo devuelve el fallo que esto corrige: el dictado no se
     /// cierra nunca y se transcribe silencio, que se paga.
+    /// 0 = automático (recomendado). Un valor > 0 lo fija a mano.
+    ///
+    /// **Por qué automático y no un número.** Un umbral fijo se eligió midiendo el
+    /// ruido de una sala vacía (0,0036) y poniéndolo cinco veces por encima: 0,02.
+    /// Al día siguiente, en una reunión real, la voz del usuario medía entre 0,010
+    /// y 0,059 — por DEBAJO de ese umbral casi todo el tiempo. El dictado se
+    /// cerraba a los quince segundos mientras él hablaba.
+    ///
+    /// La lección: la separación entre voz y ruido depende del micrófono, de la
+    /// distancia y de la sala, y puede ser de apenas el doble. Ningún número fijo
+    /// sirve para todos. Se mide el suelo de ruido de ESTA sesión y se decide
+    /// contra él.
     static func umbralVozDictado() -> Double {
-        let v = (json()["dictado_umbral_voz"] as? Double) ?? 0.02
-        return min(max(v, 0.001), 0.5)
+        let v = (json()["dictado_umbral_voz"] as? Double) ?? 0
+        return v <= 0 ? 0 : min(max(v, 0.001), 0.5)
+    }
+
+    /// Cuántas veces por encima del suelo de ruido cuenta como voz. De fábrica 2.
+    ///
+    /// Medido con audio real: suelo 0,0036 y picos de voz 0,0112. Un factor de 3
+    /// ya se los comía; con 2 quedan dentro y el ruido fuera.
+    static func factorVozSobreRuido() -> Double {
+        min(max((json()["dictado_factor_voz"] as? Double) ?? 2.0, 1.2), 10)
     }
 
     /// Cada cuántos minutos late el borde recordando que se está grabando.

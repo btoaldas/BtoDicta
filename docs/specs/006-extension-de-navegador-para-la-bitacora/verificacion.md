@@ -9,7 +9,7 @@
 | RF | Qué exigía | Cómo se comprobó | Segundo ángulo | Veredicto |
 |---|---|---|---|---|
 | RF-01 | Saber qué pestaña suena, en < 2 s | Informe con correo activo y vídeo audible: la API devuelve `activa=correo`, `audible=vídeo`. Reporta en cada cambio de pestaña, de audio y de URL, más latido de 30 s | El filtro decide con ese dato: vídeo detrás → se graba; vídeo delante → se aparta. Y degrada en tres casos (informe caducado, sin extensión, otro navegador) | Cumple |
-| RF-02 | Texto en vez de OCR, ≥ 90 % de cobertura | **La medida de la spec estaba mal planteada** (ver §Desviaciones). Medido de la forma correcta: 17 311 letras por página frente a 1 532 del OCR — **11,3× más texto** y sin errores de lectura | En el índice queda `procesado=1`: 0 pendientes de OCR para esas páginas, frente a 11 capturas normales que sí esperan | Cumple |
+| RF-02 | Texto en vez de OCR, ≥ 90 % de cobertura | **La medida de la spec estaba mal planteada, y la primera corrección TAMBIÉN** (ver §Desviaciones). Comparando cada página contra el OCR de esa misma página: **mediana 1,5×**, de 0,2× a 4,3×. Cumple con menos margen del que se dijo | En el índice queda `procesado=1`: 0 pendientes de OCR para esas páginas, frente a 11 capturas normales que sí esperan | Cumple |
 | RF-03 | Captura de la pestaña, sin barras ni ventanas encima | `captureVisibleTab` captura la pestaña, no la pantalla: por construcción no incluye lo que haya delante. `{"captura_guardada":true}` y archivo en `BtoDicta Bitácora/navegador/` | Apagada de fábrica; con un dominio excluido ni se captura | Cumple |
 | RF-04 | Sin la extensión, todo igual | `qa-paquete.sh` pasa igual con y sin ella. La prueba de exportación se omite sola cuando no hay paquete | Tres formas de degradar probadas en RF-01 | Cumple |
 | RF-05 | Excluir dominios: 0 envíos | 12 comprobaciones: normalización, subdominios incluidos, dominios parecidos excluidos, lista vacía no excluye nada | De un dominio excluido se calla URL y título, pero se mantiene el dato de que suena — sin contenido, y es el que evita anotar una película como trabajo | Cumple |
@@ -40,8 +40,17 @@ correcto; lo absurdo era la comparación, que enfrentaba una página de Amazon c
 el OCR de una ventana de Claude abierta al lado.
 
 Medido de la forma que el requisito quería decir —cuánto texto aporta cada vía—
-el resultado es **11,3× a favor de la extensión, y sin errores de lectura**. El
-requisito se cumple; la métrica escrita en la spec, no servía.
+el primer resultado fue **11,3×**. **Ese número también estaba mal medido**, y se
+corrige aquí el 2026-09-22: salía de dividir la media de unas páginas de Amazon
+enormes entre la media de TODAS las capturas del equipo, que son dos poblaciones
+distintas.
+
+Comparando cada página contra el OCR de **esa misma página**, la cifra honesta es
+una **mediana de 1,5×**, con un reparto ancho: 0,2× en la peor y 4,3× en la mejor.
+El requisito se cumple —la mitad de las páginas aporta al menos tanto texto como
+el OCR, y sin errores de lectura— pero con mucho menos margen del que se dijo. La
+cola baja tiene causa conocida: el tope de 20 000 caracteres desde el principio
+del documento.
 
 **Orden de tareas alterado** a petición de Alberto: T15 (empaquetado) se adelantó
 a T13 y T14 para poder cargar la extensión y probarla antes de seguir. Las

@@ -197,6 +197,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var activacionVozRearmeIntentos = 0
     private var activacionVozUltimoForzado = Date.distantPast
     private var iniciandoDictado = false
+
+    /// Suelo de ruido estimado de la sesión actual, para decidir qué es voz.
+    ///
+    /// Baja deprisa y sube muy despacio: así aprende el silencio de la sala en
+    /// cuanto lo oye, y una racha larga de habla no lo arrastra hacia arriba
+    /// hasta dejar de reconocer la voz.
+    private var sueloRuido: Float = 1
+    private var avisadoDeCierreCercano = false
+
+    /// A partir de qué nivel se considera voz, AHORA, en esta sala.
+    ///
+    /// Un umbral fijo no sirve: se eligió 0,02 midiendo una sala vacía (0,0036) y
+    /// al día siguiente, en una reunión real, la voz medía entre 0,010 y 0,059 —
+    /// por debajo casi todo el rato. El dictado se cerraba a los quince segundos
+    /// mientras el usuario hablaba, y sin decir nada. La separación entre voz y
+    /// ruido depende del micrófono, la distancia y la sala, y puede ser de apenas
+    /// el doble; ningún número fijo vale para todos.
+    private func umbralDeVozAhora(_ rms: Float) -> Float {
+        let fijo = Float(Config.umbralVozDictado())
+        if fijo > 0 { return fijo }   // el usuario lo fijó a mano
+        if rms < sueloRuido { sueloRuido = rms }
+        else { sueloRuido *= 1.0002 } // sube muy despacio
+        // Un mínimo absoluto evita que con el micrófono silenciado —suelo casi
+        // cero— cualquier chasquido cuente como voz.
+        return max(sueloRuido * Float(Config.factorVozSobreRuido()), 0.0015)
+    }
+
     /// Cuántos recordatorios de «sigues grabando» se han dado en esta sesión.
     private var avisosGrabandoDados = 0
     /// Hay una pregunta del tope en pantalla: no se vuelve a preguntar encima.
@@ -4679,7 +4706,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         recorder.onRMS = { [weak self] rms in
             DispatchQueue.main.async {
                 guard let self else { return }
-                if rms > Float(Config.umbralVozDictado()) {
+                if rms > self.umbralDeVozAhora(rms) {
                     self.lastVoice = Date()
                     self.huboVozEnSesion = true
                 }
@@ -6363,8 +6390,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             let quiet = Date().timeIntervalSince(self.lastVoice)
             let limit = Config.maxSilence()
+            // 0 = no cerrar nunca por silencio. Grabar una reunión en la que uno
+            // escucha más de lo que habla es un caso legítimo, y ahí el corte por
+            // silencio es justo lo contrario de lo que hace falta.
+            guard limit > 0 else { return }
+
+            // Avisar ANTES, no después. El cierre por silencio no dejaba rastro
+            // en ningún sitio: ni aviso previo, ni línea en el registro. Se
+            // cerraba solo en mitad de una reunión y no había forma de saber por
+            // qué, ni de reaccionar a tiempo.
+            let avisarDesde = max(limit - 5, limit * 0.6)
+            if quiet >= avisarDesde, !self.avisadoDeCierreCercano {
+                self.avisadoDeCierreCercano = true
+                let quedan = max(Int((limit - quiet).rounded()), 1)
+                self.panel.update("🔇 Sin oírte — cierro en \(quedan)s. Habla o pulsa para seguir.")
+                AvisoGrabando.shared.latir(insistente: true)
+                self.playSound("Pop")
+                Log.log(.sistema, "dictado: \(Int(quiet))s sin detectar voz — aviso de cierre en \(quedan)s")
+            }
+            if quiet < avisarDesde { self.avisadoDeCierreCercano = false }
+
             if quiet >= limit {
                 timer.invalidate()
+                // El motivo QUEDA ESCRITO. Sin esto, reconstruir por qué se cerró
+                // un dictado exige medir el audio a mano, y eso solo pasa cuando
+                // ya se perdió algo.
+                Log.log(.sistema, "dictado: cerrado por \(Int(limit))s sin voz (suelo de ruido \(String(format: "%.4f", self.sueloRuido)), umbral \(String(format: "%.4f", self.umbralDeVozAhora(self.sueloRuido))))")
                 self.panel.update("🔇 \(Int(limit))s de silencio — cerrando dictado…")
                 self.stopAndTranscribe()
             }
@@ -6391,6 +6442,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             iniciandoDictado = false
             avisosGrabandoDados = 0
             preguntandoPorElTope = false
+            // El suelo de ruido se aprende POR SESIÓN: la sala de una reunión no
+            // es el despacho, y arrastrar el suelo de ayer decidiría con el ruido
+            // equivocado.
+            sueloRuido = 1
+            avisadoDeCierreCercano = false
             armEsc()
             media.dictationStarted()
             playSound("Tink")

@@ -62,6 +62,7 @@ final class SettingsModel: ObservableObject {
     }
     @Published var silencioMax: Double { didSet { Config.set("silencio_max_seg", to: silencioMax) } }
     @Published var umbralVoz: Double { didSet { Config.set("dictado_umbral_voz", to: umbralVoz) } }
+    @Published var factorVoz: Double { didSet { Config.set("dictado_factor_voz", to: factorVoz) } }
     @Published var avisoGrabandoMin: Double { didSet { Config.set("dictado_aviso_min", to: avisoGrabandoMin) } }
     @Published var avisoGrabandoBorde: Bool { didSet { Config.set("dictado_aviso_borde", to: avisoGrabandoBorde) } }
     @Published var maxDictadoMin: Double { didSet { Config.set("dictado_max_min", to: maxDictadoMin) } }
@@ -207,6 +208,7 @@ final class SettingsModel: ObservableObject {
         porSonido = Config.correccionPorSonido()
         silencioMax = Config.maxSilence()
         umbralVoz = Config.umbralVozDictado()
+        factorVoz = Config.factorVozSobreRuido()
         avisoGrabandoMin = Config.avisoGrabandoMin()
         avisoGrabandoBorde = Config.avisoGrabandoBorde()
         maxDictadoMin = Config.maxDictadoMin()
@@ -862,11 +864,15 @@ struct SettingsView: View {
                 Toggle("Arrancar al iniciar sesión", isOn: $m.arrancarInicio)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Auto-cerrar tras \(Int(m.silencioMax)) s de silencio").font(.subheadline)
-                    Slider(value: $m.silencioMax, in: 15...300, step: 15).tint(acento)
-                    Text("A partir de qué nivel se considera que hablas: \(String(format: "%.3f", m.umbralVoz))")
+                    Slider(value: $m.silencioMax, in: 0...300, step: 15).tint(acento)
+                    Text(m.silencioMax == 0
+                         ? "No cerrar nunca por silencio"
+                         : "Auto-cerrar tras \(Int(m.silencioMax)) s de silencio")
                         .font(.caption).foregroundStyle(.secondary)
-                    Slider(value: $m.umbralVoz, in: 0.005...0.100, step: 0.005).tint(acento)
-                    Text("Más bajo capta voces lejanas; más alto evita que el ruido de la sala cuente como voz y el dictado no se cierre nunca. Una sala vacía suele medir 0,004.")
+                    Text("Sensibilidad de la voz: \(String(format: "%.1f", m.factorVoz))x sobre el ruido de la sala")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Slider(value: $m.factorVoz, in: 1.2...5.0, step: 0.1).tint(acento)
+                    Text("El nivel que separa tu voz del ruido se mide en cada sesión, porque depende del micrófono, de la distancia y de la sala. Un número fijo falló: se eligió midiendo una sala vacía y en una reunión real la voz quedaba por debajo, así que el dictado se cerraba a media frase. Más alto exige hablar más fuerte; más bajo deja que el ruido cuente como voz.")
                         .font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

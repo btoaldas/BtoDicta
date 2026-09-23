@@ -209,6 +209,10 @@ else
   ejecutar "navegador_informe" "BTODICTA_NAVEGADORTEST" "1" 90
   # Qué entra en la bitácora y qué no: de fábrica entra todo.
   ejecutar "filtro_bitacora" "BTODICTA_FILTROTEST" "1" 90
+  # La detección de voz reconoce una voz REAL, no una de laboratorio. Corre sobre
+  # las grabaciones de dictado que haya en el equipo: el fallo vivía justo en la
+  # diferencia entre el silencio de una sala vacía y una reunión de verdad.
+  estatica "deteccion_voz" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-deteccion-voz.py"
   # La bitácora no puede robarle el micrófono al dictado que arranca. Provoca la
   # reconciliación sin parar durante el arranque: una carrera no se espera, se fuerza.
   ejecutar "carrera_microfono" "BTODICTA_CARRERAMICROTEST" "1" 60

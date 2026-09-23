@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.79.0"
+    static let numero = "0.79.1"
     static let fecha = "2026-09-21"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.79.1", "2026-09-22", [
+            "EL DICTADO SE CERRABA SOLO MIENTRAS HABLABAS, y era culpa del arreglo de ayer. El umbral que separa tu voz del ruido se puso en un número fijo, elegido midiendo una sala vacía. En una reunión real tu voz medía por DEBAJO de ese número casi todo el rato: el dictado se cerraba a los quince segundos, sin aviso y sin dejar rastro en el registro, y había que volver a pulsar una y otra vez",
+            "Medido sobre las grabaciones reales de esa reunión: con el número fijo, 8 de 11 tenían huecos de más de quince segundos «sin voz» mientras se hablaba. Ahora el nivel se mide en CADA sesión respecto al ruido de esa sala, y el hueco mayor baja a 1,2 segundos",
+            "Y NUNCA MÁS EN SILENCIO: cinco segundos antes de cerrar avisa —notch, borde y sonido— para que puedas seguir, y el motivo del cierre queda escrito en el registro con el nivel que midió",
+            "Poner el auto-cierre en 0 desactiva el corte por silencio. Grabar una reunión en la que escuchas más de lo que hablas es un caso legítimo, y ahí cortar por silencio es lo contrario de lo que hace falta",
+        ]),
         ("0.79.0", "2026-09-21", [
             "EL CORTE POR SILENCIO NUNCA HABÍA FUNCIONADO. Comparaba contra el valor del MEDIDOR, que viene amplificado 12 veces y con raíz cuadrada para que un susurro mueva la barra. Con ese transformador, un nivel de 0,0019 —silencio digital— ya daba 0,15 y contaba como voz: hacía falta una sala casi 2 veces más callada que una habitación vacía para que el dictado se cerrara solo. Un dictado se quedó abierto ocho minutos sin nadie hablando, y ese silencio se transcribió y se pagó",
             "Ahora se decide con el nivel REAL, y el umbral es tuyo: un control en Ajustes con la referencia medida (una sala vacía da 0,004)",
