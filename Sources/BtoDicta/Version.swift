@@ -8,11 +8,14 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.81.0"
-    static let fecha = "2026-09-22"
+    static let numero = "0.81.1"
+    static let fecha = "2026-09-23"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.81.1", "2026-09-23", [
+            "CON LOS AIRPODS EN UNA LLAMADA, BTODICTA NO GRABABA. Durante la llamada macOS pone el micrófono de los AirPods a 24 000 Hz; BtoDicta fija el micrófono integrado, que va a 48 000, y el motor de audio se quedaba con la frecuencia vieja y no arrancaba (error -10868). El dictado no grababa nada y la bitácora reintentaba sin parar, cargando la aplicación. Ahora, al cambiar de micrófono, se ajusta la frecuencia a la del micrófono elegido. Comprobado en plena reunión: el dictado graba y la bitácora arranca sin un solo error",
+        ]),
         ("0.81.0", "2026-09-22", [
             "FN FN FN PONE O QUITA EL MODO REUNIÓN, sin buscar ningún menú. Las dos primeras arrancan el dictado como siempre —la segunda no espera a ver si llega una tercera— y la tercera, si llega enseguida, cambia el modo sin cortar la grabación. El notch lo confirma. Si pulsas fn para parar en menos de medio segundo después de arrancar, pondrás el modo reunión: otra fn detiene como siempre",
             "SI EL ICONO DE LA BARRA NO SE VE, BTODICTA TE LO DICE. Una vez, con la forma de arreglarlo y un botón «No volver a avisar». Mira dónde está el icono: fuera de la barra o bajo la muesca cuenta como escondido; con una aplicación a pantalla completa no se sabe, y no avisa. Espera 30 segundos seguidos antes de decir nada, y nunca te interrumpe en mitad de un dictado",

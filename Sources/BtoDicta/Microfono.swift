@@ -52,7 +52,45 @@ enum Microfono {
             Log.log(.sistema, "micrófono: no pude fijar el aparato elegido (estado \(estado)) — sigo con el del sistema")
             return false
         }
+        alinearFormato(unidad, conAparato: deseado)
         return true
+    }
+
+    /// Tras cambiar de aparato, la unidad sigue con el formato del ANTERIOR.
+    ///
+    /// La unidad de entrada no convierte la frecuencia: la del lado de la app
+    /// tiene que ser la del aparato. Con unos AirPods en llamada el sistema
+    /// tiene el micrófono a 24 000 Hz; al fijar el integrado (48 000 Hz) la
+    /// unidad se quedaba en 24 000 y el motor no arrancaba: error -10868. El
+    /// dictado no grababa y la bitácora reintentaba sin parar. Medido el
+    /// 2026-09-23 en una reunión, y reproducido aparte: sin esto, 0 buffers;
+    /// con esto, arranca y entrega audio.
+    private static func alinearFormato(_ unidad: AudioUnit, conAparato id: AudioDeviceID) {
+        guard let tasa = frecuencia(id), tasa > 0 else { return }
+        var asbd = AudioStreamBasicDescription()
+        var tam = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        guard AudioUnitGetProperty(unidad, kAudioUnitProperty_StreamFormat,
+                                   kAudioUnitScope_Output, 1, &asbd, &tam) == noErr else { return }
+        guard asbd.mSampleRate != tasa else { return }
+        let antes = asbd.mSampleRate
+        asbd.mSampleRate = tasa
+        let r = AudioUnitSetProperty(unidad, kAudioUnitProperty_StreamFormat,
+                                     kAudioUnitScope_Output, 1, &asbd, tam)
+        Log.log(.sistema, r == noErr
+            ? "micrófono: formato alineado al aparato elegido (\(Int(antes)) → \(Int(tasa)) Hz)"
+            : "micrófono: no pude alinear el formato al aparato (estado \(r))")
+    }
+
+    /// Frecuencia nominal de un aparato.
+    static func frecuencia(_ id: AudioDeviceID) -> Double? {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var tasa: Float64 = 0
+        var size = UInt32(MemoryLayout<Float64>.size)
+        guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &tasa) == noErr else { return nil }
+        return tasa
     }
 
     /// Todos los dispositivos con canales de ENTRADA.
