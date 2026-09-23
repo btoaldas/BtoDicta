@@ -1,5 +1,14 @@
 # Hito — Controles rápidos desde el icono: modo reunión y pausa de la bitácora
 
+> **Corrección, 2026-09-22 (spec 011).** Lo que se dice aquí sobre una «barra de
+> menús llena» era **falso**: quedaban 257 puntos libres. El icono estaba oculto
+> porque macOS 26 lo había apuntado a nombre del programa que ejecutó el binario
+> del paquete —las propias pruebas, desde una terminal bloqueada en la barra—, y
+> ese apunte persiste para los arranques normales. Causa y corrección en
+> `docs/specs/011-el-icono-de-la-barra-no-puede-quedar-a-nombre-de-otra-aplicacion/`.
+> El resto de este documento se deja tal como se escribió.
+
+
 - Fecha: 2026-09-22
 - Spec: 010 — Controles rápidos desde el icono de la barra (nivel P)
 - Versión: 0.80.0
@@ -58,7 +67,7 @@ QA de 30 a 35 pruebas; suite Swift de 35 a 47.
   controles con el estado real; el icono en sí puede seguir sin verse.
 - **El modo reunión no caduca**, por decisión de Alberto.
 - **Una sesión larga se transcribe de golpe al soltar**: veinte horas son unos
-  2,2 GB. Lo resuelve la spec 011.
+  2,2 GB. Lo resuelve la spec de transcripción por tramos (por crear).
 - **El modo reunión evita el corte, no mejora lo que capta el micrófono.**
 - **La vista del menú real no se capturó**: el clic automático no alcanzó el icono
   oculto. Pendiente de comprobación visual de Alberto.

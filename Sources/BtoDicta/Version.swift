@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.80.0"
+    static let numero = "0.80.1"
     static let fecha = "2026-09-22"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.80.1", "2026-09-22", [
+            "EL ICONO DE LA BARRA YA NO DESAPARECE. Lo que dijimos en la 0.80.0 —que se escondía porque la barra estaba llena— era FALSO: quedaba sitio de sobra. macOS apunta el icono a nombre de quien lanza la aplicación, y las pruebas de BtoDicta la ejecutaban desde una terminal que tienes bloqueada en la barra. El icono quedaba escondido, también en los arranques normales, hasta repararlo a mano",
+            "Ahora BtoDicta solo pone su icono si la abre el sistema —Dock, Finder, Spotlight, al iniciar sesión o al actualizarse—. Si la lanza otro programa, funciona sin icono y deja escrito por qué, así ninguna herramienta puede volver a esconderlo. Comprobado con veinte arranques de ese tipo: ninguno lo envenenó",
+            "Si alguna vez quedó envenenado de antes, se limpia a mano con `make reparar-icono`: la aplicación no toca ajustes del sistema",
+        ]),
         ("0.80.0", "2026-09-22", [
             "MODO REUNIÓN, DESDE EL MENÚ DEL ICONO. Mientras está puesto, el dictado no se cierra por silencio ni por duración, y no te interrumpe con avisos. Se puede poner con el dictado YA EMPEZADO, sin cortarlo y sin perder lo grabado: la reunión sigue en la misma grabación. Nace de una reunión de una hora que quedó troceada en once grabaciones porque evitarlo exigía ir a Ajustes",
             "Al quitarlo vuelve todo como lo tenías —tus ajustes no se tocan: el modo los ignora mientras dura, no los reescribe— y no se cierra de golpe: el silencio empieza a contar desde ese momento",

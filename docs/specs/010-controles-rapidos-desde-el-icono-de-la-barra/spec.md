@@ -43,7 +43,7 @@ reunión que no interrumpe nunca, y una pausa de la bitácora con vuelta automá
 
 - **Transcribir por tramos mientras se graba.** Es lo que hace viable una sesión
   de horas sin una factura de golpe al final, y cambia el motor de transcripción:
-  orden, costura entre tramos y armado del texto. Va en la spec 011. Aquí solo se
+  orden, costura entre tramos y armado del texto. Va en la spec de transcripción por tramos (por crear). Aquí solo se
   **enseña** cuánto hay pendiente, para que el coste se vea antes de soltar.
 - **Mejorar lo que el micrófono capta.** El modo reunión evita que se corte; no
   hace audible lo inaudible. Para una reunión remota ya existe la grabación del
@@ -142,7 +142,7 @@ reunión que no interrumpe nunca, y una pausa de la bitácora con vuelta automá
   - Dado un dictado de más de diez minutos en curso
   - Cuando se abre el menú del icono
   - Entonces se ven los minutos y el tamaño que se transcribirá al soltar
-- Nota: sustituye provisionalmente a la transcripción por tramos (spec 011). Hasta
+- Nota: sustituye provisionalmente a la transcripción por tramos (spec de transcripción por tramos, por crear). Hasta
   que exista, esto es lo único que hace visible el coste antes de pagarlo.
 
 ### RF-08 — Quitar el modo reunión devuelve el comportamiento de siempre
@@ -195,7 +195,7 @@ reunión que no interrumpe nunca, y una pausa de la bitácora con vuelta automá
 - **Depende** de `ContinuoBitacora` para suspender y reanudar la captura; la
   cesión del micrófono al dictado ya existe y no se toca.
 - **Depende** del icono de la barra, que ya tiene estados (reposo, grabando).
-- **No depende** de la spec 011: si nunca se hiciera, el modo reunión funciona
+- **No depende** de la spec de transcripción por tramos (por crear): si nunca se hiciera, el modo reunión funciona
   igual, solo que la transcripción sigue siendo una sola al final.
 
 ## 9. Criterios de aceptación de la spec
@@ -211,7 +211,7 @@ reunión que no interrumpe nunca, y una pausa de la bitácora con vuelta automá
 - P: ¿Cuándo se apaga solo el modo reunión? → R: **hasta que yo lo apague, con el
   icono gritando** (decisión de Alberto). Sin límite de horas.
 - P: ¿Cómo se transcriben veinte horas? → R: **a trozos mientras se graba**
-  (decisión de Alberto). Por tamaño, va a la spec 011; aquí queda el RF-07 que
+  (decisión de Alberto). Por tamaño, va a la spec de transcripción por tramos (por crear); aquí queda el RF-07 que
   hace visible lo pendiente mientras tanto.
 - Petición literal recogida: «podría hacer clic ahí mismo y podría decir no
   bitácora por media hora, no bitácora por todo el día, por el tiempo que yo

@@ -208,6 +208,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var activacionVozRearmeIntentos = 0
     private var activacionVozUltimoForzado = Date.distantPast
     private var iniciandoDictado = false
+    /// El motivo de no registrar el icono ya se escribió en el registro (spec 011).
+    private var iconoNoRegistradoDicho = false
 
     /// Suelo de ruido estimado de la sesión actual, para decidir qué es voz.
     ///
@@ -5216,6 +5218,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// La corrupción cruzada de Control Center se trata en el flujo local; aquí
     /// siempre se mantiene exactamente una referencia AppKit dentro del proceso.
     private func crearStatusItem() {
+        // Spec 011: el icono solo se registra si a esta copia la lanzó el sistema.
+        // Si no, macOS lo apuntaría a nombre de quien la lanzó —una terminal, un
+        // agente— y, si ese programa está bloqueado en la barra, lo escondería
+        // también en los arranques normales siguientes. Se dice una vez y basta.
+        let padre = getppid()
+        guard IconoBarra.debeRegistrar(padre: padre) else {
+            if !iconoNoRegistradoDicho {
+                iconoNoRegistradoDicho = true
+                Log.log(.sistema, IconoBarra.motivoParaNoRegistrar(padre: padre))
+            }
+            return
+        }
         if let anterior = statusItem {
             NSStatusBar.system.removeStatusItem(anterior)
             statusItem = nil
@@ -5402,7 +5416,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func probarIconosBarraSiSePidio() {
         guard ProcessInfo.processInfo.environment["BTODICTA_ICONTEST"] == "1" else { return }
         guard statusItem != nil else {
-            print("ICONTEST FALLA: ejecutar desde BtoDicta.app, no como binario suelto")
+            print("ICONTEST FALLA: no hay icono. Esta prueba necesita que la lance el sistema: `open -W -n --env BTODICTA_ICONTEST=1 BtoDicta.app` (spec 011)")
+            Log.vaciar()   // que el motivo de no registrar el icono llegue al registro
             fflush(stdout)
             exit(3)
         }

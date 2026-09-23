@@ -57,9 +57,11 @@ AJUSTES_PREVIOS = {
 
 def binario():
     aqui = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # El binario SUELTO primero, no el de dentro del paquete (spec 011): ejecutar
+    # el del paquete desde una terminal apunta el icono de la barra a nombre de
+    # esa terminal. Estas pruebas no necesitan el icono.
     for c in (os.environ.get("BIN"),
-              "/Applications/BtoDicta.app/Contents/MacOS/BtoDicta",
-              os.path.join(aqui, "build", "BtoDicta.app", "Contents", "MacOS", "BtoDicta")):
+              os.path.join(aqui, "build", "release", "BtoDicta")):
         if c and os.path.exists(c):
             return c
     return None

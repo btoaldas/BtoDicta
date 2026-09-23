@@ -1,5 +1,14 @@
 # Verificación 010 — Controles rápidos desde el icono de la barra
 
+> **Corrección, 2026-09-22 (spec 011).** Lo que se dice aquí sobre una «barra de
+> menús llena» era **falso**: quedaban 257 puntos libres. El icono estaba oculto
+> porque macOS 26 lo había apuntado a nombre del programa que ejecutó el binario
+> del paquete —las propias pruebas, desde una terminal bloqueada en la barra—, y
+> ese apunte persiste para los arranques normales. Causa y corrección en
+> `docs/specs/011-el-icono-de-la-barra-no-puede-quedar-a-nombre-de-otra-aplicacion/`.
+> El resto de este documento se deja tal como se escribió.
+
+
 - Fecha: 2026-09-22
 - Spec: `spec.md` (Aprobada 2026-09-22, nivel P)
 - Estado del QA al verificar: **35 pruebas, 0 fallos** (código de salida 0) · suite Swift **47**, 0 fallos · versión 0.80.0
@@ -92,5 +101,5 @@ debajo de 10 s escrito a mano en `config.json`, pueden llegar en la misma vuelta
   graba sin cortes hasta que se quite. Lo compensa el icono, con la reserva
   anterior.
 - **Una sesión larga se transcribe de golpe al soltar.** Veinte horas son unos
-  2,2 GB de audio. El menú lo enseña; resolverlo es la spec 011.
+  2,2 GB de audio. El menú lo enseña; resolverlo es la spec de transcripción por tramos (por crear).
 - **El modo reunión no mejora lo que el micrófono capta**, solo evita que se corte.

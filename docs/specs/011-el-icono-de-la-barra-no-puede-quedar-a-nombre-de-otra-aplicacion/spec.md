@@ -1,11 +1,11 @@
 # Spec 011 — Corrección: El icono de la barra no puede quedar a nombre de otra aplicación
 
-- Estado: Borrador
+- Estado: Implementada
 - Tipo: correccion
 - Nivel: P
 - Fecha: 2026-09-22
 - Modifica: ninguna (corrige una explicación equivocada de la spec 010, ver §9)
-- Aprobada por: PENDIENTE
+- Aprobada por: Alberto — 2026-09-22 — «todo si bajo goal y loop hasta resolver y que funcione todo bien» (a «¿Apruebo la spec 011 y paso al plan?»)
 
 ## 1. Problema y propósito
 

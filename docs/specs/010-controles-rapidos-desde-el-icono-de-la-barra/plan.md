@@ -136,12 +136,12 @@ que nadie lo note, y se descubre buscando material que ya no existe. Va primero.
 |---|---|
 | La pausa no vuelve y nadie se entera | Va primero, con pruebas; vence contra el reloj; el icono lo muestra todo el rato |
 | El modo reunión se queda puesto días | RF-03: el icono lo dice sin abrir nada. Decisión consciente de Alberto: sin caducidad |
-| Una sesión de horas produce una transcripción enorme y cara | RF-07 lo enseña antes de soltar; la solución real es la spec 011 |
+| Una sesión de horas produce una transcripción enorme y cara | RF-07 lo enseña antes de soltar; la solución real es la spec de transcripción por tramos (por crear) |
 | El modo reunión pisa los ajustes del usuario | D-4: no escribe en ellos, y el QA lo comprueba comparando las claves preexistentes |
 | Dos estados a la vez en el icono | D-5: prioridad escrita, no un símbolo mezclado |
 
 ## 8. Lo que este plan NO resuelve
 
-- Transcribir por tramos mientras se graba (spec 011).
+- Transcribir por tramos mientras se graba (spec de transcripción por tramos, por crear).
 - Mejorar lo que el micrófono capta.
 - Activar el modo reunión solo, por calendario o por aplicación al frente.

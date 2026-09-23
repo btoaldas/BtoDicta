@@ -23,5 +23,6 @@ otra spec con `Modifica: NNN`.
 | 008 | El texto que se guarda es el que se está leyendo | Aprobada | X | cambio | 2026-09-21 | Alberto — 2026-09-21 — «resuelve aprobado te doy» | 006 | Lista para tareas |
 | 009 | Buscar por palabras en la bitácora | Aprobada | X | funcionalidad | 2026-09-21 | Alberto — 2026-09-21 — «resuelve aprobado te doy» | ninguna | Lista para tareas |
 | 010 | Controles rápidos desde el icono de la barra | Implementada | P | funcionalidad | 2026-09-22 | Alberto — 2026-09-22 — «si» (a «¿Apruebo la spec y paso al plan?») | ninguna | Especificando |
+| 011 | Corrección: El icono de la barra no puede quedar a nombre de otra aplicación | Implementada | P | correccion | 2026-09-22 | Alberto — 2026-09-22 — «todo si bajo goal y loop hasta resolver y que funcione todo bien» (a «¿Apruebo la spec 011 y paso al plan?») | ninguna (corrige una explicación equivocada de la spec 010, ver §9) | Especificando |
 
 <!-- sdd:indice:fin -->

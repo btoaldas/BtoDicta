@@ -128,6 +128,39 @@ total=0
 fallos=0
 omitidas=0
 
+# Lanza una prueba COMO LA LANZARÍA EL SISTEMA: con `open`, no ejecutando el
+# binario del paquete (spec 011).
+#
+# Ejecutar el binario desde una terminal hace que macOS apunte el icono de la barra
+# a nombre del programa dueño de esa terminal; si está bloqueado en la barra, el
+# icono desaparece y el apunte queda guardado para los arranques normales. Lo
+# hacían estas mismas pruebas.
+#
+# `open -W` devuelve 0 aunque la aplicación salga con error, así que aquí se juzga
+# por lo que escribe la prueba: pasa si dice «<marca> OK» y nunca «<marca> FALLA».
+ejecutar_por_sistema() {
+  local id="$1" variable="$2" marca="$3" limite="${4:-90}"
+  local log="$salida/logs-automaticos/$id.log"
+  local app="${BTODICTA_QA_APP:-/Applications/BtoDicta.app}"
+  local dir="$salida/config-de-prueba-$id"
+  local inicio fin estado
+  : > "$log"                      # `--stdout` añade: se vacía antes
+  /bin/mkdir -p "$dir"
+  inicio="$(/bin/date +%s)"
+  /usr/bin/perl -e 'alarm shift; exec @ARGV' "$limite" \
+    /usr/bin/open -W -n --env "$variable=1" --env "BTODICTA_DIR=$dir" \
+      --stdout "$log" --stderr "$log" "$app" 2>>"$log"
+  fin="$(/bin/date +%s)"
+  total=$((total + 1))
+  if /usr/bin/grep -q "^$marca OK" "$log" && ! /usr/bin/grep -q "^$marca FALLA" "$log"; then
+    estado="PASA"
+  else
+    estado="FALLA"; fallos=$((fallos + 1))
+  fi
+  print "[$estado] $id"
+  print "$id\t$estado\t-\t$((fin - inicio))\t$id.log" >> "$salida/resumen.tsv"
+}
+
 ejecutar() {
   local id="$1" variable="$2" valor="$3" limite="${4:-90}"
   local log="$salida/logs-automaticos/$id.log"
@@ -136,19 +169,10 @@ ejecutar() {
   # aparte. Confiar en que restauren al terminar ya falló una vez: una sección
   # añadida al final volvió a machacar y `exit()` no ejecuta ningún `defer`.
   case "$id" in
-    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|icono_estados|menu_rapido)
+    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|menu_rapido)
       desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id") ;;
   esac
-  # Las pruebas del icono necesitan el paquete .app: un binario suelto no recibe
-  # icono en la barra de menús, y la prueba se negaría a correr.
   local bin="$BIN"
-  case "$id" in
-    icono_estados)
-      for candidato in "$REPO/build/BtoDicta.app/Contents/MacOS/BtoDicta" \
-                       "/Applications/BtoDicta.app/Contents/MacOS/BtoDicta"; do
-        [[ -x "$candidato" ]] && { bin="$candidato"; break; }
-      done ;;
-  esac
   inicio="$(/bin/date +%s)"
   /usr/bin/perl -e 'alarm shift; exec @ARGV' "$limite" \
     /usr/bin/env "$variable=$valor" "${desvio[@]}" "$bin" > "$log" 2>&1
@@ -229,7 +253,7 @@ else
   # El modo reunión no corta un dictado en curso, y quitarlo no lo cierra de golpe.
   ejecutar "reunion_no_corta" "BTODICTA_REUNIONTEST" "1" 70
   # El icono dice el estado sin abrir el menú, y sigue siendo plantilla.
-  ejecutar "icono_estados" "BTODICTA_ICONTEST" "1" 60
+  ejecutar_por_sistema "icono_estados" "BTODICTA_ICONTEST" "ICONTEST" 60
   # El menú del icono: pulsa sus elementos de verdad y comprueba lo que enseña.
   ejecutar "menu_rapido" "BTODICTA_MENUTEST" "1" 60
   # Desde FUERA: el modo no toca los ajustes del usuario, y la pausa vence a su
@@ -250,6 +274,13 @@ else
   estatica "lectura_por_trozos" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-lectura-por-trozos.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "memoria_en_disco" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-memoria-en-disco.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
   estatica "conexion_compartida" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-conexion-compartida.py" "${REPO:-$QA_DIR/../..}/Sources/BtoDicta"
+fi
+
+# ¿A nombre de quién quedó el icono? (spec 011) Al FINAL, después de todas las
+# pruebas: son ellas las que podían dejarlo apuntado a nombre de la terminal
+# desde la que corre el QA. Solo lee la lista de la barra; no la repara.
+if [[ -f "${REPO:-$QA_DIR/../..}/scripts/qa-icono-a-su-nombre.py" ]]; then
+  estatica "icono_a_su_nombre" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-icono-a-su-nombre.py"
 fi
 
 # ¿Alguna prueba tocó la configuración real? Se comprueba al final, y cuenta

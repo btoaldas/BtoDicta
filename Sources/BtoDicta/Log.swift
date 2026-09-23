@@ -23,6 +23,13 @@ enum Log {
     /// Registro general (siempre se escribe).
     static func write(_ message: String) { log(.sistema, message) }
 
+    /// Espera a que todo lo encolado esté escrito.
+    ///
+    /// `log` escribe en una cola en segundo plano. Un `exit()` inmediato —el de
+    /// cualquier arnés de prueba— se llevaba por delante las últimas líneas, y con
+    /// ellas justo lo que explicaba por qué había terminado así.
+    static func vaciar() { queue.sync {} }
+
     /// Nota de depuración (solo si modo_desarrollo está activo).
     static func debug(_ message: String) {
         guard Config.devMode() else { return }
