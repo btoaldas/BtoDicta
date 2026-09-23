@@ -10487,15 +10487,27 @@ extension AppDelegate {
                             let sinReunion = lineas("icono barra: RECORDATORIO")
                             // De vuelta a su tamaño: vuelve a verse.
                             item.length = 18
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+                            // Devuelto: tiene que volver a verse. Si entretanto la barra
+                            // se fue de la pantalla (pantalla completa), se espera a que
+                            // vuelva; si no vuelve, se dice que no se pudo medir.
+                            func devuelto(_ intentos: Int) {
                                 let v = medida("devuelto")
-                                chk(v == .visible, "devuelto a su tamaño, vuelve a verse (\(v.texto))")
+                                if case .noSeSabe = v, intentos > 0 {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { devuelto(intentos - 1) }
+                                    return
+                                }
+                                if case .noSeSabe(let m) = v {
+                                    print("ICONOOCULTO devuelto: no se pudo medir (\(m)) — la barra no volvió en 30 s")
+                                } else {
+                                    chk(v == .visible, "devuelto a su tamaño, vuelve a verse (\(v.texto))")
+                                }
                                 chk(lineas("icono barra: RECORDATORIO") == sinReunion,
                                     "RF-06: sin la reunión, ningún recordatorio más")
                                 chk(lineas("icono barra: AVISO") == 1, "RF-01: un solo aviso en toda la sesión")
                                 if mal == 0 { fin(true, "el vigía ve el icono escondido, avisa una vez y recuerda la reunión") }
                                 fin(false, "\(mal) comprobación(es) fallida(s)")
                             }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { devuelto(15) }
                         }
                     }
                     return
@@ -10505,7 +10517,7 @@ extension AppDelegate {
             }
             esperarAviso(120)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 110) { fin(false, "tiempo agotado") }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 140) { fin(false, "tiempo agotado") }
     }
 
     /// BTODICTA_TRIPLEFNTEST=1 — fn fn fn, con eventos sintéticos por el MISMO

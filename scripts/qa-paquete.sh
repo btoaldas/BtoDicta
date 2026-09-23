@@ -261,7 +261,7 @@ else
   ejecutar_por_sistema "icono_estados" "BTODICTA_ICONTEST" "ICONTEST" 60
   # Red de seguridad del icono (spec 012): se esconde de verdad el propio icono y
   # el vigía real tiene que decirlo una vez, y recordar el modo reunión.
-  ejecutar_por_sistema "icono_oculto" "BTODICTA_ICONOOCULTOTEST" "ICONOOCULTO" 130
+  ejecutar_por_sistema "icono_oculto" "BTODICTA_ICONOOCULTOTEST" "ICONOOCULTO" 160
   # fn fn fn cambia el modo reunión sin parar el dictado; lo tardío detiene; el
   # doble no cambia. Eventos sintéticos por el manejador real, sin tocar el teclado.
   ejecutar "triple_fn" "BTODICTA_TRIPLEFNTEST" "1" 90

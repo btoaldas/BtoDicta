@@ -11,6 +11,23 @@
     (ver abajo). El arnés completo se corrió aparte, lanzado por el sistema y con la
     barra a la vista, y pasó.
 
+## Segunda ronda, 2026-09-23 (00:44-00:50)
+
+- **La gracia absorbió un falso «oculto» real.** Al volver del juego a la barra, la
+  copia viva de BtoDicta registró durante un solo latido «oculto: fuera de toda
+  pantalla (1128, 1026)»: la barra ya estaba en pantalla y la ventana del icono aún
+  no había bajado a su sitio. Dos segundos después, «visible». Sin aviso: la gracia
+  de 30 s (D-3) está para esto.
+- **El arnés, repetido con la barra a la vista** y el código de la 0.81.0: visible sin
+  aviso; escondido en (-1894, 949), aviso a los 7,3 s, uno solo; 2 recordatorios con
+  la reunión. La última comprobación («devuelto, vuelve a verse») no se pudo medir:
+  se había vuelto al juego y la barra ya no estaba. El arnés ahora espera hasta 30 s
+  a que la barra vuelva antes de mirar, y si no vuelve lo dice en vez de fallar.
+- **BtoDicta se cerró a las 00:44:41** con un cierre normal —pasó por
+  `applicationWillTerminate`, que apaga la bitácora—, no por un fallo ni por el
+  actualizador. Fue tres segundos después de que la barra volviera a verse; no hay
+  rastro de quién lo pidió. No se volvió a abrir desde aquí.
+
 ## Requerimientos funcionales
 
 | RF | Qué exigía | Cómo se comprobó | Segundo ángulo | Veredicto |
