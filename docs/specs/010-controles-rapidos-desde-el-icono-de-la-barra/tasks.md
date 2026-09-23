@@ -122,17 +122,20 @@ puede fallar en silencio es lo de debajo.
     dentro de los 60 s siguientes al vencimiento.
   - Evidencia (2026-09-22): `scripts/qa-modo-rapido.py t13` con el vigía REAL de 15 s: pausa de 40 s, la aplicación se cierra 5 s y se vuelve a abrir; vuelve **+11,4 s** después del vencimiento (límite 60). Sabotaje (vigía que no arranca) → la pausa no vuelve nunca, ROJO. El primer intento de este sabotaje NO rompió nada: un `return` suelto en Swift se une a la línea siguiente y el vigía seguía ejecutándose. Un sabotaje que no rompe nada no prueba la prueba.
 
-- [ ] T14 (RF-05, RF-04) Los dos ADR
+- [x] T14 (RF-05, RF-04) Los dos ADR
   - Archivos: `docs/adr/013-instante-frente-a-cuenta-atras.md`,
     `docs/adr/014-pausa-y-cesion-dos-banderas.md`
   - Numerados a partir de 013: del 006 al 009 los tomó la spec 008/009, y del 010
     al 012 quedan reservados para la spec 007.
   - Evidencia esperada: los dos archivos con su alternativa descartada.
+  - Evidencia (2026-09-22): `docs/adr/013-instante-frente-a-cuenta-atras.md` y `docs/adr/014-pausa-y-cesion-dos-banderas.md`, cada uno con su alternativa descartada y la medida que la respalda.
 
-- [ ] T15 (todos) Verificación RF por RF
+- [x] T15 (todos) Verificación RF por RF
   - Archivos: `docs/specs/010-controles-rapidos-desde-el-icono-de-la-barra/verificacion.md`
   - Evidencia esperada: cada RF con segundo ángulo; `qa-paquete.sh` en 0.
+  - Evidencia (2026-09-22): `verificacion.md` con los 8 RF y los 4 RNF en «Cumple», cada uno con segundo ángulo; RF-03 con reserva medida (icono oculto por la barra llena, mitigado por el menú del Dock, con prueba en rojo). Cuatro desviaciones y tres lecciones de prueba escritas.
 
-- [ ] T16 (todos) Hito
+- [x] T16 (todos) Hito
   - Archivos: `docs/hitos/2026-09-22-controles-rapidos.md`, `ROADMAP.md`
   - Evidencia esperada: spec a `Implementada` e índice regenerado.
+  - Evidencia (2026-09-22): `docs/hitos/2026-09-22-controles-rapidos.md`; spec en `Implementada`; índice regenerado con `indice-specs.py --escribir`; QA 35 de 35 y suite Swift 47 de 47 en la versión 0.80.0.

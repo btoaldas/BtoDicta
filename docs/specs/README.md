@@ -19,8 +19,9 @@ otra spec con `Modifica: NNN`.
 | 004 | Panel de salud y aviso de saldo | Implementada (0.63.0) | X | funcionalidad | 2026-09-15 | Alberto — 2026-09-15 — «estas ideas me gustan: aviso cuando un proveedor se queda sin saldo… un panel de salud» | ninguna | Especificando |
 | 005 | API de transcripción para servicios externos | Implementada (0.65.0) | X | funcionalidad | 2026-09-18 | Alberto — 2026-09-19 — «continúa con todo bajo goal y loop… ya no necesito que vuelvas a pararte hasta que termines absolutamente todo» | ninguna | Especificando |
 | 006 | Extensión de navegador para la bitácora | Aprobada | X | funcionalidad | 2026-09-20 | Alberto — 2026-09-20 — «aprobado, dale con el plan» | ninguna | Implementando: T26 de T27 |
-| 007 | Asistente de exclusiones con semillas y modo de trabajo | Aprobada | P | funcionalidad | 2026-09-21 | Alberto — 2026-09-21 — «si dale» (a «¿Apruebo la spec y paso al plan?») | ninguna | Lista para tareas |
-| 008 | El texto que se guarda es el que se está leyendo | Aprobada | X | cambio | 2026-09-21 | Alberto — 2026-09-21 — «resuelve aprobado te doy» | 006 | Planificando |
-| 009 | Buscar por palabras en la bitácora | Aprobada | X | funcionalidad | 2026-09-21 | Alberto — 2026-09-21 — «resuelve aprobado te doy» | ninguna | Planificando |
+| 007 | Asistente de exclusiones con semillas y modo de trabajo | Aprobada | P | funcionalidad | 2026-09-21 | Alberto — 2026-09-21 — «si dale» (a «¿Apruebo la spec y paso al plan?») | ninguna | Implementando: T07 de T20 |
+| 008 | El texto que se guarda es el que se está leyendo | Aprobada | X | cambio | 2026-09-21 | Alberto — 2026-09-21 — «resuelve aprobado te doy» | 006 | Lista para tareas |
+| 009 | Buscar por palabras en la bitácora | Aprobada | X | funcionalidad | 2026-09-21 | Alberto — 2026-09-21 — «resuelve aprobado te doy» | ninguna | Lista para tareas |
+| 010 | Controles rápidos desde el icono de la barra | Implementada | P | funcionalidad | 2026-09-22 | Alberto — 2026-09-22 — «si» (a «¿Apruebo la spec y paso al plan?») | ninguna | Especificando |
 
 <!-- sdd:indice:fin -->

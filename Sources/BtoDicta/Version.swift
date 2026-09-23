@@ -8,11 +8,19 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.79.1"
-    static let fecha = "2026-09-21"
+    static let numero = "0.80.0"
+    static let fecha = "2026-09-22"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.80.0", "2026-09-22", [
+            "MODO REUNIÓN, DESDE EL MENÚ DEL ICONO. Mientras está puesto, el dictado no se cierra por silencio ni por duración, y no te interrumpe con avisos. Se puede poner con el dictado YA EMPEZADO, sin cortarlo y sin perder lo grabado: la reunión sigue en la misma grabación. Nace de una reunión de una hora que quedó troceada en once grabaciones porque evitarlo exigía ir a Ajustes",
+            "Al quitarlo vuelve todo como lo tenías —tus ajustes no se tocan: el modo los ignora mientras dura, no los reescribe— y no se cierra de golpe: el silencio empieza a contar desde ese momento",
+            "«NO MIRAR DURANTE…»: pausa la bitácora 15 min, 30 min, 1 h, 2 h o hasta mañana a las 8, y vuelve SOLA a su hora, avisando al empezar y al volver. Aguanta que cierres BtoDicta o reinicies el equipo en medio. Un dictado en mitad de la pausa no la cancela",
+            "EL ICONO DICE EN QUÉ ESTADO ESTÁS sin abrir nada: micrófono (normal), dos personas (modo reunión), dos personas con ondas (grabando en reunión) y pausa",
+            "Mientras grabas, el menú dice cuánto llevas y cuántos MB se van a transcribir al soltar — para que el coste de una sesión larga se vea antes de pagarlo",
+            "Si tu barra de menús está llena, macOS esconde el icono de BtoDicta sin avisar. Estos mismos controles están en el menú del icono del Dock (clic derecho), que ahora enseña siempre el estado real",
+        ]),
         ("0.79.1", "2026-09-22", [
             "EL DICTADO SE CERRABA SOLO MIENTRAS HABLABAS, y era culpa del arreglo de ayer. El umbral que separa tu voz del ruido se puso en un número fijo, elegido midiendo una sala vacía. En una reunión real tu voz medía por DEBAJO de ese número casi todo el rato: el dictado se cerraba a los quince segundos, sin aviso y sin dejar rastro en el registro, y había que volver a pulsar una y otra vez",
             "Medido sobre las grabaciones reales de esa reunión: con el número fijo, 8 de 11 tenían huecos de más de quince segundos «sin voz» mientras se hablaba. Ahora el nivel se mide en CADA sesión respecto al ruido de esa sala, y el hueco mayor baja a 1,2 segundos",

@@ -20,7 +20,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Clic derecho en el ícono del Dock muestra el mismo menú.
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
-        appMenu?.copy() as? NSMenu
+        // Se refresca ANTES de copiar. El menú del Dock es una copia, y sin esto
+        // enseñaría el estado de la última vez que alguien abrió el del icono.
+        //
+        // Importa más de lo que parece: con la barra de menús llena, macOS esconde
+        // el icono de BtoDicta tras la muesca sin avisar —medido en el equipo de
+        // desarrollo el 2026-09-22: el icono estaba en (2, 981), fuera de la
+        // barra—, y entonces el Dock es el ÚNICO sitio desde el que llegar al modo
+        // reunión y a la pausa (spec 010).
+        guard let m = appMenu else { return nil }
+        menuWillOpen(m)
+        return m.copy() as? NSMenu
     }
 
     /// Clic izquierdo en el ícono del Dock (sin ventanas abiertas) → abre la
@@ -10144,6 +10154,15 @@ extension AppDelegate {
             "RNF-01: está en el PRIMER nivel: abrir el menú y pulsar, dos interacciones")
         pulsar(reunion); abrir()
         chk(ModoRapido.enReunion && reunion?.state == .on, "T10: pulsarlo lo pone, y el menú lo marca")
+        // El Dock: con la barra llena es el único camino. El estado cambia SIN
+        // abrir el menú del icono —que es lo que pasa cuando el icono está oculto—
+        // y se pide el del Dock. Sin refrescar antes de copiar, enseñaría el estado
+        // viejo.
+        pulsar(reunion)                       // lo quita; el menú del icono NO se abre
+        let dock = applicationDockMenu(NSApp)
+        chk(!ModoRapido.enReunion && dock?.items.first { $0.tag == AppDelegate.tagModoReunion }?.state == .off,
+            "T10: el menú del Dock lo ofrece y marca el estado REAL, sin haber abierto el del icono")
+        pulsar(reunion); abrir()              // se deja puesto, como estaba
         pulsar(reunion); abrir()
         chk(!ModoRapido.enReunion && reunion?.state == .off, "T10: pulsarlo otra vez lo quita")
 

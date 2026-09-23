@@ -1,6 +1,6 @@
 # Spec 010 — Controles rápidos desde el icono de la barra
 
-- Estado: Aprobada
+- Estado: Implementada
 - Tipo: funcionalidad
 - Nivel: P (heredado del ROADMAP; lo fija sw-ciclo)
 - Fecha: 2026-09-22
