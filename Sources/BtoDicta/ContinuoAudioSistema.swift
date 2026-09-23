@@ -176,6 +176,7 @@ final class ContinuoAudioSistema: NSObject {
 
     fileprivate func recibir(_ muestra: CMSampleBuffer) {
         guard activo, Config.continuoSistemaActivo() else { return }
+        guard !ModoRapido.pausaVigente() else { return }   // pausa del usuario (spec 010)
         guard let pcm = convertir(muestra) else { return }
 
         let n = nivel(pcm)

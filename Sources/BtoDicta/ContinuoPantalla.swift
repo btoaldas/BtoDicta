@@ -125,6 +125,8 @@ final class ContinuoPantalla {
     }
 
     private func capturar() async {
+        // Pausa del usuario (spec 010): ni una captura.
+        guard !ModoRapido.pausaVigente() else { return }
         do {
             let contenido = try await SCShareableContent.excludingDesktopWindows(false,
                                                                                 onScreenWindowsOnly: true)

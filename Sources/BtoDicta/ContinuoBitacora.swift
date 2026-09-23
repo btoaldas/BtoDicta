@@ -17,6 +17,16 @@ enum ContinuoBitacora {
     /// veces y con el módulo apagado (no hace nada).
     static func arrancar() {
         guard Config.continuoActivo() else { return }
+        // La pausa del usuario (spec 010) manda sobre todo lo que intente
+        // arrancar la captura: el lanzamiento, el despertar, un cambio de ajustes.
+        // Es una bandera PROPIA, distinta de la cesión del micrófono al dictado:
+        // esa la revierte el final del dictado, y con una sola bandera colgar un
+        // dictado cancelaría la pausa que el usuario pidió (D-2).
+        if ModoRapido.pausaVigente() {
+            Log.log(.sistema, "bitácora: no arranco — en pausa hasta las \(ModoRapido.pausadaHasta.map(ModoRapido.horaLegible) ?? "?")")
+            ModoRapido.vigilar()
+            return
+        }
         ContinuoIndice.shared.abrir()
         // Lo que quedó a medias en un cierre brusco entra ahora: el archivo
         // sobrevivía pero nadie volvía a mirarlo.

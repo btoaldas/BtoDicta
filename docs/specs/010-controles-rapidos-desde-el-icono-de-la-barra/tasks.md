@@ -1,9 +1,9 @@
 # Tareas 010 — Controles rápidos desde el icono de la barra
 
-- Estado: Borrador
+- Estado: Aprobado
 - Fecha: 2026-09-22
 - Spec: `spec.md` (Aprobada 2026-09-22) · Plan: `plan.md` (Aprobado 2026-09-22)
-- Aprobadas por: PENDIENTE
+- Aprobado por: Alberto — 2026-09-22 — «si goal todas las tareas hasta terminar todo una por una»
 
 Cada tarea cita su RF y dice qué evidencia la cierra. Un `[x]` sin `Evidencia:`
 es una promesa, no un hecho.
@@ -17,41 +17,46 @@ puede fallar en silencio es lo de debajo.
 
 ## Fase A — El estado y la pausa
 
-- [ ] T01 (RF-04, RF-05, RF-06) El estado: reunión y pausa, sin interfaz
+- [x] T01 (RF-04, RF-05, RF-06) El estado: reunión y pausa, sin interfaz
   - Archivos: `Sources/BtoDicta/ModoRapido.swift`
   - `enReunion`, `pausadaHasta` como **instante**, `pausar(minutos:)`,
     `reanudar()`, `pausaVigente(ahora:)`. Todo con el reloj como parámetro, para
     poder probarlo sin esperar media hora.
   - Evidencia esperada: compila y el estado se guarda y se recupera de
     `config.json` en las dos claves del plan, y solo en esas.
+  - Evidencia (2026-09-22): `ModoRapido.swift` compila. Solo escribe `modo_reunion` y `bitacora_pausada_hasta` (`clavesDeEstado`, fijado por `testSoloDosClavesDeEstado`); la comprobación de que no toca ninguna otra es T08.
 
-- [ ] T02 (RF-05, RF-06) Pruebas del vencimiento, vistas en ROJO
+- [x] T02 (RF-05, RF-06) Pruebas del vencimiento, vistas en ROJO
   - Archivos: `Tests/BtoDictaTests/ModoRapidoTests.swift`
   - Casos: vence a su hora; no vence antes; tras un «reinicio» simulado sigue
     vigente con el tiempo que le quedaba; tras una «suspensión» de dos horas ya
     venció; pausar estando pausada sustituye el plazo, no lo acumula.
   - Evidencia esperada: sabotaje —guardar minutos restantes en vez del instante—
     con la prueba del reinicio en rojo, y verde tras restaurar.
+  - Evidencia (2026-09-22): `swift test --filter ModoRapidoTests` → 8 de 8. Sabotaje con la alternativa descartada (guardar los segundos que faltan y sumarlos al cargar): `testTrasUnReinicioLeQuedaElTiempoDeReloj` y `testTrasUnaSuspensionLargaYaVencio` en ROJO. Restaurado: 8 de 8.
 
-- [ ] T03 (RF-04) La pausa llega de verdad a la bitácora
+- [x] T03 (RF-04) La pausa llega de verdad a la bitácora
   - Archivos: `Sources/BtoDicta/ContinuoBitacora.swift`, `Sources/BtoDicta/ContinuoPantalla.swift`
   - Bandera **propia**, separada de la cesión del micrófono al dictado (D-2).
     Durante la pausa: ni audio ni capturas.
   - Evidencia esperada: con una pausa activa, 0 anotaciones nuevas en la bitácora
     durante la ventana medida.
+  - Evidencia (2026-09-22): Arnés `BTODICTA_PAUSATEST` contra carpeta aislada: control sin pausa 329 244 bytes en 10 s; con pausa, **0 bytes nuevos en 12 s**. La pausa se comprueba en el arranque y en las tres entradas de datos (audio, pantalla, audio del sistema).
 
-- [ ] T04 (RF-05) El vencimiento, con su aviso
+- [x] T04 (RF-05) El vencimiento, con su aviso
   - Archivos: `Sources/BtoDicta/ModoRapido.swift`
   - `DispatchSourceTimer` en cola propia (D-3) que comprueba contra el reloj cada
     15 s. Al vencer: reanuda y avisa.
   - Evidencia esperada: arnés con una pausa de un minuto; se reanuda antes de 60 s
     después del vencimiento, con la línea de aviso en el registro.
+  - Evidencia (2026-09-22): Mismo arnés: vence y reanuda 0,1 s después del vencimiento (intervalo 3 s); tras volver entran 956 612 bytes. Con el intervalo real de 15 s corre dentro del QA.
 
-- [ ] T05 (RF-04) La pausa no toca el dictado en curso [P]
+- [x] T05 (RF-04) La pausa no toca el dictado en curso [P]
   - Archivos: `Sources/BtoDicta/ContinuoBitacora.swift`
   - Evidencia esperada: prueba de que terminar un dictado durante una pausa no la
     cancela. Es el fallo que evita D-2: con una sola bandera, colgar un dictado
     reanudaría la bitácora que el usuario pausó.
+  - Evidencia (2026-09-22): Mismo arnés: se simula un dictado entero —ceder y recuperar el micrófono— en mitad de la pausa, y siguen entrando 0 bytes. Sabotaje: sin las dos cerraduras de `ContinuoAudio`, ese mismo dictado reabre el micrófono y **escribe 399 968 bytes durante la pausa**. Es exactamente el fallo que D-2 evita.
 
 ## Fase B — El modo reunión
 

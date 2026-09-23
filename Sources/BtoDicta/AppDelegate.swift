@@ -935,6 +935,99 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             return
         }
+        // La pausa de la bitácora, de punta a punta. BTODICTA_PAUSATEST=1
+        //
+        // Corre SIEMPRE contra una carpeta aislada (lo exige: sin BTODICTA_DIR no
+        // arranca), porque medir una pausa significa dejar de grabar, y el sitio
+        // donde se prueba eso nunca es la bitácora de verdad.
+        //
+        // Cubre tres tareas de la spec 010 en un solo recorrido:
+        //   T03  con la pausa puesta no entra ni un byte de audio ni de pantalla
+        //   T05  terminar un dictado durante la pausa NO la cancela
+        //   T04  la pausa vence sola, reanuda y lo deja escrito
+        if ProcessInfo.processInfo.environment["BTODICTA_PAUSATEST"] == "1" {
+            guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+                print("PAUSA FALLA — se niega a correr sin BTODICTA_DIR: pausaría la bitácora real")
+                exit(2)
+            }
+            let raiz = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
+            try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+            Config.set("continuo_activo", to: true)
+            Config.set("continuo_carpeta", to: raiz.path)
+            Config.set("continuo_audio_modo", to: "siempre")
+            Config.set("continuo_sistema_activo", to: false)
+            Config.set("continuo_pantalla_activa", to: false)
+            Config.set(ModoRapido.clavePausa, to: 0.0)
+
+            var mal = 0
+            func chk(_ ok: Bool, _ q: String) { print("PAUSA \(ok ? "✓" : "✗") \(q)"); fflush(stdout); if !ok { mal += 1 } }
+            /// Bytes de audio escritos en la carpeta: lo único que demuestra que
+            /// se grabó o que no.
+            func bytes() -> Int {
+                let fm = FileManager.default
+                guard let e = fm.enumerator(at: raiz, includingPropertiesForKeys: [.fileSizeKey]) else { return 0 }
+                var total = 0
+                for case let u as URL in e where ["pcm", "wav", "m4a", "caf"].contains(u.pathExtension) {
+                    total += (try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                }
+                return total
+            }
+
+            ContinuoBitacora.arrancar()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                let b0 = bytes()
+                chk(b0 > 0, "control: sin pausa, la bitácora graba (\(b0) bytes en 10 s)")
+
+                // T03 — pausa de 30 s.
+                ModoRapido.pausar(hasta: Date().addingTimeInterval(30))
+                let vence = ModoRapido.pausadaHasta ?? Date()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    let b1 = bytes()
+
+                    // T05 — un dictado empieza y termina en mitad de la pausa.
+                    ContinuoBitacora.cederMicrofono {
+                        ContinuoBitacora.recuperarMicrofono()
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+                        let b2 = bytes()
+                        chk(b2 == b1, "T03: durante la pausa no entra audio (\(b2 - b1) bytes nuevos en 12 s)")
+                        chk(ModoRapido.pausaVigente(),
+                            "T05: terminar un dictado en mitad de la pausa no la cancela")
+
+                        // T04 — esperar al vencimiento y medir cuánto tarda en volver.
+                        var vuelta: Date?
+                        let vigia = Timer(timeInterval: 0.5, repeats: true) { _ in
+                            if vuelta == nil, !ModoRapido.pausaVigente(), ModoRapido.pausadaHasta == nil {
+                                vuelta = Date()
+                            }
+                        }
+                        RunLoop.main.add(vigia, forMode: .common)
+                        let espera = max(vence.timeIntervalSinceNow, 0) + 20
+                        DispatchQueue.main.asyncAfter(deadline: .now() + espera) {
+                            vigia.invalidate()
+                            if let v = vuelta {
+                                let retraso = v.timeIntervalSince(vence)
+                                chk(retraso < 60, "T04: vence y se reanuda sola (\(String(format: "%.1f", retraso)) s después del vencimiento; límite 60)")
+                            } else {
+                                chk(false, "T04: la pausa venció y NO se reanudó")
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+                                let b3 = bytes()
+                                chk(b3 > b2, "T04: tras volver, se graba otra vez (\(b3 - b2) bytes nuevos)")
+                                print("PAUSA \(mal == 0 ? "TODO OK — la pausa calla, aguanta un dictado y vuelve sola" : "FALLA (\(mal))")")
+                                fflush(stdout)
+                                ContinuoBitacora.detener()
+                                exit(mal == 0 ? 0 : 1)
+                            }
+                        }
+                    }
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 150) {
+                print("PAUSA FALLA timeout"); fflush(stdout); exit(4)
+            }
+            return
+        }
         // El borde de aviso, para poder MIRARLO. BTODICTA_BORDETEST=1
         // Lo deja encendido y se queda: un aviso visual no se da por bueno
         // porque compile, se da por bueno cuando se ha visto.

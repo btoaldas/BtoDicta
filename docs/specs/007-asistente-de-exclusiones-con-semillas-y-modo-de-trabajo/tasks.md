@@ -1,6 +1,6 @@
 # Tareas 007 — Asistente de exclusiones con semillas y modo de trabajo
 
-- Estado: Aprobadas
+- Estado: Aprobado
 - Fecha: 2026-09-21
 - Spec: `spec.md` (Aprobada 2026-09-21) · Plan: `plan.md` (Aprobado 2026-09-21)
 - Aprobado por: Alberto — 2026-09-21 — «sigue adelante las tareas y arranca por t01»

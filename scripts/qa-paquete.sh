@@ -136,7 +136,7 @@ ejecutar() {
   # aparte. Confiar en que restauren al terminar ya falló una vez: una sección
   # añadida al final volvió a machacar y `exit()` no ejecuta ningún `defer`.
   case "$id" in
-    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono)
+    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta)
       desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id") ;;
   esac
   inicio="$(/bin/date +%s)"
@@ -213,6 +213,9 @@ else
   # las grabaciones de dictado que haya en el equipo: el fallo vivía justo en la
   # diferencia entre el silencio de una sala vacía y una reunión de verdad.
   estatica "deteccion_voz" /usr/bin/python3 "${REPO:-$QA_DIR/../..}/scripts/qa-deteccion-voz.py"
+  # La pausa de la bitácora (spec 010): calla, aguanta un dictado y vuelve sola.
+  # Siempre contra carpeta aislada: medir una pausa es dejar de grabar.
+  ejecutar "pausa_bitacora" "BTODICTA_PAUSATEST" "1" 150
   # La bitácora no puede robarle el micrófono al dictado que arranca. Provoca la
   # reconciliación sin parar durante el arranque: una carrera no se espera, se fuerza.
   ejecutar "carrera_microfono" "BTODICTA_CARRERAMICROTEST" "1" 60

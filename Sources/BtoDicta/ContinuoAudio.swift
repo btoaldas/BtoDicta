@@ -169,6 +169,10 @@ final class ContinuoAudio {
         // Sin esto, el segundo arranque abría otro trozo y dejaba al tap del
         // primero escribiendo en un descriptor ya cerrado: 0 bytes en disco.
         guard !activo, !estaCedido, !montando else { return }
+        // Pausada por el usuario: no se abre el micrófono. Esto es lo que impide
+        // que terminar un dictado —que llama a `reanudar()`— devuelva la
+        // bitácora a la vida en mitad de una pausa (spec 010, T05).
+        guard !ModoRapido.pausaVigente() else { return }
         montando = true
         defer { montando = false }
         if Config.continuoSoloConCorriente(), !EnergiaMac.conCorriente() {
@@ -398,6 +402,9 @@ final class ContinuoAudio {
 
     private func recibir(_ trozo: Data, rms: Double) {
         guard activo, !estaCedido else { return }
+        // Segunda cerradura: aunque algo reabriera el micrófono, durante una
+        // pausa no se escribe ni un byte.
+        guard !ModoRapido.pausaVigente() else { return }
 
         if Config.continuoAudioModo() == "voz" {
             // Puerta por energía (no es un detector neuronal: es un umbral sobre
