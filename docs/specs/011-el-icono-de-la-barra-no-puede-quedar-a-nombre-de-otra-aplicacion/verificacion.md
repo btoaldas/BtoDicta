@@ -43,5 +43,7 @@
   `ec.bto.pruebaicono`); se quitan en Ajustes → Barra de menús.
 - **`make reparar-icono` sigue dentro de `make instalar-local`.** Retirarlo necesita
   un sí explícito y separado; hasta entonces, el agente instala con `make install`.
+  **Resuelto el 2026-09-24:** Alberto dio el sí («quita reparar-icono de
+  instalar-local») y se retiró. `make reparar-icono` sigue existiendo, solo a mano.
 - **Si macOS cambiara** cómo lanza las aplicaciones y dejara de ser `launchd` el
   padre, la app se quedaría sin icono: la guardia en vivo del QA lo detectaría.

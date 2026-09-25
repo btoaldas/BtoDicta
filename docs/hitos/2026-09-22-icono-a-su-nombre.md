@@ -41,7 +41,7 @@ otra vez con `open`, sigue oculta.
 
 - BtoStats, BtoStatsTest, siprobe y Neptunus siguen colgadas de Claude Code: otras
   aplicaciones, mismo fallo.
-- `make reparar-icono` sigue en el instalador hasta que se decida retirarlo.
+- `make reparar-icono` sigue en el instalador hasta que se decida retirarlo. **Retirado el 2026-09-24** con el sí de Alberto; queda solo a mano.
 - La mediana de texto de la extensión frente al OCR bajó a 0,9× (spec 006): ajena a
   esto, se deja en rojo.
 

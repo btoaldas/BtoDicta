@@ -122,22 +122,24 @@ install: bundle
 # macOS 26 puede asociar el ícono a la app que lanzó BtoDicta durante el
 # desarrollo. Este mantenimiento no abre AppKit: respalda y elimina únicamente
 # la referencia cruzada ec.bto.btodicta de una fila extranjera.
+#
+# SOLO A MANO, para una fila envenenada de antes de la spec 011. Reescribe los
+# ajustes de la barra del sistema: ningún otro objetivo lo llama.
 reparar-icono:
 	@xcrun swift scripts/reparar-icono-barra.swift
 
 probar-reparacion-icono:
 	@xcrun swift scripts/reparar-icono-barra.swift --probar
 
-# Flujo de desarrollo seguro: evita reinstalar sobre un proceso vivo, abre la
-# app nueva y corrige la asociación que macOS 26 puede crear con la herramienta
-# que lanzó el build (Codex/Terminal). No forma parte del DMG ni toca otras apps.
+# Flujo de desarrollo: evita reinstalar sobre un proceso vivo y abre la app
+# nueva con `open`, como la abre el sistema. Así el icono queda a su nombre
+# (spec 011) y no hace falta reparar nada después. No forma parte del DMG ni
+# toca otras apps ni los ajustes del sistema.
 instalar-local:
 	-killall $(APP)
 	$(MAKE) install
 	open -a /Applications/$(APP).app
-	sleep 3
-	$(MAKE) reparar-icono
-	@echo "BtoDicta instalado, abierto y con la barra verificada"
+	@echo "BtoDicta instalado y abierto por el sistema: el icono queda a su nombre"
 
 clean:
 	rm -rf build
