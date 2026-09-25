@@ -248,6 +248,11 @@ enum ResumenCorreo {
     /// equipo despierte —o la aplicación se reabra— más tarde de la hora fijada.
     static func revisarHorarios(ahora: Date = Date()) {
         guard Config.correoAutomatico(), !Config.correoDestinatarios().isEmpty else { return }
+        // Sin red no se empieza: el resumen gasta una ronda de llamadas a la IA
+        // antes de intentar el envío. Con el equipo dormido a las 07:00 lo hacía
+        // cinco veces seguidas, y cada una apartaba proveedores que estaban bien.
+        // La hora sigue contando: sale en la primera vuelta con red.
+        guard EstadoRed.shared.hayRed else { return }
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let d = DateFormatter(); d.dateFormat = "yyyy-MM-dd"
         let hhmm = f.string(from: ahora), hoy = d.string(from: ahora)

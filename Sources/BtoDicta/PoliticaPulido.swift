@@ -78,7 +78,16 @@ final class CuarentenaPulido {
 
     @discardableResult
     func registrar(_ identidad: String, local: Bool, codigo: Int, cuerpo: String,
-                   error: Error?, ahora: Date = Date()) -> TimeInterval {
+                   error: Error?, ahora: Date = Date(),
+                   redLocal: Bool = EstadoRed.shared.hayRed) -> TimeInterval {
+        // Sin red en ESTE equipo, el fallo no es del proveedor: no se le aparta
+        // ni se le sube la cuenta. Solo se salta la nube unos segundos.
+        if error != nil, !redLocal {
+            if !local {
+                lock.lock(); nubeHasta = ahora.addingTimeInterval(15); lock.unlock()
+            }
+            return 0
+        }
         let segundos = Self.duracion(codigo: codigo, cuerpo: cuerpo, error: error,
                                      identidad: identidad)
         guard segundos > 0 else { return 0 }

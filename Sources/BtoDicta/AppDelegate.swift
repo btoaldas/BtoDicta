@@ -493,6 +493,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func rssMBGlobal() -> Double { MemoriaProceso.huellaMB() }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Saber si ESTE equipo tiene red: un corte propio no aparta proveedores y
+        // lo de fondo espera a que vuelva (2026-09-24).
+        EstadoRed.shared.arrancar()
         // La extensión del navegador, al día en su ruta fija (spec 006, RF-11).
         // En segundo plano: comparar dos versiones y copiar ocho archivos no
         // debe retrasar el arranque de la aplicación ni un milisegundo.
@@ -4894,6 +4897,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         probarIconoOcultoSiSePidio()
         probarTripleFnSiSePidio()
         probarRafagaMicrofonoSiSePidio()
+        probarFormatoViejoSiSePidio()
+        probarCesionLentaSiSePidio()
 
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
         registerHotKey()
@@ -6588,12 +6593,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Incluso si el listener todavía figura "preparando", cancelar primero
         // su Task/tap evita la carrera de dos AVAudioEngine por fn o por wake.
         iniciandoDictado = true
+        // El dictado NO espera indefinidamente a nadie. Pedir el micrófono a la
+        // bitácora y al oyente es cortesía; si en 1,5 s no lo sueltan —su cola
+        // ocupada, un motor atascado—, el dictado arranca igual: macOS deja
+        // leer el mismo micrófono a dos a la vez. Antes, si la cesión no
+        // terminaba, la tecla respondía y no se grababa nada.
+        var arrancado = false
+        let arrancar: (String) -> Void = { [weak self] via in
+            guard let self, !arrancado else { return }
+            arrancado = true
+            if via != "cesion" {
+                Log.log(.sistema, "dictado: la bitácora o el oyente no soltaron el micrófono en 1,5 s — arranco igual")
+            }
+            self.startDictationAhora()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.plazoCesionMicrofono) { arrancar("plazo") }
         // La bitácora continua suelta el micrófono ANTES que el listener: es un
         // tercer dueño posible del dispositivo y el dictado tiene prioridad
         // absoluta sobre los dos. Vuelve sola al cerrar el dictado.
         ContinuoBitacora.cederMicrofono {
             ActivacionVoz.shared.suspender { [weak self] in
-                guard let self else { return }
+                guard self != nil else { return }
                 // `iniciandoDictado` se mantiene EN ALTO hasta que el grabador
                 // tenga de verdad el micrófono. Lo limpia `startDictationAhora`,
                 // por todos sus caminos de salida.
@@ -6612,10 +6632,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 // el motor de embeddings y pide la URL del navegador por
                 // AppleScript. Y falla de la peor forma: la tecla responde, el
                 // registro dice «iniciar», y no se graba nada.
-                self.startDictationAhora()
+                arrancar("cesion")
             }
         }
     }
+
+    /// Cuánto espera el dictado a que la bitácora y el oyente suelten el micrófono.
+    static var plazoCesionMicrofono: TimeInterval = 1.5
 
     /// Main-only: conserva la semántica push-to-talk aunque antes haya que
     /// esperar brevemente a que Apple Speech libere el dispositivo.
@@ -10713,5 +10736,123 @@ extension AppDelegate {
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { print("RAFAGA FALLA timeout"); fflush(stdout); exit(4) }
+    }
+}
+
+// MARK: - Prueba: el dictado arranca aunque el micrófono haya cambiado de frecuencia
+extension AppDelegate {
+
+    /// BTODICTA_FORMATOVIEJOTEST=1 — el fallo del 21 al 23 de septiembre: el
+    /// micrófono pasaba de 48 000 a 44 100 Hz (o a los 24 000 de unos AirPods en
+    /// llamada) y el dictado siguiente no arrancaba; solo reiniciar la aplicación
+    /// lo arreglaba. Aquí se deja el motor del grabador en la frecuencia vieja,
+    /// como lo dejaba ese cambio, y se exige que el dictado grabe igual.
+    /// Solo con carpeta aislada.
+    fileprivate func probarFormatoViejoSiSePidio() {
+        guard ProcessInfo.processInfo.environment["BTODICTA_FORMATOVIEJOTEST"] == "1" else { return }
+        guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+            print("FORMATO FALLA — se niega a correr sin BTODICTA_DIR"); exit(2)
+        }
+        Config.set("continuo_activo", to: false)
+        var mal = 0
+        func chk(_ ok: Bool, _ q: String) { print("FORMATO \(ok ? "✓" : "✗") \(q)"); fflush(stdout); if !ok { mal += 1 } }
+        /// Un dictado corto: arranca, graba 1,5 s y devuelve los bytes.
+        func grabar(_ nombre: String, _ hecho: @escaping (Int, String?) -> Void) {
+            do { try recorder.start() } catch {
+                hecho(-1, error.localizedDescription); return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                let b = self?.recorder.bytesGrabados ?? 0
+                _ = self?.recorder.stop()
+                hecho(b, nil)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self else { exit(2) }
+            grabar("primero") { b, err in
+                chk(b > 0, "primer dictado graba (\(b) bytes\(err.map { " — \($0)" } ?? ""))")
+                let vieja = self.recorder.envejecerFormatoParaPrueba()
+                print("FORMATO medida: motor del grabador dejado en \(vieja.map { "\(Int($0)) Hz" } ?? "¿?"), como tras un cambio de frecuencia")
+                grabar("tras el cambio") { b2, err2 in
+                    chk(b2 > 0, "tras el cambio de frecuencia, el dictado siguiente graba (\(b2) bytes\(err2.map { " — \($0)" } ?? ""))")
+                    // Y otra vez, por si el arreglo solo sirviera una vez.
+                    _ = self.recorder.envejecerFormatoParaPrueba()
+                    grabar("otra vez") { b3, err3 in
+                        chk(b3 > 0, "y otra vez (\(b3) bytes\(err3.map { " — \($0)" } ?? ""))")
+                        // Si el micrófono elegido no arranca, el dictado sigue con el
+                        // del sistema: el dictado es lo que no puede fallar.
+                        self.recorder.simularFalloDelElegido = true
+                        grabar("respaldo") { b4, err4 in
+                        self.recorder.simularFalloDelElegido = false
+                        let reg = ((try? String(contentsOf: URL(fileURLWithPath: dir).appendingPathComponent("btodicta.log"), encoding: .utf8)) ?? "")
+                        chk(b4 > 0 && reg.contains("el dictado arrancó con el micrófono del sistema"),
+                            "si el micrófono elegido falla, graba con el del sistema y lo deja escrito (\(b4) bytes\(err4.map { " — \($0)" } ?? ""))")
+                        print("FORMATO \(mal == 0 ? "OK — el dictado arranca aunque el micrófono cambie de frecuencia" : "FALLA (\(mal))")")
+                        fflush(stdout); exit(mal == 0 ? 0 : 1)
+                        }
+                    }
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { print("FORMATO FALLA timeout"); fflush(stdout); exit(4) }
+    }
+}
+
+// MARK: - Prueba: el dictado no espera a que la bitácora suelte el micrófono
+extension AppDelegate {
+
+    /// BTODICTA_CESIONLENTATEST=1 — la bitácora tarda seis segundos en soltar el
+    /// micrófono. El dictado tiene que grabar igual, sin esperarla más de su
+    /// plazo. Y al cerrar el dictado la bitácora vuelve. Solo con carpeta aislada.
+    fileprivate func probarCesionLentaSiSePidio() {
+        guard ProcessInfo.processInfo.environment["BTODICTA_CESIONLENTATEST"] == "1" else { return }
+        guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+            print("CESION FALLA — se niega a correr sin BTODICTA_DIR"); exit(2)
+        }
+        let raiz = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
+        try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        Config.set("continuo_activo", to: true)
+        Config.set("continuo_carpeta", to: raiz.path)
+        Config.set("continuo_audio_modo", to: "siempre")
+        Config.set("continuo_pantalla_activa", to: false)
+        Config.set("continuo_sistema_activo", to: false)
+        Config.set("silencio_max_seg", to: 0.0)
+        let registro = URL(fileURLWithPath: dir).appendingPathComponent("btodicta.log")
+        func cuenta(_ que: String) -> Int {
+            Log.vaciar()
+            return ((try? String(contentsOf: registro, encoding: .utf8)) ?? "")
+                .components(separatedBy: "\n").filter { $0.contains(que) }.count
+        }
+        var mal = 0
+        func chk(_ ok: Bool, _ q: String) { print("CESION \(ok ? "✓" : "✗") \(q)"); fflush(stdout); if !ok { mal += 1 } }
+        ContinuoAudio.shared.arrancar()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self else { exit(2) }
+            chk(cuenta("bitácora: audio en marcha") >= 1, "la bitácora tiene el micrófono antes del dictado")
+            ContinuoAudio.shared.retrasoCesionPrueba = 6
+            let pedido = Date()
+            self.startDictation()
+            var grabandoEn: Date?
+            let t = Timer(timeInterval: 0.05, repeats: true) { tm in
+                if self.recorder.isRecording, grabandoEn == nil { grabandoEn = Date(); tm.invalidate() }
+            }
+            RunLoop.main.add(t, forMode: .common)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                let espera = grabandoEn.map { $0.timeIntervalSince(pedido) }
+                print("CESION medida: la bitácora tarda 6 s en soltar; el dictado grabó a los \(espera.map { String(format: "%.1f s", $0) } ?? "— no grabó")")
+                chk((espera ?? 99) < 2.5, "el dictado arranca sin esperar a la bitácora más de su plazo")
+                chk(self.recorder.bytesGrabados > 0, "y graba audio (\(self.recorder.bytesGrabados) bytes)")
+                // Cerrar el dictado: cuando la cesión termine, la bitácora vuelve.
+                ContinuoAudio.shared.retrasoCesionPrueba = 0
+                let antes = cuenta("bitácora: audio en marcha")
+                self.cancelDictation(silencioso: true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                    chk(cuenta("bitácora: audio en marcha") > antes, "cerrado el dictado, la bitácora vuelve a grabar")
+                    print("CESION \(mal == 0 ? "OK — el dictado no espera a la bitácora, y la bitácora vuelve" : "FALLA (\(mal))")")
+                    fflush(stdout); exit(mal == 0 ? 0 : 1)
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { print("CESION FALLA timeout"); fflush(stdout); exit(4) }
     }
 }

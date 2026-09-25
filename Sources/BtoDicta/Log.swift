@@ -66,18 +66,49 @@ enum Log {
     private static func rotateIfNeeded() {
         let week = stamp("yyyy-'W'ww")
         if currentWeekStamp == nil { currentWeekStamp = readWeekMarker() ?? week }
-        guard currentWeekStamp != week else { return }
+        switch decisionRotacion(enMemoria: currentWeekStamp!, enDisco: readWeekMarker(), actual: week) {
+        case .nada: return
+        case .adoptar: currentWeekStamp = week; return
+        case .rotar: break
+        }
 
         if FileManager.default.fileExists(atPath: fileURL.path),
            let contenido = try? Data(contentsOf: fileURL), !contenido.isEmpty {
             try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
-            let destino = logsDir.appendingPathComponent("btodicta-\(currentWeekStamp!).log.gz")
+            let destino = destinoLibre("btodicta-\(currentWeekStamp!)")
             if let comprimido = gzip(contenido) { try? comprimido.write(to: destino) }
             try? FileManager.default.removeItem(at: fileURL)
         }
         currentWeekStamp = week
         writeWeekMarker(week)
         podarArchivos()
+    }
+
+    enum Rotacion: Equatable { case nada, adoptar, rotar }
+
+    /// Otro proceso que escribe en la misma carpeta —una prueba, un arnés— puede
+    /// haber rotado ya. Se mira la marca del DISCO, no solo la de memoria: si ya
+    /// es de esta semana, el archivo vivo ya es el nuevo y no se toca. Sin esto,
+    /// un proceso que arrancó antes de medianoche volvía a «rotar» y sobrescribía
+    /// el archivo de la semana con lo poco escrito tras la rotación buena: así se
+    /// perdió la semana del 14 al 21 de septiembre de 2026.
+    static func decisionRotacion(enMemoria: String, enDisco: String?, actual: String) -> Rotacion {
+        if enMemoria == actual { return .nada }
+        if enDisco == actual { return .adoptar }
+        return .rotar
+    }
+
+    /// Un archivo de semana nunca se sobrescribe: si ya existe, el siguiente
+    /// lleva un sufijo. Perder líneas repetidas no cuesta; perder una semana, sí.
+    static func destinoLibre(_ base: String, en carpeta: URL? = nil) -> URL {
+        let dir = carpeta ?? logsDir
+        var destino = dir.appendingPathComponent("\(base).log.gz")
+        var n = 2
+        while FileManager.default.fileExists(atPath: destino.path) {
+            destino = dir.appendingPathComponent("\(base)-\(n).log.gz")
+            n += 1
+        }
+        return destino
     }
 
     private static func podarArchivos() {

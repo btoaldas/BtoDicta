@@ -125,7 +125,7 @@ enum ContinuoRutinas {
     /// transcrito y leído al minuto) y después el documento con su prompt y su
     /// rango. En seco (variable de entorno) se detiene justo antes de llamar a
     /// la IA: deja la mecánica verificable sin enviar nada a nadie.
-    static func ejecutar(_ r: RutinaResumen) {
+    static func ejecutar(_ r: RutinaResumen, reintento: Int = 0) {
         // El interruptor maestro del resumen con IA manda sobre las rutinas:
         // es el consentimiento de que el material pueda salir hacia un modelo.
         // Con él apagado, ninguna rutina envía nada.
@@ -161,8 +161,20 @@ enum ContinuoRutinas {
                     // Registrarlo como «falló» hacía ruido y escondía los reales.
                     if let er = e as? ContinuoResumen.ErrorResumen, er == .sinMaterial {
                         Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» omitida — sin material en el rango")
+                    } else if reintento < 2 {
+                        // Su hora ya quedó anotada: sin reintento, el resumen de
+                        // esas tres horas se perdía por un corte de red de un
+                        // minuto. Sin red, espera a que vuelva; con red, diez
+                        // minutos. Dos veces como mucho.
+                        if EstadoRed.shared.hayRed {
+                            Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» falló — \(e.localizedDescription) · reintento en 10 min")
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 600) { ejecutar(r, reintento: reintento + 1) }
+                        } else {
+                            Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» falló sin red — la repito en cuanto vuelva")
+                            EstadoRed.shared.cuandoHayaRed { ejecutar(r, reintento: reintento + 1) }
+                        }
                     } else {
-                        Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» falló — \(e.localizedDescription)")
+                        Log.log(.sistema, "bitácora: rutina «\(r.descripcion)» falló — \(e.localizedDescription) · sin más reintentos")
                     }
                 }
             }

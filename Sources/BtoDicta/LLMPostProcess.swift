@@ -1153,7 +1153,7 @@ enum LLMPostProcess {
                 // nube — todos van a fallar igual y solo suman 16 líneas al
                 // registro y segundos de espera. Directo al primer motor LOCAL
                 // que quede en la cascada; si no hay, texto original. Una línea.
-                if !ia.local, SinConexion.es(error) {
+                if !ia.local, SinConexion.es(error) || (error != nil && !EstadoRed.shared.hayRed) {
                     let locales = resto.filter { $0.local }
                     if let primero = locales.first {
                         Log.write("pulido: sin conexión a internet → salto directo al motor local \(primero.id)")

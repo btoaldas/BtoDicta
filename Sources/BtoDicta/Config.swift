@@ -25,6 +25,16 @@ struct Config {
             try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
             return u
         }
+        // Las pruebas unitarias corren en su propio proceso, sin desvío: escribían
+        // en el registro real y hasta lo rotaban. El 21 de septiembre de 2026 una
+        // rotación de otro proceso, a medianoche, sobrescribió el archivo de la
+        // semana anterior con 29 líneas: una semana entera de registro perdida.
+        if NSClassFromString("XCTestCase") != nil {
+            let u = FileManager.default.temporaryDirectory
+                .appendingPathComponent("btodicta-pruebas-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+            try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
+            return u
+        }
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".btodicta")
     }()
 

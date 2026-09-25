@@ -5,7 +5,17 @@ import Carbon.HIToolbox
 // MARK: - Grabadora (micrófono → PCM16 16 kHz mono, con chunks y nivel)
 
 final class Recorder {
-    private let engine = AVAudioEngine()
+    /// UN MOTOR NUEVO EN CADA DICTADO (se crea en `arrancarMotor`).
+    ///
+    /// Era uno solo para toda la vida de la aplicación, y guarda el formato del
+    /// micrófono de la primera vez. Cuando otra aplicación cambia la frecuencia
+    /// del micrófono (48 000 ↔ 44 100 Hz) o entra un auricular (24 000 en una
+    /// llamada), el motor seguía con la vieja y no arrancaba: error -10868, sin
+    /// una línea en el registro, y el dictado muerto hasta reiniciar la
+    /// aplicación. Visto del 21 al 23 de septiembre de 2026: tres fn fn seguidos
+    /// sin grabar, y un reinicio que lo «arreglaba». Crear uno cuesta
+    /// milisegundos; reusarlo costaba dictados.
+    private var engine = AVAudioEngine()
     /// Ventana reciente de PCM, NO el dictado entero.
     ///
     /// Hasta 0.63.3 esto acumulaba todo lo hablado: seis horas eran 659 MB en
@@ -142,6 +152,25 @@ final class Recorder {
         return wav
     }
 
+    /// Solo pruebas: el primer intento, con el micrófono elegido, falla.
+    var simularFalloDelElegido = false
+
+    /// Solo pruebas: deja el motor como lo deja un cambio de frecuencia del
+    /// micrófono —lo cambian otras aplicaciones, o un auricular que entra—: el
+    /// formato del lado de la app sigue en la frecuencia vieja. Devuelve la
+    /// frecuencia vieja que quedó puesta.
+    func envejecerFormatoParaPrueba() -> Double? {
+        guard let au = engine.inputNode.audioUnit else { return nil }
+        var asbd = AudioStreamBasicDescription()
+        var tam = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        guard AudioUnitGetProperty(au, kAudioUnitProperty_StreamFormat,
+                                   kAudioUnitScope_Output, 1, &asbd, &tam) == noErr else { return nil }
+        asbd.mSampleRate = asbd.mSampleRate == 44100 ? 48000 : 44100
+        guard AudioUnitSetProperty(au, kAudioUnitProperty_StreamFormat,
+                                   kAudioUnitScope_Output, 1, &asbd, tam) == noErr else { return nil }
+        return asbd.mSampleRate
+    }
+
     func start(preloadPCM: Data = Data()) throws {
         // Blindaje contra doble arranque: un segundo installTap en el mismo
         // bus lanza NSException y tumba la app (crash real del 2026-07-10).
@@ -152,11 +181,44 @@ final class Recorder {
 
         abrirSalida(preload: preloadPCM)
 
+        // El dictado es lo que no puede fallar. Primero con el micrófono elegido;
+        // si no arranca, con un motor nuevo y el micrófono del sistema. Y cada
+        // fallo queda escrito: antes el de `engine.start()` no dejaba rastro.
+        do {
+            try arrancarMotor(forzarElegido: true)
+        } catch let primero {
+            Log.log(.sistema, "micrófono: el dictado no arrancó con el micrófono elegido (\(Recorder.describir(primero))) — pruebo con un motor nuevo y el micrófono del sistema")
+            do {
+                try arrancarMotor(forzarElegido: false)
+                Log.log(.sistema, "micrófono: el dictado arrancó con el micrófono del sistema")
+            } catch let segundo {
+                Log.log(.sistema, "micrófono: el dictado NO arrancó (\(Recorder.describir(segundo)))")
+                throw segundo
+            }
+        }
+        isRecording = true
+        // La activación manos libres entrega los últimos segundos que estaban
+        // solo en RAM. Pasan por el MISMO historial/preview/backlog que el audio
+        // nuevo y la cascada final recibe una única grabación continua.
+        if !preloadPCM.isEmpty { onChunk?(preloadPCM) }
+    }
+
+    /// Monta un motor NUEVO y lo arranca. Lanza si no arranca, dejándolo parado
+    /// y sin escucha puesta.
+    private func arrancarMotor(forzarElegido: Bool) throws {
+        if forzarElegido, simularFalloDelElegido {
+            throw NSError(domain: "prueba", code: -10868,
+                          userInfo: [NSLocalizedDescriptionKey: "fallo simulado del micrófono elegido"])
+        }
+        engine = AVAudioEngine()
+        // Cada motor anuncia su formato: así el registro dice con qué frecuencia
+        // se grabó cada dictado, que es lo primero que hay que saber si falla.
+        convertidorDesde = nil
         let input = engine.inputNode
         input.removeTap(onBus: 0)   // por si quedó un tap de un intento fallido
         // Fijar el micrófono ANTES de leer el formato: sin esto macOS puede
         // enchufarnos el mic del iPhone (Continuity) y grabar silencio.
-        Microfono.aplicar(a: input.audioUnit)
+        if forzarElegido { Microfono.aplicar(a: input.audioUnit) }
         // El formato del micrófono puede llegar INVÁLIDO (0 Hz o 0 canales)
         // cuando el dispositivo está en transición: justo lo que pasa al pulsar
         // la tecla mientras la bitácora acaba de soltar el micrófono. Con ese
@@ -285,13 +347,14 @@ final class Recorder {
             // Sin esto el tap queda huérfano y el próximo start crashea
             // (doble installTap en el mismo bus).
             input.removeTap(onBus: 0)
+            engine.stop()
             throw errorArranque
         }
-        isRecording = true
-        // La activación manos libres entrega los últimos segundos que estaban
-        // solo en RAM. Pasan por el MISMO historial/preview/backlog que el audio
-        // nuevo y la cascada final recibe una única grabación continua.
-        if !preloadPCM.isEmpty { onChunk?(preloadPCM) }
+    }
+
+    static func describir(_ e: Error) -> String {
+        let n = e as NSError
+        return "\(n.domain) \(n.code): \(n.localizedDescription)"
     }
 
     /// Cierra el dictado y devuelve **la ruta** del `.wav`, no su contenido.

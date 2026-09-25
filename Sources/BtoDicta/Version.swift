@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.81.2"
-    static let fecha = "2026-09-23"
+    static let numero = "0.82.0"
+    static let fecha = "2026-09-24"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.82.0", "2026-09-24", [
+            "EL DICTADO YA NO SE MUERE CUANDO EL MICRÓFONO CAMBIA DE FRECUENCIA. Desde el 21 de septiembre, a veces pulsabas fn fn y no grababa nada, y solo reiniciar BtoDicta lo arreglaba. La causa: el dictado usaba un único motor de audio para toda la sesión, que recordaba la frecuencia del micrófono de la primera vez. Cuando otra aplicación la cambiaba —de 48 000 a 44 100 Hz— o entraban unos AirPods en llamada (24 000), el motor ya no arrancaba, y el fallo no quedaba escrito en ningún sitio. Ahora cada dictado usa un motor nuevo, y si el micrófono elegido no arranca, graba con el del sistema. Reproducido y comprobado: antes fallaba, ahora graba",
+            "EL DICTADO NO ESPERA A LA BITÁCORA. Antes de grabar le pide el micrófono a la bitácora; si ella tardaba en soltarlo, el dictado se quedaba esperando sin grabar. Ahora espera como mucho un segundo y medio y arranca igual",
+            "SIN RED, NADIE PAGA LA CULPA. Con el equipo dormido o sin Wi-Fi, cada fallo se le apuntaba al proveedor de pulido, que quedaba apartado hasta quince minutos después de volver la red. Ahora un corte de tu red no aparta a nadie, el correo diario espera a que haya red en vez de reintentar cinco veces seguidas, y una rutina de la bitácora que falla por un corte se repite al volver la red en vez de perderse",
+            "UNA SEMANA DE REGISTRO SE PERDIÓ, Y NO VOLVERÁ A PASAR. El 21 de septiembre a medianoche dos procesos rotaron el registro a la vez y el segundo sobrescribió el archivo de la semana con 29 líneas. Ahora la rotación mira si otro ya rotó y nunca sobrescribe un archivo de semana; y las pruebas internas ya no escriben en tu registro",
+        ]),
         ("0.81.2", "2026-09-23", [
             "LA BITÁCORA YA NO PIDE EL MICRÓFONO EN RÁFAGA cuando falla. Esperaba 2,5 s, 5, 10… entre reintentos, pero cada fallo provocaba un cambio de estado que le volvía a pedir el micrófono al instante y se saltaba la espera: seis reintentos y la rendición en el mismo segundo, una y otra vez, cargando la aplicación. Ahora todo pedido pasa por la espera. Medido: con el micrófono fallando y un pedido cada 100 ms, 3 intentos en 6 s en vez de 91. Y tras un dictado vuelve al momento, aunque viniera de fallar",
         ]),

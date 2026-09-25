@@ -55,6 +55,8 @@ final class ContinuoAudio {
     private var aplazado = false
     /// Solo el arnés `BTODICTA_RAFAGATEST`: el montaje falla a propósito.
     var simularFallo = false
+    /// Solo el arnés `BTODICTA_CESIONLENTATEST`: la cesión tarda en soltar.
+    var retrasoCesionPrueba: TimeInterval = 0
     /// Arranques que montaron el motor pero no entregaron un solo buffer. Se
     /// cuentan APARTE de los intentos de montaje: el motor «arranca» siempre,
     /// así que reiniciar el contador al montar dejaba un bucle infinito de
@@ -144,6 +146,7 @@ final class ContinuoAudio {
 
         cola.async { [weak self] in
             guard let self else { DispatchQueue.main.async { completion() }; return }
+            if self.retrasoCesionPrueba > 0 { Thread.sleep(forTimeInterval: self.retrasoCesionPrueba) }
             self.detenerEnCola(cerrandoTrozo: true)
             // El micrófono cambia de dueño: al volver, otra situación. Sin esto,
             // tras un dictado la bitácora esperaría a un reintento que la cesión

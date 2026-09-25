@@ -61,3 +61,42 @@ final class EsperaMicrofonoTests: XCTestCase {
         XCTAssertEqual(e.pedido(en: t0), .arrancar)
     }
 }
+
+/// Un corte de red de ESTE equipo no aparta al proveedor de pulido (2026-09-24).
+final class CuarentenaSinRedTests: XCTestCase {
+
+    /// Lo que pasó a las 07:53: el equipo sin red, y el proveedor preferido
+    /// apartado 60, 300 y 900 s por fallos que no eran suyos.
+    func testSinRedLocalNoSeApartaAlProveedor() {
+        CuarentenaPulido.reiniciarContadores()
+        let c = CuarentenaPulido()
+        let id = "prueba-sin-red|x|m|h"
+        for _ in 1...3 {
+            let s = c.registrar(id, local: false, codigo: -1, cuerpo: "",
+                                error: URLError(.networkConnectionLost), redLocal: false)
+            XCTAssertEqual(s, 0)
+        }
+        XCTAssertEqual(CuarentenaPulido.fallosSeguidos(id), 0, "la cuenta no sube")
+        XCTAssertFalse(c.activa(id, local: false, ahora: Date().addingTimeInterval(20)),
+                       "pasado el salto breve de la nube, el proveedor está disponible")
+    }
+
+    /// Con red, un proveedor que corta la conexión sí se aparta, y sube.
+    func testConRedElFalloSiEsDelProveedor() {
+        CuarentenaPulido.reiniciarContadores()
+        let c = CuarentenaPulido()
+        let id = "prueba-con-red|x|m|h"
+        let a = c.registrar(id, local: false, codigo: -1, cuerpo: "", error: URLError(.networkConnectionLost), redLocal: true)
+        let b = c.registrar(id, local: false, codigo: -1, cuerpo: "", error: URLError(.networkConnectionLost), redLocal: true)
+        XCTAssertEqual([a, b], [60, 300])
+    }
+
+    /// Un 429 sin red no existe; un HTTP con respuesta no depende de la red local.
+    func testRespuestaHTTPNoSeConfundeConFaltaDeRed() {
+        CuarentenaPulido.reiniciarContadores()
+        let c = CuarentenaPulido()
+        let s = c.registrar("prueba-429|x|m|h", local: false, codigo: 429,
+                            cuerpo: "insufficient_quota", error: nil, redLocal: false)
+        XCTAssertEqual(s, 1800)
+    }
+}

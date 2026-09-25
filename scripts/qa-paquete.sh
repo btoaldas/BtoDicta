@@ -174,7 +174,7 @@ ejecutar() {
   # aparte. Confiar en que restauren al terminar ya falló una vez: una sección
   # añadida al final volvió a machacar y `exit()` no ejecuta ningún `defer`.
   case "$id" in
-    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|menu_rapido|triple_fn|rafaga_microfono)
+    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|menu_rapido|triple_fn|rafaga_microfono|formato_viejo|cesion_lenta)
       desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id") ;;
   esac
   local bin="$BIN"
@@ -276,6 +276,13 @@ else
   # Tras un fallo del micrófono, la bitácora no lo vuelve a pedir en ráfaga: cada
   # fallo provocaba un cambio de estado que lo pedía otra vez al instante.
   ejecutar "rafaga_microfono" "BTODICTA_RAFAGATEST" "1" 60
+  # EL DICTADO ES LO QUE NO PUEDE FALLAR. Si el micrófono cambia de frecuencia
+  # (44 100 ↔ 48 000, o los 24 000 de unos AirPods en llamada), el dictado
+  # siguiente graba igual; y si el micrófono elegido no arranca, graba con el
+  # del sistema. Antes: -10868 sin rastro y la app a reiniciar.
+  ejecutar "formato_viejo" "BTODICTA_FORMATOVIEJOTEST" "1" 60
+  # El dictado no espera más de 1,5 s a que la bitácora le suelte el micrófono.
+  ejecutar "cesion_lenta" "BTODICTA_CESIONLENTATEST" "1" 60
   # El catálogo de exclusiones propuestas, comprobado sobre el paquete construido.
   # Aquí y no en las pruebas de Swift: allí `Bundle.main` no trae el recurso y la
   # prueba se salta sola, así que nadie miraría el archivo que de verdad viaja.
