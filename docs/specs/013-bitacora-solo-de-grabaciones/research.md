@@ -14,7 +14,7 @@ El modo nuevo debe conservar esa propiedad, no crear otro transcriptor de dictad
 
 | Responsabilidad | Fuente actual | Observación para el futuro plan |
 |---|---|---|
-| Preferencias e interfaz | `Config.swift`, `ContinuoView.swift` | Añadir opción global subordinada al maestro |
+| Preferencias e interfaz | `Config.swift`, `ContinuoView.swift` | El maestro gobierna captura de bitácora; el modo sigue editable y suspende el oyente incluso con maestro apagado |
 | Coordinación | `ContinuoBitacora.swift` | Separar preparación/planificación de captura autorizada |
 | Inicio y fin del dictado | `AppDelegate.swift` | Abrir ventana solo tras iniciar realmente; cerrarla al detener, cancelar, pausar o fallar |
 | Audio del notch | `HistoryWriter.swift`, `ContinuoAudio.swift` | Conservar autorización de cada grabación hasta su entrega tardía |
@@ -39,8 +39,11 @@ Las rutas de la aplicación de esta lista se resuelven bajo `Sources/BtoDicta/`.
 - Una respuesta ambiental ya solicitada antes del cambio puede conservarse. El
   cambio no recupera créditos gastados ni debe encadenar solicitudes nuevas.
 - La cesión del micrófono nunca puede añadir una espera indefinida al dictado.
-- Pausa, exclusiones y modo reunión mantienen sus frenos actuales; el oyente de
-  activación por voz es independiente del módulo de bitácora.
+- Pausa, exclusiones y modo reunión mantienen sus frenos actuales. Aunque el
+  oyente de activación por voz sea independiente, la corrección del requerimiento
+  lo incluye expresamente: debe quedar suspendido mientras esté marcado solo de
+  grabaciones, conservando su preferencia para el modo continuo. Esto también
+  aplica con maestro de bitácora apagado: el dictado manual sigue disponible.
 
 ## Verificación propuesta, todavía no ejecutada
 
@@ -51,6 +54,11 @@ Cubrir reposo de 60 s con todas las fuentes habilitadas, inicio fallido, dictado
 corto, parada/cancelación, pausa/reanudación, maestro apagado durante dictado,
 captura en vuelo, dos dictados con entregas cruzadas y reinicio con backlog
 ambiental. Verificar por separado la captura y el procesamiento posterior.
+
+Añadir fixtures de configuración nueva, anterior con maestro ON/OFF, preferencia
+nueva explícita true/false y dos actualizaciones/reinicios después de elegir
+continuo. Comprobar suspensión/reintentos del oyente de voz y recuperación de su
+preferencia al desmarcar. Estas pruebas están propuestas, todavía no ejecutadas.
 
 Reutilizar las baterías de `scripts/qa-paquete.sh` y
 `extension/pruebas/correr.mjs`. Antes de ejecutar QA, ampliar o comprobar su
@@ -66,3 +74,30 @@ las distingue. La auditoría debe separar ciclo de facturación y mes natural,
 anotar la zona horaria y declarar las limitaciones de atribución.
 
 Las cifras y credenciales de una cuenta concreta no forman parte del repositorio.
+
+## Corrección de valor predeterminado y actualización
+
+La opción debe estar activa tanto en instalación nueva como al actualizar una
+instalación anterior que no tenga la preferencia. No debe activar el maestro ni
+forzar true en cada actualización después de que el usuario haya elegido false.
+
+Patrón existente comprobado: `Config.json()` lee/cachea el diccionario sin
+inyectar defaults (`Config.swift:45–52`); los getters aportan sus valores por
+ausencia. `Config.set()` conserva booleanos explícitos y escribe atómicamente
+bajo candado (`Config.swift:879–901`). El maestro conserva default false
+(`Config.swift:1047`). Por tanto basta un getter nuevo con default true por
+ausencia; una elección explícita false permanece false en futuras actualizaciones.
+
+Se descarta un migrador que reescriba configuración o fuerce true por versión:
+no aporta valor a este cambio, añade fallos de persistencia y podría deshacer una
+elección posterior. La prueba debe comprobar también huellas de configuración:
+leer el nuevo default no debe modificar el archivo.
+
+Los selectores actuales siguen definiendo qué fuentes se usan; la política nueva
+define cuándo. Audio del sistema es opcional de fábrica, mientras pantalla/OCR
+están habilitados de fábrica: no confundir default del modo con habilitar todos
+los canales ni solicitar permisos silenciosamente.
+
+La grabación de vídeo de `CapturaMac` es una acción manual independiente y no
+alimenta actualmente la bitácora. Integrarla como origen nuevo no forma parte de
+esta spec de dictado; se conserva su funcionamiento actual.

@@ -13,3 +13,15 @@
 - Recuperación: eventual commit inverso revisado y autorizado; sin reescritura
   de historia ni borrado de historial de usuario.
 - Estado de funcionalidad: borrador sin aprobación; no implementada.
+
+## Corrección documental posterior
+
+- Objetivo: incorporar default activo al instalar/actualizar y suspensión del
+  oyente de voz, confirmados expresamente en la aclaración del requerimiento.
+- Acción: actualizar spec, investigación, checklist, bitácora y este manifiesto;
+  nuevo commit documental y push normal a `origin/main`.
+- Impacto: solo documentación pública; no se modifica la app ni la configuración
+  de ninguna instalación. La publicación de una release queda pendiente.
+- Verificación: 8 RF, 3 RNF, sin errores/avisos; revisión de alcance y del diff;
+  hash local/remoto y blob de spec idénticos después del push.
+- Recuperación: eventual commit inverso revisado y autorizado; sin reescritura.

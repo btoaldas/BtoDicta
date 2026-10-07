@@ -22,18 +22,18 @@ explícitas del notch y conserva los resúmenes habituales.
 
 ## 3. Alcance
 
-Incluye ajuste, fuentes habilitadas —también sistema y navegador—, pendientes e
-integración con dictado. Conserva proveedores, prompts, horarios, formatos,
-historial y pendientes. El oyente independiente de activación por voz queda fuera.
+Incluye ajuste, fuentes habilitadas —micrófono/ambiente, sistema, pantallas, OCR
+y navegador—, pendientes, dictado y suspensión del oyente de activación por voz.
+Conserva permisos, exclusiones, proveedores, prompts, horarios, formatos e historial.
 
 ## 4. Requerimientos funcionales
 
 ### RF-01 — Opción global en configuración
 
 - Actor: usuario.
-- Acción: marca «Activar solo de grabaciones», debajo de «Activar la bitácora».
-- Resultado: conserva el modo al reiniciar; el maestro apagado prevalece.
-- Medida: 1 preferencia, inicialmente desmarcada; desmarcarla recupera el modo anterior.
+- Acción: encuentra «Activar solo de grabaciones» marcada, debajo de «Activar la bitácora», y puede desmarcarla.
+- Resultado: conserva el modo al reiniciar; el maestro apagado impide generar bitácora. La opción sigue editable y explica que también suspende activación por voz.
+- Medida: 1 preferencia, activada por defecto; desmarcarla recupera el modo continuo.
 - Prioridad: P1.
 - Criterio de aceptación:
   - Dado el maestro activo y la opción marcada
@@ -44,7 +44,7 @@ historial y pendientes. El oyente independiente de activación por voz queda fue
 
 - Actor: usuario.
 - Acción: deja la aplicación abierta sin grabar con la opción marcada.
-- Resultado: no escucha micrófono ni sistema, ni recoge pantalla, navegador u OCR ambiental.
+- Resultado: no mantiene captura de micrófono/ambiente, sistema, pantalla, navegador ni OCR ambiental, ni oyentes pasivos de voz.
 - Medida: 0 capturas, segmentos o solicitudes STT ambientales nuevos en 60 s de reposo.
 - Prioridad: P1.
 - Criterio de aceptación:
@@ -56,7 +56,7 @@ historial y pendientes. El oyente independiente de activación por voz queda fue
 
 - Actor: usuario.
 - Acción: graba desde el notch, su atajo o tecla de dictado.
-- Resultado: utiliza ese audio y recoge contexto habilitado mientras graba; detener, cancelar o pausar cierra la captura; reanudar la abre.
+- Resultado: utiliza ese audio —voz propia y ambiente— y las fuentes habilitadas de sistema, pantalla, OCR y navegador mientras graba. Detener, cancelar o pausar cierra la captura; reanudar la abre.
 - Medida: contexto desde el comienzo, incluso en grabaciones cortas; 0 material nuevo capturado fuera de la ventana autorizada, aunque se procese después.
 - Prioridad: P1.
 - Criterio de aceptación:
@@ -100,6 +100,30 @@ historial y pendientes. El oyente independiente de activación por voz queda fue
   - Cuando vencen pausas/reintentos o llegan resultados tardíos
   - Entonces permanece en reposo; completa grabaciones autorizadas y conserva el backlog. Un pedido ambiental ya enviado puede guardar su respuesta, sin encadenar pedidos nuevos.
 
+### RF-07 — Aplicación automática al actualizar
+
+- Actor: usuario nuevo o existente.
+- Acción: instala o actualiza sin tener la nueva preferencia.
+- Resultado: adopta automáticamente solo de grabaciones antes de iniciar capturadores; conserva el maestro y los demás ajustes.
+- Medida: valor predeterminado true; 0 activaciones del maestro apagado y 0 cambios forzados de elecciones posteriores.
+- Prioridad: P1.
+- Criterio de aceptación:
+  - Dado una instalación antigua, incluso con bitácora apagada
+  - Cuando actualiza y después elige continuo
+  - Entonces primero obtiene solo de grabaciones y conserva el maestro; tras elegir continuo, reinicios y actualizaciones respetan su elección.
+
+### RF-08 — Activación por voz suspendida en este modo
+
+- Actor: usuario con activación del asistente por voz configurada.
+- Acción: utiliza solo de grabaciones.
+- Resultado: el oyente permanece suspendido; inicia dictados desde notch o teclado, sin perder la preferencia de voz.
+- Medida: 0 oyentes pasivos en reposo, incluso con maestro de bitácora apagado.
+- Prioridad: P1.
+- Criterio de aceptación:
+  - Dado el oyente configurado y solo de grabaciones marcado
+  - Cuando permanece en reposo o vuelve al modo continuo
+  - Entonces primero no escucha; al volver a continuo recupera la activación por voz según su preferencia conservada.
+
 ## 5. Requerimientos no funcionales
 
 | ID | Dimensión | Requerimiento con cifra u observable | Cómo se mide |
@@ -116,6 +140,9 @@ historial y pendientes. El oyente independiente de activación por voz queda fue
 | Se detiene antes de terminar OCR o pulido | Solo completa el material capturado durante esa grabación | RF-03, RF-06 |
 | Comienza otro dictado antes de acabar el anterior | Cada resultado conserva la autorización de su grabación | RF-04, RF-06 |
 | Maestro apagado, pausa o modo reunión | Se conservan sus restricciones actuales | RF-01, RF-06 |
+| Actualización sin preferencia nueva | Solo de grabaciones activo; maestro conservado | RF-07 |
+| Usuario desmarca la opción y vuelve a actualizar | Se conserva continuo | RF-07 |
+| Oyente de voz configurado, bitácora apagada y modo nuevo marcado | No escucha en reposo; dictado manual disponible | RF-08 |
 
 ## 7. Datos y cumplimiento
 
@@ -125,15 +152,18 @@ La auditoría de cuentas privadas se documenta fuera del repositorio.
 
 ## 8. Supuestos y dependencias
 
-«Grabación» comprende los controles habituales del notch, no importaciones ni API
-local. Procesamiento posterior y resúmenes pueden consumir IA. No se promete un
-porcentaje fijo de ahorro.
+«Grabación» comprende dictado desde notch o teclado, no importaciones ni API local.
+Los selectores existentes determinan qué fuentes se recogen; no se encienden
+fuentes desmarcadas ni se eluden permisos/exclusiones. Procesamiento posterior y
+resúmenes pueden consumir IA; no se promete un ahorro porcentual fijo.
 
 ## 9. Decisiones y aclaraciones
 
 ### Sesión 2026-10-06
 
 - Pedido: opción «Activar solo de grabaciones»; conservar continuo, contexto durante dictado y resúmenes.
-- Propuesta por aprobar: inicialmente desmarcada, atajos equivalentes al botón y pendientes ambientales conservados sin proceso automático.
+- Corrección confirmada: activada por defecto para instalaciones nuevas y existentes al actualizar; maestro apagado conservado. Sustituye la propuesta inicial de valor desmarcado.
+- Confirmación sobre el oyente independiente: «Sí: también pausar la activación por voz; usar notch o teclado».
+- Propuesta técnica: valor true por ausencia de preferencia; la elección explícita posterior false se conserva. Sin reescritura de configuración ni imposición repetida.
 - Diagnóstico privado separado; no atribuir todo el gasto de la cuenta a esta aplicación.
 - Pendientes: aprobación de spec, plan y tareas; implementación y activación en instalación viva.
