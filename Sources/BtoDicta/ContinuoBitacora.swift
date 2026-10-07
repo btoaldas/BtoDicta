@@ -31,15 +31,15 @@ enum ContinuoBitacora {
         // Lo que quedó a medias en un cierre brusco entra ahora: el archivo
         // sobrevivía pero nadie volvía a mirarlo.
         DispatchQueue.global(qos: .utility).async { ContinuoIndice.shared.rescatarHuerfanos() }
-        ContinuoAudio.shared.arrancar()
-        if #available(macOS 14.0, *) { ContinuoPantalla.shared.arrancar() }
-        if #available(macOS 13.0, *) { ContinuoAudioSistema.shared.arrancar() }
+        ContinuoCapturaSesion.shared.reanudarCapturaSiGrabando()
+        arrancarCapturadores()
         ContinuoPlanificador.arrancar()
         ContinuoLote.programarRecompresion()
         Log.log(.sistema, "bitácora: encendida")
     }
 
     static func detener(esperandoElCierre: Bool = false) {
+        ContinuoCapturaSesion.shared.suspenderCaptura()
         if esperandoElCierre { ContinuoAudio.shared.detenerYEsperar() }
         else { ContinuoAudio.shared.detener() }
         if #available(macOS 14.0, *) { ContinuoPantalla.shared.detener() }
@@ -55,6 +55,32 @@ enum ContinuoBitacora {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { arrancar() }
     }
 
+    private static func arrancarCapturadores() {
+        guard ContinuoCapturaSesion.shared.contextoActual() != nil else { return }
+        if !Config.continuoSoloGrabaciones() { ContinuoAudio.shared.arrancar() }
+        if #available(macOS 14.0, *) { ContinuoPantalla.shared.arrancar() }
+        if #available(macOS 13.0, *) { ContinuoAudioSistema.shared.arrancar() }
+    }
+
+    /// Solo después de que Recorder confirma que empezó a grabar.
+    @discardableResult
+    static func iniciarGrabacion() -> ContinuoCapturaSesion.Contexto? {
+        let contexto = ContinuoCapturaSesion.shared.iniciarGrabacion()
+        // Un stream ambiental anterior tiene otra generación y debe cerrarse.
+        if #available(macOS 14.0, *) { ContinuoPantalla.shared.detener() }
+        if #available(macOS 13.0, *) { ContinuoAudioSistema.shared.detener() }
+        arrancarCapturadores()
+        return contexto
+    }
+
+    /// El cierre invalida primero los callbacks; el procesado autorizado sigue.
+    static func terminarGrabacion() {
+        ContinuoCapturaSesion.shared.cerrarGrabacion()
+        if #available(macOS 14.0, *) { ContinuoPantalla.shared.detener() }
+        if #available(macOS 13.0, *) { ContinuoAudioSistema.shared.detener() }
+        if !Config.continuoSoloGrabaciones() { arrancarCapturadores() }
+    }
+
     // MARK: Cesión al dictado
     //
     // Estos dos los llama AppDelegate alrededor del dictado. No son ajustes:
@@ -65,6 +91,7 @@ enum ContinuoBitacora {
     }
 
     static func recuperarMicrofono() {
+        guard !Config.continuoSoloGrabaciones() else { return }
         ContinuoAudio.shared.reanudar()
     }
 

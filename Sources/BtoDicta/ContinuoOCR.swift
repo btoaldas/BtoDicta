@@ -18,15 +18,18 @@ enum ContinuoOCR {
     /// pendientes llegan sin filtrar por fecha, igual que el audio.
     /// `deteneteSi` permite abortar limpio si empieza un dictado.
     @discardableResult
-    static func procesarPendientes(limite: Int, deteneteSi: (() -> Bool)? = nil) -> (hechas: Int, conTexto: Int, dias: Set<Date>) {
+    static func procesarPendientes(limite: Int, manual: Bool = false, deteneteSi: (() -> Bool)? = nil) -> (hechas: Int, conTexto: Int, dias: Set<Date>) {
         ContinuoIndice.shared.abrir()
-        let pendientes = ContinuoIndice.shared.pendientes(material: .pantalla, limite: limite)
+        let pendientes = ContinuoIndice.shared.pendientes(material: .pantalla, limite: limite,
+                                                             soloGrabaciones: !manual && Config.continuoSoloGrabaciones())
         guard !pendientes.isEmpty else { return (0, 0, []) }
 
         var hechas = 0, conTexto = 0
         var dias = Set<Date>()
         for p in pendientes {
             if deteneteSi?() == true { break }
+            guard Config.continuoActivo(), ContinuoLote.permiteProcesar(
+                sesion: p.sesion, manual: manual, soloGrabaciones: Config.continuoSoloGrabaciones()) else { continue }
             guard FileManager.default.fileExists(atPath: p.ruta.path) else {
                 // Se borró por fuera: se marca para no reintentarlo eternamente.
                 ContinuoIndice.shared.anotarTexto("", material: .pantalla, id: p.id)

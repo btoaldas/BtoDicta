@@ -73,7 +73,27 @@ final class ContinuoAudio {
         get { candadoBuffers.lock(); defer { candadoBuffers.unlock() }; return _buffersVistos }
         set { candadoBuffers.lock(); _buffersVistos = newValue; candadoBuffers.unlock() }
     }
+    private var solicitudesMontaje = 0
     private(set) var activo = false
+
+    struct EstadoCaptura {
+        let activo: Bool
+        let recursoAbierto: Bool
+        let montando: Bool
+        let solicitudes: Int
+        let recibidos: Int
+        let bytes: Int
+    }
+
+    /// Diagnóstico pasivo: no solicita micrófono ni reinicia capturadores.
+    func estadoCaptura(_ completion: @escaping (EstadoCaptura) -> Void) {
+        cola.async { [weak self] in
+            guard let self else { return }
+            completion(EstadoCaptura(activo: self.activo, recursoAbierto: self.engine != nil,
+                montando: self.montando, solicitudes: self.solicitudesMontaje,
+                recibidos: self.buffersVistos, bytes: self.bytesTrozo))
+        }
+    }
 
     /// Modo `voz`: colchón previo para no cortar la primera sílaba.
     private var colchon = Data()
@@ -86,12 +106,13 @@ final class ContinuoAudio {
 
     /// Enciende la bitácora si el ajuste lo permite. Idempotente.
     func arrancar() {
-        guard Config.continuoActivo(), Config.continuoAudioModo() != "manual" else { return }
+        guard permiteMicrofonoAmbiental else { return }
         // Encenderla es una orden explícita: no espera a un fallo anterior.
         cola.async { [weak self] in self?.espera.reiniciar(); self?.arrancarEnCola() }
     }
 
     func detener() {
+        candadoCesion.lock(); generacion &+= 1; candadoCesion.unlock()
         cola.async { [weak self] in self?.detenerEnCola(cerrandoTrozo: true) }
     }
 
@@ -163,7 +184,7 @@ final class ContinuoAudio {
         candadoCesion.unlock()
         cola.async { [weak self] in
             guard let self else { return }
-            guard Config.continuoActivo(), Config.continuoAudioModo() != "manual" else { return }
+            guard self.permiteMicrofonoAmbiental else { return }
             self.pedirMicrofono()
         }
     }
@@ -174,9 +195,17 @@ final class ContinuoAudio {
         return cedido
     }
 
+    /// El audio del notch ya existe en el historial. El modo de grabaciones
+    /// nunca necesita otro motor de micrófono, ni siquiera durante el dictado.
+    private var permiteMicrofonoAmbiental: Bool {
+        Config.continuoActivo() && !Config.continuoSoloGrabaciones()
+            && Config.continuoAudioModo() != "manual" && !ModoRapido.pausaVigente()
+    }
+
     /// Un pedido que no viene de un reintento programado: un cambio de estado, el
     /// fin de un dictado. Pasa por la espera.
     private func pedirMicrofono() {
+        guard permiteMicrofonoAmbiental else { return }
         switch espera.pedido(en: Date()) {
         case .arrancar:
             arrancarEnCola()
@@ -192,7 +221,7 @@ final class ContinuoAudio {
                 guard let self else { return }
                 self.aplazado = false
                 self.candadoCesion.lock(); let vigente = self.generacion; self.candadoCesion.unlock()
-                guard vigente == gen, Config.continuoActivo() else { return }
+                guard vigente == gen, self.permiteMicrofonoAmbiental else { return }
                 self.arrancarEnCola()
             }
         }
@@ -201,6 +230,7 @@ final class ContinuoAudio {
     // MARK: Arranque real
 
     private func arrancarEnCola() {
+        guard permiteMicrofonoAmbiental else { return }
         // `montando` cierra una reentrada real: `reconciliarActivacionVoz` llama
         // a `reanudar()` cada vez que cambia el estado del micrófono, y mientras
         // el montaje espera en `main.sync` la bandera `activo` todavía es falsa.
@@ -227,8 +257,13 @@ final class ContinuoAudio {
         // de audio de verdad (`escribir`), porque el motor puede no arrancar:
         // abrirlo antes dejaba un .pcm de 0 bytes por cada intento fallido.
         var arrancado = false
-        DispatchQueue.main.sync { arrancado = self.montarEnMain() }
+        candadoCesion.lock(); let genMontaje = generacion; candadoCesion.unlock()
+        DispatchQueue.main.sync { arrancado = self.montarEnMain(generacionEsperada: genMontaje) }
         guard arrancado else { reintentar(); return }
+        guard permiteMicrofonoAmbiental, !estaCedido else {
+            detenerEnCola(cerrandoTrozo: true)
+            return
+        }
         // `intentos` NO se reinicia aquí: solo cuando llegue audio de verdad.
         activo = true
         let marcaBuffers = buffersVistos
@@ -239,7 +274,8 @@ final class ContinuoAudio {
         // puede pasar si el dispositivo quedó en mal estado). Si en 8 s no
         // llegó nada, se desmonta y se reintenta desde cero.
         cola.asyncAfter(deadline: .now() + 8) { [weak self] in
-            guard let self, self.activo, self.buffersVistos == marcaBuffers else { return }
+            guard let self, self.permiteMicrofonoAmbiental,
+                  self.activo, self.buffersVistos == marcaBuffers else { return }
             // Un vigía de una generación anterior no puede matar un motor
             // recién re-arrancado tras una cesión.
             self.candadoCesion.lock(); let vigente = self.generacion; self.candadoCesion.unlock()
@@ -258,7 +294,7 @@ final class ContinuoAudio {
                 }
                 self.espera.reiniciar()
                 self.cola.asyncAfter(deadline: .now() + 60) { [weak self] in
-                    guard let self, Config.continuoActivo() else { return }
+                    guard let self, self.permiteMicrofonoAmbiental else { return }
                     Log.debug("bitácora: reintento lento del micrófono (\(self.arranquesMudos) arranques mudos)")
                     self.arrancarEnCola()
                 }
@@ -275,6 +311,7 @@ final class ContinuoAudio {
     /// con espera creciente y se abandona tras varios intentos para no dejar un
     /// bucle eterno pidiendo un micrófono que otro tiene.
     private func reintentar() {
+        guard permiteMicrofonoAmbiental else { return }
         let espera: TimeInterval
         switch self.espera.fallo(en: Date()) {
         case .enfriar(let tras, let durante):
@@ -293,14 +330,18 @@ final class ContinuoAudio {
             // Si entre medias el dictado pidió el micrófono, este reintento es
             // de una generación anterior y no debe tomarlo.
             self.candadoCesion.lock(); let vigente = self.generacion; self.candadoCesion.unlock()
-            guard vigente == gen else { return }
+            guard vigente == gen, self.permiteMicrofonoAmbiental else { return }
             self.espera.reintentoLlega()
             self.arrancarEnCola()
         }
     }
 
     /// Monta el motor de captura. SOLO desde el hilo principal.
-    private func montarEnMain() -> Bool {
+    private func montarEnMain(generacionEsperada: UInt64) -> Bool {
+        guard permiteMicrofonoAmbiental, !estaCedido else { return false }
+        candadoCesion.lock(); let vigente = generacion; candadoCesion.unlock()
+        guard vigente == generacionEsperada else { return false }
+        solicitudesMontaje += 1
         if simularFallo {
             Log.log(.sistema, "bitácora: el motor de audio no arrancó (simulado por la prueba)")
             return false
@@ -345,8 +386,11 @@ final class ContinuoAudio {
         // que se mira para saber si la bitácora está escuchando.
         buffersVistos = 0
 
+        candadoCesion.lock(); let genMontaje = generacion; candadoCesion.unlock()
         entrada.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
-            guard let self else { return }
+            guard let self, self.permiteMicrofonoAmbiental, !self.estaCedido else { return }
+            self.candadoCesion.lock(); let vigente = self.generacion; self.candadoCesion.unlock()
+            guard vigente == genMontaje else { return }
             let formatoEntrada = buffer.format
             if self.convertidorDesde?.sampleRate != formatoEntrada.sampleRate
                 || self.convertidorDesde?.channelCount != formatoEntrada.channelCount {
@@ -397,9 +441,18 @@ final class ContinuoAudio {
             }
             let rms = (suma / Double(max(n, 1))).squareRoot()
 
-            self.cola.async { self.recibir(trozo, rms: rms) }
+            self.cola.async {
+                self.candadoCesion.lock(); let vigente = self.generacion; self.candadoCesion.unlock()
+                guard vigente == genMontaje else { return }
+                self.recibir(trozo, rms: rms)
+            }
         }
 
+        guard permiteMicrofonoAmbiental, !estaCedido else {
+            entrada.removeTap(onBus: 0)
+            try? entrada.setVoiceProcessingEnabled(false)
+            return false
+        }
         motor.prepare()
         do {
             try motor.start()
@@ -415,6 +468,8 @@ final class ContinuoAudio {
     }
 
     private func detenerEnCola(cerrandoTrozo: Bool) {
+        colchon.removeAll()
+        hablando = false
         guard activo || engine != nil else {
             if cerrandoTrozo { cerrarTrozo() }
             return
@@ -423,8 +478,6 @@ final class ContinuoAudio {
         engine = nil
         conversor = nil
         activo = false
-        colchon.removeAll()
-        hablando = false
         if let motor {
             // Desmontar en MAIN, simétrico al montaje: el nodo de entrada no se
             // toca desde colas de fondo. Y APAGAR el procesamiento de voz al
@@ -445,7 +498,7 @@ final class ContinuoAudio {
     // MARK: Escritura
 
     private func recibir(_ trozo: Data, rms: Double) {
-        guard activo, !estaCedido else { return }
+        guard activo, !estaCedido, permiteMicrofonoAmbiental else { return }
         // Segunda cerradura: aunque algo reabriera el micrófono, durante una
         // pausa no se escribe ni un byte.
         guard !ModoRapido.pausaVigente() else { return }
@@ -485,7 +538,7 @@ final class ContinuoAudio {
     }
 
     private func escribir(_ datos: Data) {
-        guard !datos.isEmpty else { return }
+        guard permiteMicrofonoAmbiental, !datos.isEmpty else { return }
         if mano == nil { abrirTrozo() }
         // write(contentsOf:) LANZA en vez de abortar el proceso: con el disco
         // lleno, la grabación continua no puede llevarse la app (y el dictado)
@@ -505,6 +558,7 @@ final class ContinuoAudio {
     }
 
     private func abrirTrozo() {
+        guard permiteMicrofonoAmbiental else { return }
         // Si ya hay un trozo abierto, ciérralo antes: abrir dos veces seguidas
         // dejaba el archivo anterior huérfano y en 0 bytes, porque `rutaTrozo`
         // se sobrescribía sin pasar por `cerrarTrozo`.
@@ -512,7 +566,10 @@ final class ContinuoAudio {
         let ahora = Date()
         let carpeta = Self.carpetaDelDia(ahora, sub: "audio")
         try? FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
-        let url = carpeta.appendingPathComponent(Self.sello(ahora) + ".pcm")
+        // Una reconfiguración puede cerrar y abrir dos trozos en el mismo
+        // segundo. Cada archivo tiene identidad propia y conserva el anterior.
+        let url = carpeta.appendingPathComponent(Self.sello(ahora)
+            + "-" + UUID().uuidString.prefix(8) + ".pcm")
         FileManager.default.createFile(atPath: url.path, contents: nil,
                                        attributes: [.posixPermissions: 0o600])
         mano = try? FileHandle(forWritingTo: url)
@@ -548,20 +605,49 @@ final class ContinuoAudio {
 
     /// Incorpora a la bitácora el `.wav` que el dictado acaba de guardar. Así,
     /// ceder el micrófono no abre un hueco en la línea de tiempo.
-    static func adoptar(wav url: URL, instante: Date) {
-        guard Config.continuoActivo(), Config.continuoAudioAdoptarDictado() else { return }
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
+    static func adoptar(wav url: URL, instante: Date, sesion: String? = nil,
+                        transcripcionCompleta: Bool = true) {
+        _ = adoptar(wav: url, instante: instante, sesion: sesion, indice: .shared, politica: .shared,
+                    ajustes: AjustesAdopcion(activa: Config.continuoActivo(),
+                        adoptarDictado: Config.continuoAudioAdoptarDictado(),
+                        soloGrabaciones: Config.continuoSoloGrabaciones()),
+                    transcripcionCompleta: transcripcionCompleta)
+    }
+
+    struct AjustesAdopcion {
+        let activa: Bool
+        let adoptarDictado: Bool
+        let soloGrabaciones: Bool
+    }
+
+    /// El mismo flujo con dependencias explícitas permite verificar originales
+    /// y pendientes en una base de prueba, sin dispositivos ni proveedores.
+    @discardableResult
+    static func adoptar(wav url: URL, instante: Date, sesion: String?, indice: ContinuoIndice,
+                        politica: ContinuoCapturaSesion, ajustes: AjustesAdopcion,
+                        transcripcionCompleta: Bool = true) -> Int64? {
+        guard ajustes.activa, ajustes.adoptarDictado else { return nil }
+        if let sesion {
+            guard politica.sesionAutorizada(sesion) else { return nil }
+        } else if ajustes.soloGrabaciones { return nil }
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let bytes = ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int64) ?? 0
         let duracion = Double(bytes) / 32_000.0
-        guard let id = ContinuoIndice.shared.registrarAudio(ruta: url, instante: instante,
-                                                            duracion: duracion, origen: "dictado") else { return }
+        guard let id = indice.registrarAudio(ruta: url, instante: instante,
+                                                            duracion: duracion, origen: "dictado",
+                                                            sesion: sesion) else { return nil }
+        guard transcripcionCompleta else { return id }
         // El dictado YA tiene su transcripción (el .txt que escribió el propio
         // flujo, con pulido incluido). Se adopta ese texto y la fila queda
         // procesada: la tanda no debe retranscribir un dictado ni, mucho menos,
         // pisar el .txt del historial con texto crudo.
         let txt = url.deletingPathExtension().appendingPathExtension("txt")
         let texto = (try? String(contentsOf: txt, encoding: .utf8)) ?? ""
-        ContinuoIndice.shared.anotarTexto(texto, material: .audio, id: id)
+        // Un fallo de transcripción conserva el audio pendiente. Marcar texto
+        // vacío como procesado impediría recuperarlo después.
+        guard !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return id }
+        indice.anotarTexto(texto, material: .audio, id: id)
+        return id
     }
 
     // MARK: Utilidades

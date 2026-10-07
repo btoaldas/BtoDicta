@@ -200,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // persistente/default del usuario.
     private var activacionVozTimer: Timer?
     private var activacionVozObserver: NSObjectProtocol?
+    private var bitacoraGrabacionesObserver: NSObjectProtocol?
     /// Una acción terminada debe devolver SIEMPRE el oyente de presencia. El
     /// reloj general sigue siendo la red de seguridad, pero esta solicitud
     /// conserva la intención hasta comprobar el estado `.escuchando` real.
@@ -314,6 +315,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         silenceTimer = nil
         liveTimer?.invalidate()
         liveTimer = nil
+        ContinuoBitacora.terminarGrabacion()
         let urlCancelado = recorder.stop()
         panel.detenerCronometro()
         entregaVivo = nil
@@ -477,6 +479,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ApiLocal.detener()
         activacionVozTimer?.invalidate()
         if let o = activacionVozObserver { NotificationCenter.default.removeObserver(o) }
+        if let o = bitacoraGrabacionesObserver { NotificationCenter.default.removeObserver(o) }
         ActivacionVoz.shared.apagar()
         TareasRecordatorios.shared.detener()
         WhisperServer.apagar(motivo: "salida de la app")
@@ -493,6 +496,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func rssMBGlobal() -> Double { MemoriaProceso.huellaMB() }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if probarBitacoraGrabacionesSiSePidio() { return }
         // Saber si ESTE equipo tiene red: un corte propio no aparta proveedores y
         // lo de fondo espera a que vuelva (2026-09-24).
         EstadoRed.shared.arrancar()
@@ -6279,6 +6283,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             forName: .betoActivacionVozConfiguracionCambio,
             object: nil, queue: .main
         ) { [weak self] _ in self?.reconciliarActivacionVoz() }
+        if let o = bitacoraGrabacionesObserver { NotificationCenter.default.removeObserver(o) }
+        bitacoraGrabacionesObserver = NotificationCenter.default.addObserver(
+            forName: .continuoSoloGrabacionesCambio, object: nil, queue: .main
+        ) { [weak self] _ in self?.vigilarActivacionVoz() }
         let timer = Timer(timeInterval: 0.4, repeats: true) { [weak self] _ in
             self?.vigilarActivacionVoz()
         }
@@ -6302,7 +6310,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// reducen la ventana en que una respuesta terminó pero el listener seguía
     /// pausado. `reconciliar` vuelve a comprobar que todo esté realmente libre.
     private func solicitarRearmeActivacionVoz(origen: String) {
-        guard Config.agenteNucleoActivo(), Config.agenteActivacionReposo() else { return }
+        guard !Config.continuoSoloGrabaciones(), Config.agenteNucleoActivo(), Config.agenteActivacionReposo() else { return }
         activacionVozRearmePendiente = true
         activacionVozRearmeOrigen = origen
         activacionVozRearmeInicio = Date()
@@ -6319,7 +6327,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// realmente activo. Ante una carrera transitoria con TTS/Recorder adelanta
     /// hasta tres reintentos; después respeta el backoff normal de Apple Speech.
     private func vigilarActivacionVoz() {
-        let habilitado = Config.agenteNucleoActivo() && Config.agenteActivacionReposo()
+        let habilitado = Config.agenteNucleoActivo() && Config.agenteActivacionReposo() && !Config.continuoSoloGrabaciones()
         guard habilitado else {
             activacionVozRearmePendiente = false
             reconciliarActivacionVoz()
@@ -6436,7 +6444,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Mismo punto para la bitácora continua: en cuanto el micrófono deja de
         // estar ocupado (fin del dictado, de una captura o del TTS), vuelve sola.
         if !activacionVozOcupada { ContinuoBitacora.recuperarMicrofono() }
-        let habilitado = Config.agenteNucleoActivo() && Config.agenteActivacionReposo()
+        let habilitado = Config.agenteNucleoActivo() && Config.agenteActivacionReposo() && !Config.continuoSoloGrabaciones()
         var activadores = Config.agenteActivadores()
         if Config.agenteCompatibilidadSiriLocal() {
             activadores += PasarelaSiriBeto.activadoresLocales(
@@ -6454,7 +6462,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func despertarPorVoz(_ despertar: ActivacionVoz.Despertar) {
         // El resultado puede llegar justo cuando fn, una captura o la voz ganaron
         // la carrera. En ese caso se descarta; nunca se pisa la operación actual.
-        guard Config.agenteNucleoActivo(), Config.agenteActivacionReposo(),
+        guard !Config.continuoSoloGrabaciones(), Config.agenteNucleoActivo(), Config.agenteActivacionReposo(),
               !activacionVozOcupada else {
             AgenteLog.registrar("activacion_reposo_descartada", ["motivo": "app_ocupada"])
             reconciliarActivacionVoz()
@@ -6930,6 +6938,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         vivoReiniciarVigia()
         do {
             try recorder.start(preloadPCM: despertarActual?.audioPrevio ?? Data())
+            history.autorizarBitacora(ContinuoBitacora.iniciarGrabacion())
             // AQUÍ, y no antes: a partir de este punto `recorder.isRecording` ya
             // sostiene por sí solo «el micrófono está ocupado».
             iniciandoDictado = false
@@ -7430,6 +7439,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         silenceTimer = nil
         liveTimer?.invalidate()
         liveTimer = nil
+        ContinuoBitacora.terminarGrabacion()
         let wavURL = recorder.stop()
         panel.detenerCronometro()
         // Del tamaño del archivo, sin abrirlo.
@@ -10689,6 +10699,7 @@ extension AppDelegate {
         }
         let raiz = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
         try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        Config.set("continuo_solo_grabaciones", to: false) // Fixture del modo continuo heredado.
         Config.set("continuo_activo", to: true)
         Config.set("continuo_carpeta", to: raiz.path)
         Config.set("continuo_audio_modo", to: "siempre")
@@ -10811,6 +10822,7 @@ extension AppDelegate {
         }
         let raiz = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
         try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        Config.set("continuo_solo_grabaciones", to: false) // Fixture del modo continuo heredado.
         Config.set("continuo_activo", to: true)
         Config.set("continuo_carpeta", to: raiz.path)
         Config.set("continuo_audio_modo", to: "siempre")
@@ -10854,5 +10866,91 @@ extension AppDelegate {
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { print("CESION FALLA timeout"); fflush(stdout); exit(4) }
+    }
+}
+
+
+// MARK: - QA aislada: un minuto de reposo sin abrir recursos de captura
+extension AppDelegate {
+    private func probarBitacoraGrabacionesSiSePidio() -> Bool {
+        guard ProcessInfo.processInfo.environment["BTODICTA_BITACORAREPOSOTEST"] == "1" else { return false }
+        guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+            print("BITACORAREPOSO FALLA: requiere perfil aislado"); exit(2)
+        }
+        let carpeta = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
+        let predeterminado = Config.continuoSoloGrabaciones()
+        Config.set("continuo_activo", to: true)
+        Config.set("continuo_solo_grabaciones", to: true)
+        Config.set("continuo_carpeta", to: carpeta.path)
+        Config.set("continuo_audio_modo", to: "siempre")
+        Config.set("continuo_pantalla_activa", to: true)
+        Config.set("continuo_sistema_activo", to: true)
+        Config.set("continuo_lote_disparadores", to: [String]())
+        Config.set("continuo_recomprimir_pendientes", to: false)
+        ContinuoBitacora.arrancar()
+        let inicio = Date()
+        let timer = Timer(timeInterval: 0.25, repeats: true) { _ in
+            ContinuoBitacora.recuperarMicrofono()
+            ContinuoAudio.shared.arrancar()
+            ContinuoPantalla.shared.arrancar()
+            ContinuoAudioSistema.shared.arrancar()
+            // Se fuerza habilitado para comprobar la guarda del propio oyente.
+            ActivacionVoz.shared.reconciliar(habilitado: true, puedeEscuchar: true,
+                                             activadores: ["Beto"]) { _ in }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { ContinuoBitacora.reconfigurar() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 40) { ContinuoBitacora.reconfigurar() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60.1) {
+            timer.invalidate()
+            let grupo = DispatchGroup()
+            let candado = NSLock()
+            var fallos = predeterminado ? 0 : 1
+            func registrar(_ fuente: String, activo: Bool, abierto: Bool, montando: Bool,
+                           solicitudes: Int, recibidos: Int, bytes: Int) {
+                let ok = !activo && !abierto && !montando && solicitudes == 0 && recibidos == 0 && bytes == 0
+                candado.lock()
+                if !ok { fallos += 1 }
+                print("BITACORAREPOSO \(ok ? "OK" : "FALLA") \(fuente): solicitudes=\(solicitudes), recibidos=\(recibidos), bytes=\(bytes), recurso=\(abierto)")
+                candado.unlock()
+            }
+            grupo.enter()
+            ContinuoAudio.shared.estadoCaptura { e in
+                registrar("micrófono", activo: e.activo, abierto: e.recursoAbierto, montando: e.montando,
+                          solicitudes: e.solicitudes, recibidos: e.recibidos, bytes: e.bytes)
+                grupo.leave()
+            }
+            grupo.enter()
+            ContinuoPantalla.shared.estadoCaptura { e in
+                registrar("pantalla", activo: e.activo, abierto: e.recursoAbierto, montando: e.montando,
+                          solicitudes: e.solicitudes, recibidos: e.recibidos, bytes: e.bytes)
+                grupo.leave()
+            }
+            grupo.enter()
+            ContinuoAudioSistema.shared.estadoCaptura { e in
+                registrar("sistema", activo: e.activo, abierto: e.recursoAbierto, montando: e.montando,
+                          solicitudes: e.solicitudes, recibidos: e.recibidos, bytes: e.bytes)
+                grupo.leave()
+            }
+            grupo.notify(queue: .main) {
+                // El minuto completo tuvo el maestro activo. Después se prueba
+                // también la guarda independiente del maestro.
+                Config.set("continuo_activo", to: false)
+                ActivacionVoz.shared.reconciliar(habilitado: true, puedeEscuchar: true,
+                                                 activadores: ["Beto"]) { _ in }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    let vozLibre = !ActivacionVoz.shared.ocupaMicrofono
+                    if !vozLibre { fallos += 1 }
+                    print("BITACORAREPOSO \(vozLibre ? "OK" : "FALLA") activación por voz, maestro apagado")
+                    print("BITACORAREPOSO \(fallos == 0 ? "OK" : "FALLA") \(Int(Date().timeIntervalSince(inicio))) s, default=\(predeterminado)")
+                    ContinuoBitacora.detener()
+                    Log.vaciar(); fflush(stdout); exit(fallos == 0 ? 0 : 1)
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 75) {
+            print("BITACORAREPOSO FALLA: tiempo agotado"); fflush(stdout); exit(4)
+        }
+        return true
     }
 }

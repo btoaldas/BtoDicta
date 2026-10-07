@@ -1,12 +1,12 @@
 # Spec 013 — Bitácora solo de grabaciones
 
-- Estado: Borrador — pendiente de aprobación
+- Estado: Aprobada
 - Tipo: funcionalidad
 - Nivel: X (heredado del ROADMAP)
 - Fecha: 2026-10-06
 - Modifica: ninguna; complementa la captura de bitácora existente
-- Aprobada por: PENDIENTE
-- Rama de implementación propuesta: `codex/013-bitacora-solo-grabaciones`
+- Aprobada por: Alberto, 2026-10-06 — «si dale», en respuesta a continuar con plan, tareas e implementación
+- Rama de implementación: `main`, excepción del módulo bitácora en AGENTS.md
 
 ## 1. Problema y propósito
 

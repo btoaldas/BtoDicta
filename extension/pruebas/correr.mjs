@@ -10,6 +10,7 @@
 // entera para leer un formulario de mentira.
 
 import { extraerTexto, tieneCampoDeContrasena } from "../src/texto.js";
+import { readFileSync } from "node:fs";
 import {
   normalizarDominio, dominioDe, estaExcluida,
   leerExcluidos, guardarExcluidos, excluir, dejarDeExcluir,
@@ -131,7 +132,7 @@ chk(orden.join(",") === "a.test,b.test", "las entradas vacías se descartan y la
 // El caso que da sentido a toda la extensión: un vídeo sonando en una pestaña
 // mientras se trabaja en otra. Eso es lo que macOS no puede ver.
 
-const { fotografiar } = await import("../src/fondo.js");
+const { fotografiar, consultarCaptura, capturarPestaña, contarPagina } = await import("../src/fondo.js");
 
 const abiertas = [
   { url: "https://correo.test/bandeja", title: "Bandeja", active: true,  audible: false },
@@ -153,6 +154,137 @@ chk(vid.audible === true,
     "pero SÍ que suena: es un dato sin contenido, y es el que evita anotar una película como trabajo");
 chk(conExcluido.pestanas[2].url === "", "y la pestaña del banco queda muda del todo");
 chk(conExcluido.pestanas[0].url.includes("correo"), "mientras lo no excluido se sigue contando entero");
+
+// ---------- Spec 013: permiso antes de recoger contenido ----------
+
+let metadatosLeidos = 0;
+const pestañaEnReposo = {
+  active: true, audible: true,
+  get url() { metadatosLeidos++; return "https://ejemplo.test/privado"; },
+  get title() { metadatosLeidos++; return "Título de prueba"; },
+};
+const minima = await fotografiar({ pestañas: [pestañaEnReposo], excluidos: [], contenidoPermitido: false });
+chk(metadatosLeidos === 0 && minima.pestanas[0].url === "" && minima.pestanas[0].titulo === "",
+    "en reposo ni se consultan URL ni título de pestañas");
+chk(minima.pestanas[0].audible && minima.pestanas[0].activa,
+    "los guardias conservan solo las señales activa y audible");
+
+const permisoA = { capturando: true, solo_grabaciones: true, pantalla_activa: true,
+  sesion: "sesion-a", generacion: 1, inicio: 1_800_000_000 };
+let consultas = 0;
+let respuestaPermiso = permisoA;
+const peticionPermiso = async () => { consultas++; return { ok: true, json: async () => respuestaPermiso }; };
+const consulta = { ahora: 100_000, peticion: peticionPermiso, obtenerToken: async () => "token-simulado" };
+await Promise.all([consultarCaptura(consulta), consultarCaptura(consulta)]);
+chk(consultas === 1, "las pestañas comparten la consulta simultánea de permiso");
+await consultarCaptura({ ...consulta, ahora: 100_250 });
+chk(consultas === 1, "el sondeo comparte su estado durante medio segundo");
+respuestaPermiso = { capturando: false, solo_grabaciones: true };
+const revocado = await consultarCaptura({ ...consulta, ahora: 100_251, forzar: true });
+chk(!revocado.capturando && consultas === 2, "revalidar antes de leer ignora el permiso cacheado y ve el cierre");
+const incompleto = await consultarCaptura({ ...consulta, ahora: 101_000, forzar: true,
+  peticion: async () => ({ ok: true, json: async () => ({ listo: true }) }) });
+chk(!incompleto.capturando, "una API sin contrato de captura nunca autoriza contenido");
+const sinApi = await consultarCaptura({ ...consulta, ahora: 102_000, forzar: true,
+  peticion: async () => { throw new Error("API simulada ausente"); } });
+chk(!sinApi.capturando, "una API ausente falla sin conceder permiso");
+const previas = consultas;
+await consultarCaptura({ ...consulta, ahora: 102_500, forzar: true });
+chk(consultas === previas, "la API caída respeta espera sin sondear en bucle");
+
+let imagenes = 0, ventanasConsultadas = 0;
+const navegadorSimulado = { tabs: {
+  query: async () => { ventanasConsultadas++; return [{ url: "https://ejemplo.test/" }]; },
+  captureVisibleTab: async () => { imagenes++; return "data:image/jpeg;base64,simulada"; },
+} };
+await capturarPestaña(permisoA, { navegador: navegadorSimulado, consultar: async () => ({ capturando: false }) });
+chk(imagenes === 0 && ventanasConsultadas === 0, "sin permiso ni siquiera se consulta la pestaña para capturar");
+let turnoPermiso = 0;
+await capturarPestaña(permisoA, { navegador: navegadorSimulado,
+  consultar: async () => (++turnoPermiso === 1 ? permisoA : { capturando: false }) });
+chk(imagenes === 0, "si el permiso termina durante las esperas, no se hace captura de pestaña");
+await capturarPestaña(permisoA, { navegador: navegadorSimulado,
+  consultar: async () => ({ ...permisoA, pantalla_activa: false }) });
+chk(imagenes === 0, "la fuente de pantalla desmarcada tampoco permite capturar desde la extensión");
+const imagenPermitida = await capturarPestaña(permisoA, { navegador: navegadorSimulado, consultar: async () => permisoA });
+chk(imagenes === 1 && Number.isFinite(imagenPermitida?.instante), "la captura autorizada lleva el instante en que empezó");
+
+let fotosDePagina = 0, cuerpoEnviado = null;
+const materialA = { ...permisoA, instante: 1_800_000_001, url: "https://ejemplo.test/", texto: "Contenido de prueba" };
+const dependenciasPagina = { consultar: async () => ({ ...permisoA, sesion: "sesion-b" }),
+  tomarFoto: async () => { fotosDePagina++; return { instante: 9, pestanas: [] }; },
+  capturas: async () => false,
+  mandar: async (_ruta, cuerpo) => { cuerpoEnviado = cuerpo; return true; } };
+await contarPagina(materialA, dependenciasPagina);
+chk(fotosDePagina === 0 && cuerpoEnviado?.sesion === "sesion-a" && cuerpoEnviado?.pestanas.length === 0,
+    "material ya leído de otra sesión conserva su identidad sin recoger contexto de la nueva");
+await contarPagina(materialA, { ...dependenciasPagina, consultar: async () => permisoA });
+chk(cuerpoEnviado?.sesion === "sesion-a" && cuerpoEnviado?.instante === materialA.instante,
+    "el envío conserva sesión e instante de lectura, aunque la foto termine después");
+
+// Se ejecuta el guion real con DOM y temporizador simulados. Los contadores
+// miden accesos; buscar una cadena de código no demostraría ausencia de lectura.
+let numeroGuion = 0;
+const contenidoFuente = readFileSync(new URL("../src/contenido.js", import.meta.url), "utf8");
+async function abrirContenido(estadoInicial, { validacion = null } = {}) {
+  const intervaloOriginal = globalThis.setInterval;
+  let tick, estado = estadoInicial, lecturas = 0, titulos = 0, urls = 0;
+  const mensajes = [];
+  let avisarListo;
+  const listo = new Promise((r) => { avisarListo = r; });
+  globalThis.document = {
+    visibilityState: "visible",
+    get body() { lecturas++; return el("P", [texto("Contenido visible neutro para la prueba de autorización de grabaciones.")]); },
+    get title() { titulos++; return "Página neutra"; },
+    querySelectorAll: () => [],
+  };
+  globalThis.location = { get href() { urls++; return "https://ejemplo.test/pagina"; } };
+  globalThis.chrome = { runtime: {
+    getURL: (ruta) => new URL("../" + ruta, import.meta.url).href,
+    sendMessage: async (msg) => {
+      if (msg.tipo === "permiso-captura") return estado;
+      if (msg.tipo === "validar-captura") return validacion ? validacion() : estado;
+      mensajes.push(msg); return {};
+    },
+  } };
+  globalThis.setInterval = (fn) => { tick = fn; avisarListo(); return 1; };
+  try {
+    // El guion clásico no tiene imports estáticos: Node lo cachearía como
+    // CommonJS por ruta ignorando la query. Un módulo de datos ejecuta sus
+    // mismos bytes de nuevo, sin modificar ni copiar el archivo de producción.
+    await import("data:text/javascript;base64," + Buffer.from(contenidoFuente).toString("base64")
+      + "#prueba=" + (++numeroGuion));
+    await listo;
+  } finally { globalThis.setInterval = intervaloOriginal; }
+  return { tick: () => tick(), estado: (nuevo) => { estado = nuevo; }, mensajes,
+    contadores: () => ({ lecturas, titulos, urls }) };
+}
+
+const reposo = await abrirContenido({ capturando: false });
+for (let n = 0; n < 120; n++) await reposo.tick();
+chk(Object.values(reposo.contadores()).every((n) => n === 0) && reposo.mensajes.length === 0,
+    "60 segundos de reposo simulados: cero DOM, URL, título y páginas enviadas");
+reposo.estado(permisoA);
+await reposo.tick();
+chk(reposo.contadores().lecturas > 0 && reposo.mensajes[0]?.sesion === "sesion-a"
+  && Number.isFinite(reposo.mensajes[0]?.instante), "una pestaña ya abierta recoge texto al comenzar la grabación");
+const lecturasTrasInicio = reposo.contadores().lecturas;
+await reposo.tick();
+chk(reposo.contadores().lecturas === lecturasTrasInicio, "el sondeo no vuelve a leer la misma página dentro de la ventana");
+reposo.estado({ capturando: false });
+for (let n = 0; n < 120; n++) await reposo.tick();
+chk(reposo.contadores().lecturas === lecturasTrasInicio, "detener o pausar cierra las lecturas posteriores de la página");
+const cierreDuranteEspera = await abrirContenido(permisoA, { validacion: () => ({ capturando: false }) });
+chk(cierreDuranteEspera.contadores().lecturas === 0 && cierreDuranteEspera.contadores().titulos === 0,
+    "si se cierra la ventana mientras cargan módulos, no se llega a leer DOM ni título");
+const sesionCruzada = await abrirContenido(permisoA, { validacion: () => ({ ...permisoA, sesion: "sesion-b" }) });
+chk(sesionCruzada.contadores().lecturas === 0 && sesionCruzada.mensajes.length === 0,
+    "un permiso de otra sesión no valida una lectura pendiente");
+const continuo = await abrirContenido({ ...permisoA, solo_grabaciones: false, sesion: null });
+chk(continuo.contadores().lecturas > 0 && continuo.mensajes.length === 1,
+    "el modo continuo explícito sigue leyendo páginas autorizadas");
+globalThis.chrome = undefined;
+globalThis.location = undefined;
 
 // ---------- T10: el envío no acumula ----------
 

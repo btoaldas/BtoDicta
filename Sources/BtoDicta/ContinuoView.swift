@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let continuoSoloGrabacionesCambio = Notification.Name("continuoSoloGrabacionesCambio")
+}
+
 /// Amortiguador para los deslizadores de la bitácora.
 ///
 /// Arrastrar uno dispara `didSet` en cada paso, y cada paso reconfiguraba el
@@ -28,6 +32,13 @@ private let acentoBitacora = Color(red: 0.36, green: 0.28, blue: 0.62)
 final class ContinuoModel: ObservableObject {
 
     @Published var activo: Bool { didSet { Config.set("continuo_activo", to: activo); aplicar() } }
+    @Published var soloGrabaciones: Bool {
+        didSet {
+            Config.set("continuo_solo_grabaciones", to: soloGrabaciones)
+            NotificationCenter.default.post(name: .continuoSoloGrabacionesCambio, object: nil)
+            aplicar()
+        }
+    }
     @Published var carpeta: String { didSet { Config.set("continuo_carpeta", to: carpeta) } }
 
     @Published var audioModo: String { didSet { Config.set("continuo_audio_modo", to: audioModo); aplicar() } }
@@ -201,6 +212,7 @@ final class ContinuoModel: ObservableObject {
 
     init() {
         activo = Config.continuoActivo()
+        soloGrabaciones = Config.continuoSoloGrabaciones()
         let raiz = Config.continuoCarpeta().path
         let casa = FileManager.default.homeDirectoryForCurrentUser.path
         carpeta = raiz.hasPrefix(casa) ? "~" + raiz.dropFirst(casa.count) : raiz
@@ -431,6 +443,12 @@ struct ContinuoView: View {
 
             Toggle("Activar la bitácora", isOn: $m.activo)
                 .help("Apagada de fábrica. Nada se graba hasta que la enciendas.")
+
+            Toggle("Activar solo de grabaciones", isOn: $m.soloGrabaciones)
+                .help("Recoge contexto solo mientras grabas desde el notch o el teclado. También suspende la activación por voz, incluso con la bitácora apagada. Desmárcala para recuperar la captura continua y tu preferencia de voz.")
+
+            Text("Solo de grabaciones también suspende la activación por voz; inicia desde el notch o el teclado.")
+                .font(.caption).foregroundStyle(.secondary)
 
             Text(m.resumen).font(.caption).foregroundStyle(.secondary)
 

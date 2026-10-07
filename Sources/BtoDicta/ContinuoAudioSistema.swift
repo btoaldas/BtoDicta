@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import ScreenCaptureKit
 
@@ -24,6 +25,8 @@ final class ContinuoAudioSistema: NSObject {
 
     private let cola = DispatchQueue(label: "btodicta.continuo.sistema")
     private var flujo: SCStream?
+    private var contextoFlujo: ContinuoCapturaSesion.Contexto?
+    private var generacionFlujo: UInt64?
     /// Cuántas veces seguidas se ha intentado recuperar tras un error. Se
     /// pone a cero en cuanto vuelve a entrar audio.
     private var reintentosTrasError = 0
@@ -34,8 +37,13 @@ final class ContinuoAudioSistema: NSObject {
     /// cerrarlo: solo se descarta si coinciden, porque un cambio de aplicación a
     /// mitad significa que en esos 30 s pasó algo más que el juego.
     private var focoAlAbrir: (app: String?, pista: String?) = (nil, nil)
+    private var veredictoAlAbrir: FiltroBitacora.Veredicto = .entra
+    private var ultimoFocoAutorizado: (app: String?, pista: String?) = (nil, nil)
+    private var ultimoVeredictoAutorizado: FiltroBitacora.Veredicto = .entra
+    private var instanteUltimoFoco = Date.distantPast
     private var inicioTrozo = Date()
     private var bytesTrozo = 0
+    private var sesionTrozo: String?
 
     private var conversor: AVAudioConverter?
     private let formatoSalida = AVAudioFormat(commonFormat: .pcmFormatInt16,
@@ -47,6 +55,27 @@ final class ContinuoAudioSistema: NSObject {
     /// Sube en cada detener(): un montaje que termina después de un apagado es
     /// de una generación vieja y debe soltar el flujo, no publicarlo.
     private var generacion: UInt64 = 0
+    private let candadoGeneracion = NSLock()
+    private var solicitudesMontaje = 0
+    private var muestrasRecibidas = 0
+
+    struct EstadoCaptura {
+        let activo: Bool
+        let recursoAbierto: Bool
+        let montando: Bool
+        let solicitudes: Int
+        let recibidos: Int
+        let bytes: Int
+    }
+
+    func estadoCaptura(_ completion: @escaping (EstadoCaptura) -> Void) {
+        cola.async { [weak self] in
+            guard let self else { return }
+            completion(EstadoCaptura(activo: self.activo, recursoAbierto: self.flujo != nil,
+                montando: self.montando, solicitudes: self.solicitudesMontaje,
+                recibidos: self.muestrasRecibidas, bytes: self.bytesTrozo))
+        }
+    }
 
     /// Último nivel medido de la salida, legible desde cualquier hilo. Es la
     /// señal que usa el micrófono para su puerta anti-eco.
@@ -66,33 +95,63 @@ final class ContinuoAudioSistema: NSObject {
 
     func arrancar() {
         guard Config.continuoActivo(), Config.continuoSistemaActivo() else { return }
-        cola.async { [weak self] in self?.arrancarEnCola() }
+        guard let autorizacion = ContinuoCapturaSesion.shared.contextoActual() else { return }
+        let gen = generacionActual()
+        cola.async { [weak self] in self?.arrancarEnCola(autorizacion: autorizacion, generacion: gen) }
     }
 
     func detener() {
+        invalidarGeneracion()
         cola.async { [weak self] in self?.detenerEnCola() }
     }
 
     func reconfigurar() {
+        let autorizacion = ContinuoCapturaSesion.shared.contextoActual()
         detener()
-        cola.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.arrancarEnCola() }
-    }
-
-    private func arrancarEnCola() {
-        guard !activo, !montando else { return }
-        if Config.continuoSoloConCorriente(), !EnergiaMac.conCorriente() { return }
-        montando = true
-        let gen = generacion
-        Task { [weak self] in
-            await self?.montar(gen: gen)
-            self?.cola.async { self?.montando = false }
+        let gen = generacionActual()
+        cola.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let autorizacion else { return }
+            self?.arrancarEnCola(autorizacion: autorizacion, generacion: gen)
         }
     }
 
-    private func montar(gen: UInt64) async {
+    private func generacionActual() -> UInt64 {
+        candadoGeneracion.lock(); defer { candadoGeneracion.unlock() }
+        return generacion
+    }
+
+    private func invalidarGeneracion() {
+        candadoGeneracion.lock(); generacion &+= 1; candadoGeneracion.unlock()
+    }
+
+    private func puedeCapturar(_ autorizacion: ContinuoCapturaSesion.Contexto,
+                              generacion gen: UInt64) -> Bool {
+        generacionActual() == gen && Config.continuoActivo()
+            && Config.continuoSistemaActivo() && !ModoRapido.pausaVigente()
+            && ContinuoCapturaSesion.shared.vigente(autorizacion)
+    }
+
+    private func arrancarEnCola(autorizacion: ContinuoCapturaSesion.Contexto, generacion gen: UInt64) {
+        guard puedeCapturar(autorizacion, generacion: gen) else { return }
+        guard !activo, !montando else { return }
+        if Config.continuoSoloConCorriente(), !EnergiaMac.conCorriente() { return }
+        montando = true
+        solicitudesMontaje += 1
+        Task { [weak self] in
+            await self?.montar(gen: gen, autorizacion: autorizacion)
+            self?.cola.async { [weak self] in
+                guard let self, self.generacionActual() == gen else { return }
+                self.montando = false
+            }
+        }
+    }
+
+    private func montar(gen: UInt64, autorizacion: ContinuoCapturaSesion.Contexto) async {
+        guard puedeCapturar(autorizacion, generacion: gen) else { return }
         do {
             let contenido = try await SCShareableContent.excludingDesktopWindows(false,
                                                                                 onScreenWindowsOnly: true)
+            guard puedeCapturar(autorizacion, generacion: gen) else { return }
             guard let pantalla = contenido.displays.first(where: { $0.displayID == CGMainDisplayID() })
                     ?? contenido.displays.first else { return }
 
@@ -139,7 +198,12 @@ final class ContinuoAudioSistema: NSObject {
                                          exceptingWindows: [])
             let s = SCStream(filter: filtro, configuration: conf, delegate: self)
             try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: cola)
+            guard puedeCapturar(autorizacion, generacion: gen) else { return }
             try await s.startCapture()
+            guard puedeCapturar(autorizacion, generacion: gen) else {
+                try? await s.stopCapture()
+                return
+            }
 
             cola.async { [weak self] in
                 guard let self else { Task { try? await s.stopCapture() }; return }
@@ -147,12 +211,17 @@ final class ContinuoAudioSistema: NSObject {
                 // ajuste, o una reconfiguración), este flujo es de una
                 // generación vieja: se detiene aquí mismo en vez de quedar
                 // huérfano capturando con el indicador encendido.
-                guard self.generacion == gen, Config.continuoActivo(), Config.continuoSistemaActivo() else {
+                guard self.puedeCapturar(autorizacion, generacion: gen) else {
                     Task { try? await s.stopCapture() }
                     Log.log(.sistema, "bitácora: montaje del audio del sistema descartado (apagado durante el arranque)")
                     return
                 }
                 self.flujo = s
+                self.contextoFlujo = autorizacion
+                self.generacionFlujo = gen
+                self.instanteUltimoFoco = .distantPast
+                self.ultimoFocoAutorizado = (nil, nil)
+                self.ultimoVeredictoAutorizado = .entra
                 self.activo = true
                 Log.log(.sistema, "bitácora: audio del sistema en marcha")
             }
@@ -162,21 +231,25 @@ final class ContinuoAudioSistema: NSObject {
     }
 
     private func detenerEnCola() {
-        generacion &+= 1
         Self.publicarNivel(0)
-        guard let s = flujo else { cerrarTrozo(); return }
+        montando = false
+        let s = flujo
         flujo = nil
         activo = false
-        Task { try? await s.stopCapture() }
+        if let s { Task { try? await s.stopCapture() } }
         cerrarTrozo()
+        contextoFlujo = nil
+        generacionFlujo = nil
         conversor = nil
     }
 
     // MARK: Escritura
 
     fileprivate func recibir(_ muestra: CMSampleBuffer) {
-        guard activo, Config.continuoSistemaActivo() else { return }
+        guard activo, let autorizacion = contextoFlujo, let gen = generacionFlujo,
+              puedeCapturar(autorizacion, generacion: gen) else { return }
         guard !ModoRapido.pausaVigente() else { return }   // pausa del usuario (spec 010)
+        actualizarFoco(autorizacion: autorizacion, generacion: gen)
         guard let pcm = convertir(muestra) else { return }
 
         let n = nivel(pcm)
@@ -186,7 +259,23 @@ final class ContinuoAudioSistema: NSObject {
         if Config.continuoSistemaSoloConSonido() {
             guard n >= Config.continuoSistemaUmbral() else { return }
         }
-        escribir(pcm)
+        escribir(pcm, autorizacion: autorizacion, generacion: gen)
+    }
+
+    /// El filtro conserva el último contexto recogido dentro de la ventana.
+    /// Se usa el informe ya recibido del navegador, sin pedirle otra lectura
+    /// ni bloquear la cola de audio con AppleScript.
+    private func actualizarFoco(autorizacion: ContinuoCapturaSesion.Contexto, generacion gen: UInt64) {
+        guard FiltroBitacora.hayReglas,
+              Date().timeIntervalSince(instanteUltimoFoco) >= 1,
+              puedeCapturar(autorizacion, generacion: gen) else { return }
+        let app = NSWorkspace.shared.frontmostApplication?.localizedName
+        let pista = ContinuoPantalla.tituloVentanaAlFrente()
+        let veredicto = FiltroBitacora.decidirConNavegador(app: app, pista: pista)
+        guard puedeCapturar(autorizacion, generacion: gen) else { return }
+        ultimoFocoAutorizado = (app, pista)
+        ultimoVeredictoAutorizado = veredicto
+        instanteUltimoFoco = Date()
     }
 
     /// De lo que entrega ScreenCaptureKit (48 kHz estéreo en coma flotante) al
@@ -243,8 +332,10 @@ final class ContinuoAudioSistema: NSObject {
         }
     }
 
-    private func escribir(_ datos: Data) {
-        if mano == nil { abrirTrozo() }
+    private func escribir(_ datos: Data, autorizacion: ContinuoCapturaSesion.Contexto, generacion gen: UInt64) {
+        guard puedeCapturar(autorizacion, generacion: gen), !datos.isEmpty else { return }
+        if mano == nil { abrirTrozo(autorizacion: autorizacion, generacion: gen) }
+        guard mano != nil else { return }
         // write(contentsOf:) LANZA en vez de abortar el proceso: con el disco
         // lleno, la grabación continua no puede llevarse la app (y el dictado)
         // por delante. Se cierra el trozo y se deja constancia.
@@ -258,22 +349,25 @@ final class ContinuoAudioSistema: NSObject {
         }
         if Date().timeIntervalSince(inicioTrozo) >= Double(Config.continuoAudioSegmentoSegundos()) {
             cerrarTrozo()
-            abrirTrozo()
         }
     }
 
-    private func abrirTrozo() {
+    private func abrirTrozo(autorizacion: ContinuoCapturaSesion.Contexto, generacion gen: UInt64) {
+        guard puedeCapturar(autorizacion, generacion: gen) else { return }
         if mano != nil { cerrarTrozo() }
         let ahora = Date()
         let carpeta = ContinuoAudio.carpetaDelDia(ahora, sub: "sistema")
         try? FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
-        let url = carpeta.appendingPathComponent(ContinuoAudio.sello(ahora) + ".pcm")
+        let url = carpeta.appendingPathComponent(ContinuoAudio.sello(ahora)
+            + "-" + UUID().uuidString.prefix(8) + ".pcm")
         FileManager.default.createFile(atPath: url.path, contents: nil,
                                        attributes: [.posixPermissions: 0o600])
         mano = try? FileHandle(forWritingTo: url)
         rutaTrozo = url
         inicioTrozo = ahora
-        focoAlAbrir = FiltroBitacora.contextoDelFrente()
+        sesionTrozo = autorizacion.sesion
+        focoAlAbrir = ultimoFocoAutorizado
+        veredictoAlAbrir = ultimoVeredictoAutorizado
         bytesTrozo = 0
     }
 
@@ -284,6 +378,8 @@ final class ContinuoAudioSistema: NSObject {
         rutaTrozo = nil
         let inicio = inicioTrozo
         let bytes = bytesTrozo
+        let sesion = sesionTrozo
+        sesionTrozo = nil
         guard bytes > 16_000 else { try? FileManager.default.removeItem(at: url); return }
         let duracion = Double(bytes) / 32_000.0
 
@@ -298,10 +394,10 @@ final class ContinuoAudioSistema: NSObject {
         // Si cambiaste de aplicación a mitad, en esos treinta segundos pasó algo
         // más y el trozo se conserva — ante la duda, se guarda.
         if FiltroBitacora.hayReglas {
-            let ahoraFoco = FiltroBitacora.contextoDelFrente()
-            let alAbrir = FiltroBitacora.decidirConNavegador(app: focoAlAbrir.app, pista: focoAlAbrir.pista)
-            let alCerrar = FiltroBitacora.decidirConNavegador(app: ahoraFoco.app, pista: ahoraFoco.pista)
-            if case .fuera(let motivo) = alAbrir, case .fuera = alCerrar {
+            // Cerrar un trozo no abre otra ventana de captura: se reutiliza
+            // el veredicto de la última muestra autorizada.
+            let alCerrar = ultimoVeredictoAutorizado
+            if case .fuera(let motivo) = veredictoAlAbrir, case .fuera = alCerrar {
                 // No se borra: se aparta a la papelera de la bitácora, donde se
                 // puede recuperar unos días. Lo que hoy no interesa puede
                 // interesar mañana, y el coste de guardarlo unos días es bajo.
@@ -313,7 +409,7 @@ final class ContinuoAudioSistema: NSObject {
         // `origen: "sistema"` es lo que hace que en la línea de tiempo aparezca
         // como «audio del sistema» y no se confunda con lo que dijo la persona.
         ContinuoIndice.shared.registrarAudio(ruta: url, instante: inicio,
-                                             duracion: duracion, origen: "sistema")
+                                             duracion: duracion, origen: "sistema", sesion: sesion)
     }
 }
 
@@ -324,6 +420,10 @@ extension ContinuoAudioSistema: SCStreamOutput, SCStreamDelegate {
 
     func stream(_ stream: SCStream, didOutputSampleBuffer muestra: CMSampleBuffer,
                 of tipo: SCStreamOutputType) {
+        // Un flujo de una sesión anterior puede entregar su último buffer
+        // después de arrancar el siguiente. Nunca se mezcla con el flujo nuevo.
+        guard flujo === stream else { return }
+        muestrasRecibidas += 1
         // Entra audio: la recuperación funcionó, el contador vuelve a cero.
         if reintentosTrasError != 0 { reintentosTrasError = 0 }
         guard tipo == .audio, CMSampleBufferIsValid(muestra) else { return }
@@ -333,10 +433,15 @@ extension ContinuoAudioSistema: SCStreamOutput, SCStreamDelegate {
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         Log.log(.sistema, "bitácora: el audio del sistema se detuvo — \(error.localizedDescription)")
         cola.async { [weak self] in
-            guard let self else { return }
+            guard let self, self.flujo === stream,
+                  let autorizacion = self.contextoFlujo else { return }
+            self.invalidarGeneracion()
+            let gen = self.generacionActual()
             self.activo = false
             self.flujo = nil
             self.cerrarTrozo()
+            self.contextoFlujo = nil
+            self.generacionFlujo = nil
             // Y SE VUELVE A MONTAR. Antes se quedaba muerto hasta que alguien
             // tocara los ajustes: el usuario no se entera de que dejó de grabar
             // el audio del sistema, porque nada se lo dice. Lo que lo tumba
@@ -353,8 +458,8 @@ extension ContinuoAudioSistema: SCStreamOutput, SCStreamDelegate {
             let espera = Double(self.reintentosTrasError) * 3
             Log.log(.sistema, "bitácora: reintento el audio del sistema en \(Int(espera)) s (intento \(self.reintentosTrasError) de 5)")
             self.cola.asyncAfter(deadline: .now() + espera) { [weak self] in
-                guard let self, Config.continuoActivo() else { return }
-                self.arrancar()
+                guard let self, self.puedeCapturar(autorizacion, generacion: gen) else { return }
+                self.arrancarEnCola(autorizacion: autorizacion, generacion: gen)
             }
         }
     }

@@ -25,6 +25,14 @@ final class ContinuoPantalla {
     private var capturando = false
     private var inicioIntento = Date.distantPast
     private var capturaLentaAvisada = false
+    private var intentoActual: UUID?
+    private var contextoReloj: ContinuoCapturaSesion.Contexto?
+    private var generacionReloj: UInt64?
+    private let candadoGeneracion = NSLock()
+    private var generacion: UInt64 = 0
+    private let candadoContadores = NSLock()
+    private var solicitudesImagen = 0
+    private var imagenesRecibidas = 0
     /// Por monitor: comparar la huella de una pantalla contra la de OTRA haría
     /// que la deduplicación no funcionara nunca (o siempre) con varias.
     /// CONFINADOS a la cola `escribir`: los muta el Task de captura (executor
@@ -38,31 +46,63 @@ final class ContinuoPantalla {
 
     private(set) var activo = false
 
+    struct EstadoCaptura {
+        let activo: Bool
+        let recursoAbierto: Bool
+        let montando: Bool
+        let solicitudes: Int
+        let recibidos: Int
+        let bytes: Int
+    }
+
+    func estadoCaptura(_ completion: @escaping (EstadoCaptura) -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.candadoContadores.lock()
+            let solicitudes = self.solicitudesImagen, recibidos = self.imagenesRecibidas
+            self.candadoContadores.unlock()
+            completion(EstadoCaptura(activo: self.activo, recursoAbierto: self.reloj != nil,
+                montando: self.capturando, solicitudes: solicitudes, recibidos: recibidos, bytes: 0))
+        }
+    }
+
     private init() {}
 
     // MARK: Ciclo de vida
 
     func arrancar() {
         guard Config.continuoActivo(), Config.continuoPantallaActiva() else { return }
-        guard !activo else { return }
+        guard let autorizacion = ContinuoCapturaSesion.shared.contextoActual() else { return }
+        let gen = generacionActual()
         let intervalo = Double(Config.continuoPantallaIntervaloSegundos())
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self, self.puedeCapturar(autorizacion, generacion: gen) else { return }
+            guard !self.activo else { return }
             self.reloj?.invalidate()
             self.reloj = Timer.scheduledTimer(withTimeInterval: intervalo, repeats: true) { [weak self] _ in
                 self?.tic()
             }
             self.activo = true
+            self.contextoReloj = autorizacion
+            self.generacionReloj = gen
             Log.log(.sistema, "bitácora: pantalla cada \(Int(intervalo)) s")
+            // No esperar al primer intervalo: un dictado corto también obtiene
+            // contexto desde que comienza su ventana autorizada.
+            if Config.continuoSoloGrabaciones() { self.tic() }
         }
     }
 
     func detener() {
+        candadoGeneracion.lock(); generacion &+= 1; candadoGeneracion.unlock()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.reloj?.invalidate()
             self.reloj = nil
             self.activo = false
+            self.contextoReloj = nil
+            self.generacionReloj = nil
+            self.capturando = false
+            self.intentoActual = nil
             // En su cola, no aquí: una captura en vuelo puede estar mutando el
             // diccionario en este mismo instante.
             self.escribir.async { [weak self] in self?.huellaPrevia = [:] }
@@ -71,13 +111,31 @@ final class ContinuoPantalla {
 
     /// Aplica un cambio de intervalo sin reiniciar la app.
     func reconfigurar() {
+        let autorizacion = ContinuoCapturaSesion.shared.contextoActual()
         detener()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.arrancar() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let autorizacion, ContinuoCapturaSesion.shared.vigente(autorizacion) else { return }
+            self?.arrancar()
+        }
+    }
+
+    private func generacionActual() -> UInt64 {
+        candadoGeneracion.lock(); defer { candadoGeneracion.unlock() }
+        return generacion
+    }
+
+    private func puedeCapturar(_ autorizacion: ContinuoCapturaSesion.Contexto,
+                              generacion gen: UInt64) -> Bool {
+        generacionActual() == gen && Config.continuoActivo()
+            && Config.continuoPantallaActiva() && !ModoRapido.pausaVigente()
+            && ContinuoCapturaSesion.shared.vigente(autorizacion)
     }
 
     // MARK: Captura
 
     private func tic() {
+        guard activo, let autorizacion = contextoReloj, let gen = generacionReloj else { return }
+        guard puedeCapturar(autorizacion, generacion: gen) else { return }
         // `capturando` no puede quedarse pegado: si `SCShareableContent` se
         // queda esperando (permiso de grabación de pantalla sin conceder tras
         // reinstalar el binario), sin este rescate el módulo enmudece para
@@ -118,18 +176,26 @@ final class ContinuoPantalla {
         capturando = true
         inicioIntento = Date()
         capturaLentaAvisada = false
+        let intento = UUID()
+        intentoActual = intento
         Task { [weak self] in
-            await self?.capturar()
-            self?.capturando = false
+            await self?.capturar(autorizacion: autorizacion, generacion: gen)
+            DispatchQueue.main.async { [weak self] in
+                // Un resultado viejo no libera el intento de una sesión nueva.
+                guard let self, self.intentoActual == intento else { return }
+                self.capturando = false
+                self.intentoActual = nil
+            }
         }
     }
 
-    private func capturar() async {
+    private func capturar(autorizacion: ContinuoCapturaSesion.Contexto, generacion gen: UInt64) async {
         // Pausa del usuario (spec 010): ni una captura.
-        guard !ModoRapido.pausaVigente() else { return }
+        guard puedeCapturar(autorizacion, generacion: gen) else { return }
         do {
             let contenido = try await SCShareableContent.excludingDesktopWindows(false,
                                                                                 onScreenWindowsOnly: true)
+            guard puedeCapturar(autorizacion, generacion: gen) else { return }
             let elegidos = Self.monitoresElegidos(de: contenido)
             guard !elegidos.isEmpty else { return }
 
@@ -142,6 +208,13 @@ final class ContinuoPantalla {
                 // se desconectó a mitad de la enumeración lanzaría y las
                 // siguientes perderían su captura sin motivo.
                 do {
+                    guard puedeCapturar(autorizacion, generacion: gen) else { return }
+                    let previo = await metadatos(autorizacion: autorizacion, generacion: gen)
+                    guard let previo else { return }
+                    if let motivo = Self.motivoParaNoCapturar(app: previo.app, ventana: previo.ventana) {
+                        Self.avisarOmision(motivo)
+                        continue
+                    }
                     let filtro = SCContentFilter(display: pantalla,
                                                  excludingApplications: apps,
                                                  exceptingWindows: [])
@@ -157,9 +230,18 @@ final class ContinuoPantalla {
                     conf.showsCursor = false
                     conf.captureResolution = .best
 
+                    guard puedeCapturar(autorizacion, generacion: gen) else { return }
+                    registrarSolicitud()
                     let imagen = try await SCScreenshotManager.captureImage(contentFilter: filtro,
                                                                            configuration: conf)
-                    procesar(imagen, monitor: Int(pantalla.displayID))
+                    registrarImagenRecibida()
+                    // La imagen se autoriza al recibirla. Después, su escritura
+                    // y OCR pueden terminar aun cuando el dictado ya haya cesado.
+                    guard puedeCapturar(autorizacion, generacion: gen) else { return }
+                    let instante = Date()
+                    guard let datos = await metadatos(autorizacion: autorizacion, generacion: gen) else { return }
+                    procesar(imagen, monitor: Int(pantalla.displayID), instante: instante,
+                             autorizacion: autorizacion, datos: datos)
                 } catch {
                     Log.log(.sistema, "bitácora: la pantalla \(pantalla.displayID) no se pudo capturar (\(error.localizedDescription)) — sigo con las demás")
                 }
@@ -169,8 +251,33 @@ final class ContinuoPantalla {
         }
     }
 
-    private func procesar(_ imagen: CGImage, monitor: Int) {
-        let ahora = Date()
+    private func registrarSolicitud() {
+        candadoContadores.lock(); solicitudesImagen += 1; candadoContadores.unlock()
+    }
+
+    private func registrarImagenRecibida() {
+        candadoContadores.lock(); imagenesRecibidas += 1; candadoContadores.unlock()
+    }
+
+    private struct Metadatos {
+        let app: String?
+        let ventana: String?
+        let visibles: [String]
+    }
+
+    /// Leer el foco forma parte de capturar contexto. No se pospone hasta la
+    /// cola de disco, donde podría pertenecer a otra grabación o al reposo.
+    @MainActor private func metadatos(autorizacion: ContinuoCapturaSesion.Contexto,
+                                     generacion gen: UInt64) -> Metadatos? {
+        guard puedeCapturar(autorizacion, generacion: gen) else { return nil }
+        let app = NSWorkspace.shared.frontmostApplication?.localizedName
+        return Metadatos(app: app, ventana: Self.tituloVentanaAlFrente(),
+                         visibles: Config.continuoPantallaAppsVisibles()
+                            ? Self.appsALaVista(excluyendo: app) : [])
+    }
+
+    private func procesar(_ imagen: CGImage, monitor: Int, instante ahora: Date,
+                          autorizacion: ContinuoCapturaSesion.Contexto, datos: Metadatos) {
         // Todo dentro de `escribir`: es la única dueña de huellaPrevia y
         // ultimaEscritura, así dos capturas solapadas o un detener() en main
         // nunca los tocan a la vez.
@@ -193,9 +300,8 @@ final class ContinuoPantalla {
             }
 
             self.ultimaEscritura[monitor] = ahora
-            let frente = NSWorkspace.shared.frontmostApplication
-            let app = frente?.localizedName
-            let ventana = Self.tituloVentanaAlFrente()
+            let app = datos.app
+            let ventana = datos.ventana
 
             // Segunda capa, sobre la exclusión que ya hace el sistema por
             // aplicación: un navegador se llama igual esté donde esté, y lo que
@@ -208,14 +314,11 @@ final class ContinuoPantalla {
                 Self.avisarOmision(motivo)
                 return
             }
-            let visibles = Config.continuoPantallaAppsVisibles()
-                ? Self.appsALaVista(excluyendo: app)
-                : []
-
             guard let url = self.guardar(imagen, instante: ahora, monitor: monitor) else { return }
             ContinuoIndice.shared.registrarPantalla(ruta: url, instante: ahora,
                                                     app: app, ventana: ventana,
-                                                    monitor: monitor, visibles: visibles)
+                                                    monitor: monitor, visibles: datos.visibles,
+                                                    sesion: autorizacion.sesion)
         }
     }
 
@@ -229,7 +332,8 @@ final class ContinuoPantalla {
         let ext = extensiones[formato] ?? "jpg"
         // El identificador del monitor va en el nombre: tres pantallas en el
         // mismo segundo no pueden pisarse el archivo.
-        let url = carpeta.appendingPathComponent(ContinuoAudio.sello(instante) + "-m\(monitor)." + ext)
+        let url = carpeta.appendingPathComponent(ContinuoAudio.sello(instante)
+            + "-m\(monitor)-" + UUID().uuidString.prefix(8) + "." + ext)
 
         guard let destino = CGImageDestinationCreateWithURL(url as CFURL,
                                                             (tipos[formato] ?? .jpeg).identifier as CFString,
@@ -278,7 +382,9 @@ final class ContinuoPantalla {
     /// Una sola línea cada diez minutos: si no, una tarde con el gestor de
     /// contraseñas abierto llena el registro de avisos idénticos.
     private static var ultimoAvisoOmision = Date.distantPast
+    private static let candadoAvisoOmision = NSLock()
     private static func avisarOmision(_ motivo: String) {
+        candadoAvisoOmision.lock(); defer { candadoAvisoOmision.unlock() }
         guard Date().timeIntervalSince(ultimoAvisoOmision) > 600 else { return }
         ultimoAvisoOmision = Date()
         Log.log(.sistema, "bitácora: no capturo la pantalla (\(motivo)) — es una de las que decidiste proteger")

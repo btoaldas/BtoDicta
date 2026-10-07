@@ -756,17 +756,22 @@ enum Failover {
     /// Igual, pero sobre una cadena dada: sirve para fijar un único proveedor
     /// sin perder su configuración de modelo y credenciales.
     static func transcribe(wav: Data, cadena: [Provider],
+                           permitirSolicitud: (() -> Bool)? = nil,
                            completion: @escaping (Result<(String, String, String), Error>) -> Void) {
-        intentar(wav: .datos(wav), cadena: cadena, idx: 0, ultimoError: nil, completion: completion)
+        intentar(wav: .datos(wav), cadena: cadena, idx: 0, ultimoError: nil, permitirSolicitud: permitirSolicitud, completion: completion)
     }
 
     static func transcribe(wav: CuerpoMultipart.Origen, cadena: [Provider],
+                           permitirSolicitud: (() -> Bool)? = nil,
                            completion: @escaping (Result<(String, String, String), Error>) -> Void) {
-        intentar(wav: wav, cadena: cadena, idx: 0, ultimoError: nil, completion: completion)
+        intentar(wav: wav, cadena: cadena, idx: 0, ultimoError: nil, permitirSolicitud: permitirSolicitud, completion: completion)
     }
 
     private static func intentar(wav: CuerpoMultipart.Origen, cadena: [Provider], idx: Int,
-                                 ultimoError: Error?, completion: @escaping (Result<(String, String, String), Error>) -> Void) {
+                                 ultimoError: Error?, permitirSolicitud: (() -> Bool)? = nil, completion: @escaping (Result<(String, String, String), Error>) -> Void) {
+        guard permitirSolicitud?() != false else {
+            completion(.failure(ScribeError.ws("Captura ambiental suspendida"))); return
+        }
         guard idx < cadena.count else {
             completion(.failure(ultimoError ?? ScribeError.sinTexto)); return
         }
@@ -775,7 +780,7 @@ enum Failover {
         // el siguiente de la cascada responde ya.
         if p.id == "elevenlabs" && StreamClient.enCuarentena {
             Log.log(.ia, "failover: ElevenLabs en cuarentena breve (su streaming cayó hace menos de 1 min) → siguiente")
-            intentar(wav: wav, cadena: cadena, idx: idx + 1, ultimoError: ultimoError, completion: completion)
+            intentar(wav: wav, cadena: cadena, idx: idx + 1, ultimoError: ultimoError, permitirSolicitud: permitirSolicitud, completion: completion)
             return
         }
         // Fallo DETERMINISTA reciente (4xx: key/cuota/parámetro deprecado): se salta sin
@@ -784,7 +789,7 @@ enum Failover {
             let d = CuarentenaSTT.detalle(p.id)
             intentar(wav: wav, cadena: cadena, idx: idx + 1,
                      ultimoError: ultimoError ?? ScribeError.http(d?.codigo ?? 0, "\(p.nombre) \(d?.texto ?? "en cuarentena")"),
-                     completion: completion)
+                     permitirSolicitud: permitirSolicitud, completion: completion)
             return
         }
         Log.log(.ia, "failover: intentando \(p.nombre) (#\(idx + 1))")
@@ -825,15 +830,19 @@ enum Failover {
                 CuarentenaSTT.limpiar(p.id)
                 completion(.success((texto, p.nombre, modeloUsado)))
             case .failure(let e):
+                guard permitirSolicitud?() != false else { completion(.failure(e)); return }
                 Log.log(.ia, "failover: \(p.nombre) falló (\(e.localizedDescription)) → siguiente")
                 CuarentenaSTT.registrar(p.id, nombre: p.nombre, error: e)
-                intentar(wav: wav, cadena: cadena, idx: idx + 1, ultimoError: e, completion: completion)
+                intentar(wav: wav, cadena: cadena, idx: idx + 1, ultimoError: e, permitirSolicitud: permitirSolicitud, completion: completion)
             }
         }
         // Un SOLO punto de envío por motor. Troceo lo usa para reintentar el
         // mismo motor con el audio partido cuando el techo del proveedor —que
         // nadie declara igual— rechaza el envío entero.
         let enviarAlMotor: (CuerpoMultipart.Origen, @escaping (Result<String, Error>) -> Void) -> Void = { fuente, cb in
+            guard permitirSolicitud?() != false else {
+                cb(.failure(ScribeError.ws("Captura ambiental suspendida"))); return
+            }
             switch p.id {
 
             case "elevenlabs": transcribeBatch(wav: fuente, model: elevenModel(p)) { cb($0) }
@@ -898,7 +907,7 @@ enum Failover {
             default: cb(.failure(ScribeError.sinTexto))
             }
         }
-        Troceo.enviarPartiendo(wav, motor: p.id, enviar: enviarAlMotor) { siguiente($0) }
+        Troceo.enviarPartiendo(wav, motor: p.id, permitirSolicitud: permitirSolicitud, enviar: enviarAlMotor) { siguiente($0) }
     }
 
     private static func elevenModel(_ p: Provider) -> String {

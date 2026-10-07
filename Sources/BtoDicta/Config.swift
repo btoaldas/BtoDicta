@@ -1046,6 +1046,16 @@ struct Config {
     /// Interruptor maestro. Apagado de fábrica: nada se graba sin decisión explícita.
     static func continuoActivo() -> Bool { (json()["continuo_activo"] as? Bool) ?? false }
 
+    /// Sin preferencia anterior se adopta el modo seguro, también al actualizar.
+    /// La elección explícita `false` se conserva y el maestro no cambia.
+    static func continuoSoloGrabaciones() -> Bool { continuoSoloGrabaciones(en: json()) }
+
+    /// Variante pura para comprobar instalaciones nuevas y actualizaciones sin
+    /// leer ni reescribir la configuración de la persona que ejecuta las pruebas.
+    static func continuoSoloGrabaciones(en preferencias: [String: Any]) -> Bool {
+        (preferencias["continuo_solo_grabaciones"] as? Bool) ?? true
+    }
+
     /// Carpeta raíz de la bitácora. Vacío = `~/BtoDicta Bitácora` (acceso rápido
     /// desde el Finder, igual que las grabaciones de pantalla).
     static func continuoCarpeta() -> URL {

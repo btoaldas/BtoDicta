@@ -56,11 +56,12 @@ enum PorteroVoz {
     /// Y se pregunta en orden, parando en cuanto uno oye voz: al segundo solo se
     /// le consulta cuando el primero dijo que no había nada, que es justo el
     /// caso en el que conviene una segunda opinión.
-    static func hayVoz(en archivo: URL, motores: [String]) -> Veredicto {
+    static func hayVoz(en archivo: URL, motores: [String], permitirSolicitud: (() -> Bool)? = nil) -> Veredicto {
         guard !motores.isEmpty else { return .noSePudo }
         var algunoRespondio = false
         for m in motores {
-            switch hayVoz(en: archivo, motor: m) {
+            guard permitirSolicitud?() != false else { return .noSePudo }
+            switch hayVoz(en: archivo, motor: m, permitirSolicitud: permitirSolicitud) {
             case .hayVoz:   return .hayVoz          // uno basta para abrir
             case .silencio: algunoRespondio = true  // sigue preguntando
             case .noSePudo: continue                // ese juez no cuenta
@@ -70,7 +71,8 @@ enum PorteroVoz {
         return algunoRespondio ? .silencio : .noSePudo
     }
 
-    static func hayVoz(en archivo: URL, motor: String) -> Veredicto {
+    static func hayVoz(en archivo: URL, motor: String, permitirSolicitud: (() -> Bool)? = nil) -> Veredicto {
+        guard permitirSolicitud?() != false else { return .noSePudo }
         let datos: Data
         if archivo.pathExtension.lowercased() == "pcm" {
             guard let crudo = try? Data(contentsOf: archivo) else { return .noSePudo }
@@ -92,6 +94,7 @@ enum PorteroVoz {
             semaforo.signal()
         }
 
+        guard permitirSolicitud?() != false else { return .noSePudo }
         switch motor {
         case "apple_speech":
             AppleSpeechSTT.run(wav: .datos(datos), idioma: nil, completion: terminar)
@@ -100,7 +103,7 @@ enum PorteroVoz {
             // así conserva su modelo y su configuración.
             let cadena = Providers.cadena().filter { $0.id == motor }
             guard !cadena.isEmpty else { return .noSePudo }
-            Failover.transcribe(wav: .datos(datos), cadena: cadena) { r in
+            Failover.transcribe(wav: .datos(datos), cadena: cadena, permitirSolicitud: permitirSolicitud) { r in
                 terminar(r.map { $0.0 })
             }
         }

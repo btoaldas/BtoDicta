@@ -81,6 +81,22 @@ enum ContinuoLote {
 
     // MARK: Trabajo
 
+    /// El pedido manual puede incluir material anterior. Una tanda automática
+    /// conserva el backlog ambiental mientras el modo exige una grabación.
+    static func permiteProcesar(sesion: String?, manual: Bool, soloGrabaciones: Bool) -> Bool {
+        manual || !soloGrabaciones
+            || !(sesion ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    static func pendientesDeAudio(en indice: ContinuoIndice = .shared, manual: Bool,
+                                  canal: String = "todo", limite: Int,
+                                  soloGrabaciones: Bool) -> [PendienteContinuo] {
+        guard canal != "pantalla" else { return [] }
+        return indice.pendientes(material: .audio, limite: limite,
+                                 canal: canal == "voz" || canal == "sistema" ? canal : nil,
+                                 soloGrabaciones: !manual && soloGrabaciones)
+    }
+
     private static func trabajar(manual: Bool, canal: String = "todo") -> String {
         guard Config.continuoActivo() else { return "la bitácora está apagada" }
         if !manual, Config.continuoLoteSoloConCorriente(), !EnergiaMac.conCorriente() {
@@ -109,13 +125,13 @@ enum ContinuoLote {
         // tope por tanda: filtrarlo aquí después de cortar hacía que una cola
         // larga del otro canal tapara los fragmentos del canal pedido y la
         // tanda respondiera «no había pendiente» habiendo trabajo.
-        let pendientes = canal == "pantalla" ? [] : ContinuoIndice.shared.pendientes(
-            material: .audio, limite: Config.continuoLoteMaximoPorTanda(),
-            canal: canal == "voz" || canal == "sistema" ? canal : nil)
+        let pendientes = pendientesDeAudio(manual: manual, canal: canal,
+                                           limite: Config.continuoLoteMaximoPorTanda(),
+                                           soloGrabaciones: Config.continuoSoloGrabaciones())
         if pendientes.isEmpty {
             if canal == "voz" || canal == "sistema" { return "no había \(canal) pendiente" }
-            if canal == "pantalla" { return leerPantallas(prefijo: "", soloPantalla: true, diasTocados: &diasTocados) }
-            return leerPantallas(prefijo: "no había audio pendiente", diasTocados: &diasTocados)
+            if canal == "pantalla" { return leerPantallas(prefijo: "", manual: manual, soloPantalla: true, diasTocados: &diasTocados) }
+            return leerPantallas(prefijo: "no había audio pendiente", manual: manual, diasTocados: &diasTocados)
         }
 
         Log.log(.sistema, "bitácora: tanda con \(pendientes.count) fragmentos pendientes")
@@ -123,6 +139,15 @@ enum ContinuoLote {
         var comprimidos: Int64 = 0
 
         for p in pendientes {
+            // Se vuelve a leer la política antes de cada petición y dentro de
+            // la cascada: puede cambiar mientras un proveedor responde. La
+            // respuesta ya enviada se conserva, sin autorizar la siguiente.
+            let permitirSolicitud = {
+                Config.continuoActivo()
+                    && permiteProcesar(sesion: p.sesion, manual: manual,
+                                       soloGrabaciones: Config.continuoSoloGrabaciones())
+            }
+            guard permitirSolicitud() else { continue }
             // El dictado manda también aquí: si la persona está hablando, la
             // tanda espera. Transcribir de fondo mientras se dicta compite por
             // CPU justo en el momento en que más se nota.
@@ -132,6 +157,7 @@ enum ContinuoLote {
             }
             guard FileManager.default.fileExists(atPath: p.ruta.path) else {
                 // El archivo se borró por fuera: se marca para no reintentarlo eternamente.
+                guard permitirSolicitud() else { continue }
                 ContinuoIndice.shared.anotarTexto("", material: .audio, id: p.id)
                 saltados += 1
                 continue
@@ -149,6 +175,7 @@ enum ContinuoLote {
             //
             // Mirar el audio cuesta milisegundos y se hace en local.
             if AudioSilencio.esSilencio(p.ruta) {
+                guard permitirSolicitud() else { continue }
                 ContinuoIndice.shared.anotarTexto("", material: .audio, id: p.id)
                 silenciosos += 1
                 // Guardar horas de ruido de fondo no sirve a nadie y ocupa. Pero
@@ -175,7 +202,10 @@ enum ContinuoLote {
             // tarda 0,8 s con dos minutos de audio.
             let porteros = Config.bitacoraPorteros()
             if !porteros.isEmpty {
-                let veredicto = PorteroVoz.hayVoz(en: p.ruta, motores: porteros)
+                guard permitirSolicitud() else { continue }
+                let veredicto = PorteroVoz.hayVoz(en: p.ruta, motores: porteros,
+                                                 permitirSolicitud: permitirSolicitud)
+                guard permitirSolicitud() else { continue }
                 if veredicto == .silencio {
                     ContinuoIndice.shared.anotarTexto("", material: .audio, id: p.id)
                     silenciosos += 1
@@ -194,7 +224,8 @@ enum ContinuoLote {
                 // portero averiado no puede hacer perder lo dictado.
             }
 
-            switch transcribir(p.ruta) {
+            guard permitirSolicitud() else { continue }
+            switch transcribir(p.ruta, permitirSolicitud: permitirSolicitud) {
             case .success(let texto):
                 ContinuoIndice.shared.anotarTexto(texto, material: .audio, id: p.id)
                 guardarTexto(texto, junto: p.ruta)
@@ -222,7 +253,7 @@ enum ContinuoLote {
         if canal == "voz" || canal == "sistema" {
             return partes.joined(separator: ", ")
         }
-        return leerPantallas(prefijo: partes.joined(separator: ", "), diasTocados: &diasTocados)
+        return leerPantallas(prefijo: partes.joined(separator: ", "), manual: manual, diasTocados: &diasTocados)
     }
 
     /// Tres archivos PUROS por día, uno por canal, siempre completos:
@@ -280,12 +311,12 @@ enum ContinuoLote {
     /// capturas y de OCR, nunca de audio: quien pulsó ese botón no preguntó
     /// por el audio, y «no había audio pendiente» le haría creer que tampoco
     /// hay capturas.
-    private static func leerPantallas(prefijo: String, soloPantalla: Bool = false,
+    private static func leerPantallas(prefijo: String, manual: Bool, soloPantalla: Bool = false,
                                       diasTocados: inout Set<Date>) -> String {
         guard Config.continuoOcrActivo() else {
             return soloPantalla ? "la lectura del texto en pantalla está desactivada" : prefijo
         }
-        let ocr = ContinuoOCR.procesarPendientes(limite: Config.continuoLoteMaximoPorTanda()) {
+        let ocr = ContinuoOCR.procesarPendientes(limite: Config.continuoLoteMaximoPorTanda(), manual: manual) {
             dictadoOcupado?() == true
         }
         // Las capturas viejas sufren lo mismo que el audio viejo: su día
@@ -317,7 +348,8 @@ enum ContinuoLote {
 
     /// Convierte el fragmento a WAV y lo pasa por el motor elegido. Síncrono a
     /// propósito: la tanda es secuencial y así no hay que orquestar nada.
-    private static func transcribir(_ url: URL) -> Result<String, Error> {
+    private static func transcribir(_ url: URL,
+                                    permitirSolicitud: @escaping () -> Bool) -> Result<String, Error> {
         guard let crudo = try? Data(contentsOf: url), !crudo.isEmpty else {
             return .failure(ErrorLote.archivoVacio)
         }
@@ -328,12 +360,14 @@ enum ContinuoLote {
         let semaforo = DispatchSemaphore(value: 0)
         var salida: Result<String, Error> = .failure(ErrorLote.sinRespuesta)
 
+        guard permitirSolicitud() else { return .failure(ErrorLote.autorizacionCambiada) }
         let motor = Config.continuoLoteMotor()
         if motor == "cadena" {
             // La misma cascada que el dictado: respeta los proveedores activos,
             // su orden y su failover. Así, conectar un motor nuevo en Modelos
             // lo pone a disposición de la bitácora sin tocar nada aquí.
-            Failover.transcribe(wav: wav) { r in
+            Failover.transcribe(wav: .datos(wav), cadena: Providers.cadena(),
+                                permitirSolicitud: permitirSolicitud) { r in
                 salida = r.map { $0.0 }
                 semaforo.signal()
             }
@@ -356,7 +390,8 @@ enum ContinuoLote {
                 Log.log(.ia, "bitácora: no hay motores locales activos — uso Apple Speech, que no sale del equipo")
                 AppleSpeechSTT.run(wav: CuerpoMultipart.Origen.datos(wav)) { r in salida = r; semaforo.signal() }
             } else {
-                Failover.transcribe(wav: .datos(wav), cadena: locales) { r in
+                Failover.transcribe(wav: .datos(wav), cadena: locales,
+                                    permitirSolicitud: permitirSolicitud) { r in
                     salida = r.map { $0.0 }
                     semaforo.signal()
                 }
@@ -370,9 +405,13 @@ enum ContinuoLote {
             // de uno solo, para no perder su configuración de modelo y clave.
             let uno = Providers.cadena().filter { $0.id == motor }
             if uno.isEmpty {
-                Failover.transcribe(wav: wav) { r in salida = r.map { $0.0 }; semaforo.signal() }
+                Failover.transcribe(wav: .datos(wav), cadena: Providers.cadena(),
+                                    permitirSolicitud: permitirSolicitud) { r in
+                    salida = r.map { $0.0 }; semaforo.signal()
+                }
             } else {
-                Failover.transcribe(wav: wav, cadena: uno) { r in
+                Failover.transcribe(wav: .datos(wav), cadena: uno,
+                                    permitirSolicitud: permitirSolicitud) { r in
                     salida = r.map { $0.0 }
                     semaforo.signal()
                 }
@@ -656,13 +695,14 @@ enum ContinuoLote {
     }
 
     enum ErrorLote: LocalizedError {
-        case archivoVacio, sinRespuesta, tiempoAgotado, bufferInvalido
+        case archivoVacio, sinRespuesta, tiempoAgotado, bufferInvalido, autorizacionCambiada
         var errorDescription: String? {
             switch self {
             case .archivoVacio: return "el fragmento está vacío"
             case .sinRespuesta: return "el motor no respondió"
             case .tiempoAgotado: return "se agotó el tiempo de transcripción"
             case .bufferInvalido: return "no pude preparar el buffer de audio"
+            case .autorizacionCambiada: return "el modo actual conserva este fragmento pendiente"
             }
         }
     }

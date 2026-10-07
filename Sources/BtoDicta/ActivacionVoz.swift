@@ -185,7 +185,7 @@ final class ActivacionVoz: @unchecked Sendable {
             self.activadores = seguros
             self.maxAnilloBytes = Int(Config.agenteActivacionPrebuffer() * 32_000)
 
-            guard habilitado else {
+            guard habilitado, !Config.continuoSoloGrabaciones() else {
                 self.cerrarEnCola()
                 self.publicar(.desactivado)
                 return
@@ -304,6 +304,9 @@ final class ActivacionVoz: @unchecked Sendable {
     }
 
     private func arrancarEnCola() {
+        guard !Config.continuoSoloGrabaciones() else {
+            cerrarEnCola(); publicar(.desactivado); return
+        }
         #if canImport(Speech)
         guard #available(macOS 26, *) else {
             publicar(.noDisponible); return
@@ -379,7 +382,7 @@ final class ActivacionVoz: @unchecked Sendable {
                 var errorMicrofono: Swift.Error?
                 Self.dbg("publicando analyzer")
                 let aceptado: Bool = self.cola.sync {
-                    guard self.generacion == gen, self.preparando else { return false }
+                    guard self.generacion == gen, self.preparando, !Config.continuoSoloGrabaciones() else { return false }
                     self._continuation = cont
                     self._analyzer = analyzer
                     self.formatoSpeech = destino
@@ -451,6 +454,9 @@ final class ActivacionVoz: @unchecked Sendable {
 
     private func arrancarMicrofonoEnCola(generacion gen: UUID,
                                           recursos: RecursosAudio) throws {
+        guard !Config.continuoSoloGrabaciones() else {
+            throw ScribeError.ws("Activación por voz suspendida: solo grabaciones")
+        }
         let engine = recursos.engine
         let input = recursos.input
         Self.dbg("inputNode listo; quitando tap anterior")
@@ -506,6 +512,9 @@ final class ActivacionVoz: @unchecked Sendable {
     }
 
     private func recibirPCMEnCola(_ chunk: Data, generacion gen: UUID) {
+        guard !Config.continuoSoloGrabaciones() else {
+            cerrarEnCola(); publicar(.desactivado); return
+        }
         guard generacion == gen, !detectado, !chunk.isEmpty else { return }
         if Self.contieneVoz(chunk) { ultimaVozAudio = Date() }
         bytesAudioTotales += chunk.count
@@ -640,6 +649,7 @@ final class ActivacionVoz: @unchecked Sendable {
                                           forma: Despertar.Forma,
                                           generacion gen: UUID,
                                           inicioSegmento: Double) {
+        guard !Config.continuoSoloGrabaciones() else { return }
         guard generacion == gen, !detectado else { return }
         detectado = true
         // `r.range.start` marca dónde empezó este segmento de Apple Speech. Como

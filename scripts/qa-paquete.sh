@@ -29,7 +29,7 @@ huella_bitacora() {
 import json,hashlib,sys
 try: d=json.load(open('$CONFIG_USUARIO'))
 except Exception: sys.exit()
-s={k:v for k,v in d.items() if k.startswith('bitacora_')}
+s={k:v for k,v in d.items() if k.startswith(('bitacora_', 'continuo_'))}
 print(hashlib.sha256(json.dumps(s,sort_keys=True,ensure_ascii=False).encode()).hexdigest())"
 }
 CONFIG_ANTES="$(huella_bitacora)"
@@ -170,13 +170,9 @@ ejecutar() {
   local id="$1" variable="$2" valor="$3" limite="${4:-90}"
   local log="$salida/logs-automaticos/$id.log"
   local inicio fin codigo estado desvio=()
-  # Los arneses que escriben en la configuración corren contra una carpeta
-  # aparte. Confiar en que restauren al terminar ya falló una vez: una sección
-  # añadida al final volvió a machacar y `exit()` no ejecuta ningún `defer`.
-  case "$id" in
-    filtro_bitacora|navegador_informe|exclusiones_asistente|carrera_microfono|pausa_bitacora|reunion_no_corta|menu_rapido|triple_fn|rafaga_microfono|formato_viejo|cesion_lenta)
-      desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id") ;;
-  esac
+  # Cada arnés tiene perfil propio: ni los arranques ni futuras pruebas
+  # pueden leer claves de proveedores o escribir ajustes del usuario.
+  desvio=("BTODICTA_DIR=$salida/config-de-prueba-$id")
   local bin="$BIN"
   inicio="$(/bin/date +%s)"
   /usr/bin/perl -e 'alarm shift; exec @ARGV' "$limite" \
@@ -247,6 +243,7 @@ else
   # El informe del navegador (spec 006): se lee, se rechaza lo incompleto y caduca.
   ejecutar "navegador_informe" "BTODICTA_NAVEGADORTEST" "1" 90
   # Qué entra en la bitácora y qué no: de fábrica entra todo.
+  ejecutar "bitacora_solo_grabaciones_reposo" "BTODICTA_BITACORAREPOSOTEST" "1" 80
   ejecutar "filtro_bitacora" "BTODICTA_FILTROTEST" "1" 90
   # La detección de voz reconoce una voz REAL, no una de laboratorio. Corre sobre
   # las grabaciones de dictado que haya en el equipo: el fallo vivía justo en la

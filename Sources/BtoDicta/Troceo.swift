@@ -319,8 +319,12 @@ enum Troceo {
     /// `profundidad` limita la recursión: cada nivel duplica el número de
     /// llamadas, y más allá de cuatro (dieciséis tramos) el fallo es otro.
     static func enviarPartiendo(_ wav: CuerpoMultipart.Origen, motor: String, profundidad: Int = 0,
+                                permitirSolicitud: (() -> Bool)? = nil,
                                 enviar: @escaping (CuerpoMultipart.Origen, @escaping (Result<String, Error>) -> Void) -> Void,
                                 completion: @escaping (Result<String, Error>) -> Void) {
+        guard permitirSolicitud?() != false else {
+            completion(.failure(ScribeError.ws("Captura ambiental suspendida"))); return
+        }
         // Si ya se sabe que este motor no traga tanto, se parte de entrada.
         if profundidad == 0, let seguro = tamanoSeguro(motor), wav.bytes > seguro + 44 {
             // Partir es lo excepcional, y solo aquí hace falta el audio en memoria.
@@ -328,6 +332,7 @@ enum Troceo {
             if partes.count > 1 {
                 Log.log(.ia, "\(motor): \(wav.bytes / 1024) kB pasan de lo que admite — lo mando en \(partes.count) tramos")
                 encadenar(partes, motor: motor, profundidad: profundidad + 1,
+                          permitirSolicitud: permitirSolicitud,
                           enviar: enviar, completion: completion)
                 return
             }
@@ -336,9 +341,15 @@ enum Troceo {
         // grande: es recorrer las muestras, y en lo corto no decide nada.
         let voz: Double = wav.bytes > minimoParaPartir ? segundosDeVoz(wav) : 0
 
+        guard permitirSolicitud?() != false else {
+            completion(.failure(ScribeError.ws("Captura ambiental suspendida"))); return
+        }
         enviar(wav) { r in
             switch r {
             case .success(let texto):
+                // La petición ya salió: se conserva su respuesta, aunque ahora
+                // esté prohibido abrir más peticiones para reparar el truncado.
+                guard permitirSolicitud?() != false else { completion(.success(texto)); return }
                 // Un éxito con muy poco texto para lo que se oye no es un éxito:
                 // es un motor que se detuvo a medias y no lo dijo. Se trata como
                 // lo que es —no pudo con el tamaño— y se reintenta partido.
@@ -348,12 +359,14 @@ enum Troceo {
                     Log.log(.ia, "\(motor): devolvió \(texto.split(separator: " ").count) palabras para \(Int(voz)) s de voz — parece que se quedó a medias, lo reintento en \(partes.count) tramos")
                     anotarRechazo(motor, bytes: wav.bytes)
                     encadenar(partes, motor: motor, profundidad: profundidad + 1,
+                              permitirSolicitud: permitirSolicitud,
                               enviar: enviar, completion: completion)
                     return
                 }
                 anotarExito(motor, bytes: wav.bytes)
                 completion(.success(texto))
             case .failure(let e):
+                guard permitirSolicitud?() != false else { completion(.failure(e)); return }
                 guard profundidad < 4, pareceDeTamano(e, bytes: wav.bytes, conVoz: voz > 0.5) else {
                     completion(.failure(e)); return
                 }
@@ -371,6 +384,7 @@ enum Troceo {
                 guard partes.count > 1 else { completion(.failure(e)); return }
                 Log.log(.ia, "\(motor) no admitió \(wav.bytes / 1024) kB — lo parto en \(partes.count) y sigo con el mismo motor")
                 encadenar(partes, motor: motor, profundidad: profundidad + 1,
+                          permitirSolicitud: permitirSolicitud,
                           enviar: enviar, completion: completion)
             }
         }
@@ -380,29 +394,39 @@ enum Troceo {
     /// limitan las peticiones simultáneas y adelantar dos segundos no compensa
     /// que te corten— y los cose quitando el solape.
     private static func encadenar(_ partes: [Data], motor: String, profundidad: Int,
+                                  permitirSolicitud: (() -> Bool)? = nil,
                                   enviar: @escaping (CuerpoMultipart.Origen, @escaping (Result<String, Error>) -> Void) -> Void,
                                   completion: @escaping (Result<String, Error>) -> Void) {
         var texto = ""
         var fallos = 0
+        var exitos = 0
         var ultimoError: Error?
-        func siguiente(_ i: Int) {
-            guard i < partes.count else {
-                // Con que UN tramo haya salido, se entrega: el objetivo es que
-                // no se pierda lo dictado, no que la llamada sea perfecta.
-                if texto.isEmpty { completion(.failure(ultimoError ?? ScribeError.sinTexto)) }
-                else {
-                    if fallos > 0 {
-                        Log.log(.ia, "\(motor): \(partes.count - fallos) de \(partes.count) tramos salieron — entrego lo recuperado")
-                    }
-                    completion(.success(texto))
+        func terminar() {
+            // Con que UN tramo haya salido, se entrega: el objetivo es que
+            // no se pierda lo dictado, tampoco al cambiar el permiso a mitad.
+            if texto.isEmpty { completion(.failure(ultimoError ?? ScribeError.sinTexto)) }
+            else {
+                if fallos > 0 {
+                    Log.log(.ia, "\(motor): \(exitos) de \(partes.count) tramos salieron — entrego lo recuperado")
                 }
+                completion(.success(texto))
+            }
+        }
+        func siguiente(_ i: Int) {
+            guard i < partes.count else { terminar(); return }
+            guard permitirSolicitud?() != false else {
+                ultimoError = ultimoError ?? ScribeError.ws("Captura ambiental suspendida")
+                terminar()
                 return
             }
             // Los tramos ya están partidos y son pequeños: van en memoria.
             enviarPartiendo(.datos(partes[i]), motor: motor, profundidad: profundidad,
+                            permitirSolicitud: permitirSolicitud,
                             enviar: enviar) { r in
                 switch r {
-                case .success(let t): texto = texto.isEmpty ? t : RedSeguridadDictado.unir(texto, t)
+                case .success(let t):
+                    exitos += 1
+                    texto = texto.isEmpty ? t : RedSeguridadDictado.unir(texto, t)
                 case .failure(let e): fallos += 1; ultimoError = e
                     Log.log(.ia, "\(motor): el tramo \(i + 1) de \(partes.count) falló (\(e.localizedDescription)) — sigo con el resto")
                 }

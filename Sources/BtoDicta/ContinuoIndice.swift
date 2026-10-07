@@ -25,6 +25,18 @@ struct PendienteContinuo {
     let material: MaterialContinuo
     let ruta: URL
     let instante: Date
+    /// Identificador de la grabación que autorizó la captura. Ausente en el
+    /// material ambiental anterior: cambiar el modo nunca lo reclasifica.
+    let sesion: String?
+
+    init(id: Int64, material: MaterialContinuo, ruta: URL, instante: Date,
+         sesion: String? = nil) {
+        self.id = id
+        self.material = material
+        self.ruta = ruta
+        self.instante = instante
+        self.sesion = sesion
+    }
 }
 
 /// Resumen de lo que ocuparía una purga, para poder avisar ANTES de borrar.
@@ -43,16 +55,16 @@ final class ContinuoIndice {
     private var db: OpaquePointer?
     private let cola = DispatchQueue(label: "btodicta.continuo.indice")
 
-    private init() {}
+    init() {}
 
     // MARK: Apertura
 
     /// Abre (y crea si hace falta) la base dentro de la carpeta de la bitácora.
     /// Idempotente: llamarla dos veces no hace daño.
-    func abrir() {
+    func abrir(carpeta carpetaExplicita: URL? = nil) {
         cola.sync {
             guard db == nil else { return }
-            let carpeta = Config.continuoCarpeta()
+            let carpeta = carpetaExplicita ?? Config.continuoCarpeta()
             try? FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
             let ruta = carpeta.appendingPathComponent("bitacora.sqlite")
 
@@ -129,6 +141,15 @@ final class ContinuoIndice {
         }
         ejecutar("CREATE INDEX IF NOT EXISTS pantalla_pendiente ON pantalla(procesado, instante);")
 
+        // Migración aditiva e idempotente: los registros y las tablas FTS
+        // conservan su contenido. Lo anterior queda sin sesión; no basta que
+        // `origen` diga «dictado» para autorizar un pendiente antiguo.
+        for tabla in ["audio", "pantalla"] {
+            if !columnaExiste(tabla, "sesion") {
+                ejecutar("ALTER TABLE \(tabla) ADD COLUMN sesion TEXT DEFAULT '';")
+            }
+        }
+
         ejecutar("""
         CREATE VIRTUAL TABLE IF NOT EXISTS audio_texto
         USING fts5(texto, fila UNINDEXED, tokenize='unicode61 remove_diacritics 2');
@@ -144,14 +165,15 @@ final class ContinuoIndice {
     /// Registra un fragmento de audio recién cerrado. `origen` distingue lo que
     /// grabó la bitácora de lo que adoptó del dictado.
     @discardableResult
-    func registrarAudio(ruta: URL, instante: Date, duracion: TimeInterval, origen: String = "continuo") -> Int64? {
+    func registrarAudio(ruta: URL, instante: Date, duracion: TimeInterval, origen: String = "continuo",
+                        sesion: String? = nil) -> Int64? {
         let bytes = tamano(de: ruta)
         return cola.sync {
             guard let d = db else { return nil }
             var st: OpaquePointer?
             let sql = """
-            INSERT OR IGNORE INTO audio (instante, ruta, duracion, bytes, origen)
-            VALUES (?, ?, ?, ?, ?);
+            INSERT OR IGNORE INTO audio (instante, ruta, duracion, bytes, origen, sesion)
+            VALUES (?, ?, ?, ?, ?, ?);
             """
             guard sqlite3_prepare_v2(d, sql, -1, &st, nil) == SQLITE_OK else { return nil }
             defer { sqlite3_finalize(st) }
@@ -160,6 +182,7 @@ final class ContinuoIndice {
             sqlite3_bind_double(st, 3, duracion)
             sqlite3_bind_int64(st, 4, bytes)
             bindTexto(st, 5, origen)
+            bindTexto(st, 6, sesion ?? "")
             guard sqlite3_step(st) == SQLITE_DONE else { return nil }
             return sqlite3_last_insert_rowid(d)
         }
@@ -168,14 +191,14 @@ final class ContinuoIndice {
     /// Registra una captura de pantalla ya escrita en disco.
     @discardableResult
     func registrarPantalla(ruta: URL, instante: Date, app: String?, ventana: String?,
-                           monitor: Int, visibles: [String] = []) -> Int64? {
+                           monitor: Int, visibles: [String] = [], sesion: String? = nil) -> Int64? {
         let bytes = tamano(de: ruta)
         return cola.sync {
             guard let d = db else { return nil }
             var st: OpaquePointer?
             let sql = """
-            INSERT OR IGNORE INTO pantalla (instante, ruta, bytes, app, ventana, monitor, visibles)
-            VALUES (?, ?, ?, ?, ?, ?, ?);
+            INSERT OR IGNORE INTO pantalla (instante, ruta, bytes, app, ventana, monitor, visibles, sesion)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """
             guard sqlite3_prepare_v2(d, sql, -1, &st, nil) == SQLITE_OK else { return nil }
             defer { sqlite3_finalize(st) }
@@ -186,6 +209,7 @@ final class ContinuoIndice {
             bindTexto(st, 5, ventana ?? "")
             sqlite3_bind_int(st, 6, Int32(monitor))
             bindTexto(st, 7, visibles.joined(separator: ", "))
+            bindTexto(st, 8, sesion ?? "")
             guard sqlite3_step(st) == SQLITE_DONE else { return nil }
             return sqlite3_last_insert_rowid(d)
         }
@@ -205,7 +229,7 @@ final class ContinuoIndice {
     /// Devuelve `true` si quedó anotado.
     @discardableResult
     func anotarTextoDeNavegador(texto: String, url: String, titulo: String,
-                                app: String, instante: Date) -> Bool {
+                                app: String, instante: Date, sesion: String? = nil) -> Bool {
         cola.sync {
             guard let d = db else { return false }
             var st: OpaquePointer?
@@ -213,8 +237,8 @@ final class ContinuoIndice {
             // guardar, y así la línea de tiempo sigue pudiendo decir de dónde
             // salió cada cosa.
             let sql = """
-            INSERT INTO pantalla (instante, ruta, bytes, app, ventana, monitor, visibles, texto, procesado)
-            VALUES (?, ?, 0, ?, ?, 0, '', ?, 1);
+            INSERT INTO pantalla (instante, ruta, bytes, app, ventana, monitor, visibles, texto, procesado, sesion)
+            VALUES (?, ?, 0, ?, ?, 0, '', ?, 1, ?);
             """
             guard sqlite3_prepare_v2(d, sql, -1, &st, nil) == SQLITE_OK else { return false }
             defer { sqlite3_finalize(st) }
@@ -224,6 +248,7 @@ final class ContinuoIndice {
             sqlite3_bind_text(st, 3, app, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(st, 4, titulo, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(st, 5, texto, -1, SQLITE_TRANSIENT)
+            bindTexto(st, 6, sesion ?? "")
             return sqlite3_step(st) == SQLITE_DONE
         }
     }
@@ -273,7 +298,7 @@ final class ContinuoIndice {
     /// ANTES del límite: filtrar después de cortar dejaba tandas vacías cuando
     /// los fragmentos más viejos eran mayoritariamente del otro canal.
     func pendientes(material: MaterialContinuo, limite: Int = 500,
-                    canal: String? = nil) -> [PendienteContinuo] {
+                    canal: String? = nil, soloGrabaciones: Bool = false) -> [PendienteContinuo] {
         cola.sync {
             guard let d = db else { return [] }
             var st: OpaquePointer?
@@ -282,7 +307,8 @@ final class ContinuoIndice {
                 if canal == "sistema" { filtro = "AND origen = 'sistema' " }
                 else if canal == "voz" { filtro = "AND origen != 'sistema' " }
             }
-            let sql = "SELECT id, ruta, instante FROM \(material.rawValue) WHERE procesado = 0 \(filtro)ORDER BY instante ASC LIMIT ?;"
+            if soloGrabaciones { filtro += "AND length(trim(COALESCE(sesion, ''))) > 0 " }
+            let sql = "SELECT id, ruta, instante, sesion FROM \(material.rawValue) WHERE procesado = 0 \(filtro)ORDER BY instante ASC LIMIT ?;"
             guard sqlite3_prepare_v2(d, sql, -1, &st, nil) == SQLITE_OK else { return [] }
             defer { sqlite3_finalize(st) }
             sqlite3_bind_int(st, 1, Int32(limite))
@@ -293,7 +319,9 @@ final class ContinuoIndice {
                     id: sqlite3_column_int64(st, 0),
                     material: material,
                     ruta: URL(fileURLWithPath: String(cString: c)),
-                    instante: Date(timeIntervalSince1970: sqlite3_column_double(st, 2))
+                    instante: Date(timeIntervalSince1970: sqlite3_column_double(st, 2)),
+                    sesion: sqlite3_column_text(st, 3).map { String(cString: $0) }
+                        .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
                 ))
             }
             return salida
@@ -523,15 +551,21 @@ final class ContinuoIndice {
         }
     }
 
-    /// aaaa/MM/dd/<sub>/HH-mm-ss.ext → fecha completa.
-    private func fechaDe(_ url: URL) -> Date? {
+    /// aaaa/MM/dd/<sub>/HH-mm-ss[-sufijo].ext → fecha completa. El sufijo
+    /// evita colisiones; la fecha sigue siendo la del prefijo horario original.
+    func fechaDe(_ url: URL) -> Date? {
         let partes = url.pathComponents
         guard partes.count >= 5 else { return nil }
         let dia = partes[partes.count - 2 - 1]
         let mes = partes[partes.count - 3 - 1]
         let anio = partes[partes.count - 4 - 1]
-        let hora = url.deletingPathExtension().lastPathComponent
+        let nombre = url.deletingPathExtension().lastPathComponent
+        let hora = String(nombre.prefix(8))
+        guard hora.range(of: "^[0-9]{2}-[0-9]{2}-[0-9]{2}$", options: .regularExpression) != nil,
+              nombre.count == 8 || nombre.dropFirst(8).first == "-" else { return nil }
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.isLenient = false
         f.dateFormat = "yyyy/MM/dd HH-mm-ss"
         return f.date(from: "\(anio)/\(mes)/\(dia) \(hora)")
     }

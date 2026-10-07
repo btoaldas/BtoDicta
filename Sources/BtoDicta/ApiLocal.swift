@@ -170,6 +170,17 @@ enum ApiLocal {
 
     private static let candadoRitmo = NSLock()
     private static var marcas: [Date] = []
+    private static let candadoRitmoCaptura = NSLock()
+    private static var marcasCaptura: [Date] = []
+
+    /// Sondeo autenticado y sin IA: no consume el cupo de operaciones de pago.
+    static func cabeConsultaCaptura(ahora: Date = Date()) -> Bool {
+        candadoRitmoCaptura.lock(); defer { candadoRitmoCaptura.unlock() }
+        marcasCaptura.removeAll { ahora.timeIntervalSince($0) > 60 }
+        guard marcasCaptura.count < 600 else { return false }
+        marcasCaptura.append(ahora)
+        return true
+    }
 
     /// `true` si esta petición cabe dentro del tope.
     static func cabeOtraPeticion(ahora: Date = Date()) -> Bool {
@@ -317,6 +328,20 @@ enum ApiLocal {
             rechazar(conexion, 401, .tokenMalo); return
         }
 
+        if metodo == "GET", ruta == "/navegador/captura" {
+            guard cabeConsultaCaptura() else { rechazar(conexion, 429, .demasiadas); return }
+            let contexto = ContinuoCapturaSesion.shared.contextoActual()
+            responder(conexion, 200, [
+                "capturando": contexto != nil,
+                "solo_grabaciones": Config.continuoSoloGrabaciones(),
+                "pantalla_activa": Config.continuoPantallaActiva(),
+                "sesion": contexto?.sesion as Any? ?? NSNull(),
+                "generacion": contexto?.generacion as Any? ?? NSNull(),
+                "inicio": contexto?.inicio.timeIntervalSince1970 as Any? ?? NSNull(),
+            ])
+            return
+        }
+
         // Un GET no lleva cuerpo, y exigírselo lo rechazaba antes de llegar a su
         // ruta. El cuerpo solo es obligatorio para quien envía algo.
         var json: [String: Any] = [:]
@@ -456,7 +481,25 @@ enum ApiLocal {
     /// contestar, la extensión acabaría acumulando informes viejos, y un informe
     /// viejo del navegador es peor que ninguno.
     private static func navegador(_ conexion: NWConnection, _ json: [String: Any]) {
-        guard let estado = EstadoNavegador(json: json) else {
+        let sesion = json["sesion"] as? String
+        let instante = (json["instante"] as? Double).flatMap {
+            $0.isFinite ? Date(timeIntervalSince1970: $0) : nil
+        }
+        let materialAutorizado = instante.map {
+            ContinuoCapturaSesion.shared.admiteMaterial(sesion: sesion, instante: $0)
+        } ?? false
+        // Las extensiones antiguas también deben respetar la ventana. Sus
+        // señales activa/audible siguen sirviendo al guardia sin URL ni título.
+        var metadatos = json
+        if !materialAutorizado, let pestanas = json["pestanas"] as? [[String: Any]] {
+            metadatos["pestanas"] = pestanas.map { pestaña -> [String: Any] in
+                var minima = pestaña
+                minima["url"] = ""
+                minima["titulo"] = ""
+                return minima
+            }
+        }
+        guard let estado = EstadoNavegador(json: metadatos) else {
             responder(conexion, 400, ["error": "falta «navegador» o «pestanas», o vienen vacíos"])
             return
         }
@@ -482,21 +525,23 @@ enum ApiLocal {
         // texto. No hace falta desactivar nada (ADR-005) — basta con no darle
         // trabajo, que además ahorra el reconocimiento de imagen entero.
         var textoGuardado = false
-        if Config.continuoActivo(),
+        let url = json["url"] as? String ?? ""
+        let veredicto = FiltroBitacora.decidir(app: estado.navegador, ventana: url)
+        let filtroPermite: Bool
+        switch veredicto {
+        case .entra: filtroPermite = true
+        case .fuera: filtroPermite = false
+        }
+        if materialAutorizado, filtroPermite,
            let texto = json["texto"] as? String,
-           let url = json["url"] as? String,
+           !url.isEmpty,
            !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             // Las mismas reglas que gobiernan el resto de la bitácora. Que el
             // texto llegue por otra puerta no lo exime del filtro.
-            let veredicto = FiltroBitacora.decidir(app: estado.navegador, ventana: url)
-            if case .fuera(let motivo) = veredicto {
-                Log.log(.ia, "navegador: no anoto esta página — \(motivo)")
-            } else {
-                textoGuardado = ContinuoIndice.shared.anotarTextoDeNavegador(
-                    texto: texto, url: url,
-                    titulo: (json["titulo"] as? String) ?? "",
-                    app: estado.navegador, instante: estado.instante)
-            }
+            textoGuardado = ContinuoIndice.shared.anotarTextoDeNavegador(
+                texto: texto, url: url,
+                titulo: (json["titulo"] as? String) ?? "",
+                app: estado.navegador, instante: estado.instante, sesion: sesion)
         }
 
         // La captura de la pestaña (RF-03), si la extensión la mandó.
@@ -505,14 +550,20 @@ enum ApiLocal {
         // viene con el texto de su página, así que someterla a reconocimiento de
         // imagen sería gastar por lo que ya se tiene.
         var capturaGuardada = false
-        if Config.continuoActivo(),
+        let instanteCaptura = (json["captura_instante"] as? Double).flatMap {
+            $0.isFinite ? Date(timeIntervalSince1970: $0) : nil
+        } ?? (Config.continuoSoloGrabaciones() ? nil : instante)
+        let capturaAutorizada = instanteCaptura.map {
+            ContinuoCapturaSesion.shared.admiteMaterial(sesion: sesion, instante: $0)
+        } ?? false
+        if capturaAutorizada, filtroPermite, Config.continuoPantallaActiva(), !url.isEmpty,
            let base64 = json["captura"] as? String,
            let coma = base64.firstIndex(of: ","),
            let datos = Data(base64Encoded: String(base64[base64.index(after: coma)...])),
            datos.count > 1024 {
             let carpeta = Config.continuoCarpeta().appendingPathComponent("navegador", isDirectory: true)
             try? FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
-            let nombre = ContinuoAudio.sello(estado.instante) + "-pestana.jpg"
+            let nombre = ContinuoAudio.sello(instanteCaptura!) + "-pestana-\(UUID().uuidString).jpg"
             let ruta = carpeta.appendingPathComponent(nombre)
             if (try? datos.write(to: ruta, options: .atomic)) != nil {
                 capturaGuardada = true

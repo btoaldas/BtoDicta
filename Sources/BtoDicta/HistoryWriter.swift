@@ -6,6 +6,11 @@ import Carbon.HIToolbox
 
 final class HistoryWriter {
     private let base: URL
+    private var contextoBitacora: ContinuoCapturaSesion.Contexto?
+
+    func autorizarBitacora(_ contexto: ContinuoCapturaSesion.Contexto?) {
+        contextoBitacora = contexto
+    }
     private var pcmHandle: FileHandle?
     private var lastTextWrite = Date.distantPast
 
@@ -180,7 +185,9 @@ final class HistoryWriter {
             try? FileManager.default.removeItem(at: wavURL)
             try FileManager.default.moveItem(at: origen, to: wavURL)
             try? FileManager.default.removeItem(at: pcmURL)
-            ContinuoAudio.adoptar(wav: wavURL, instante: Date())
+            ContinuoAudio.adoptar(wav: wavURL, instante: contextoBitacora?.inicio ?? Date(),
+                                   sesion: contextoBitacora?.sesion,
+                                   transcripcionCompleta: !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } catch {
             Log.log(.sistema, "historial: no pude adoptar el .wav (\(error.localizedDescription)) — conservo el .pcm crudo")
         }
@@ -202,7 +209,9 @@ final class HistoryWriter {
             // aquí el .wav recién cerrado es lo que evita que esa cesión deje un
             // hueco en la línea de tiempo. Un único punto para los ocho sitios
             // que cierran un dictado.
-            ContinuoAudio.adoptar(wav: wavURL, instante: Date())
+            ContinuoAudio.adoptar(wav: wavURL, instante: contextoBitacora?.inicio ?? Date(),
+                                   sesion: contextoBitacora?.sesion,
+                                   transcripcionCompleta: !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         } catch {
             Log.log(.sistema, "historial: no pude escribir el .wav (\(error.localizedDescription)) — conservo el .pcm crudo")
         }
