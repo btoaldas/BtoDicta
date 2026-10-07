@@ -31,7 +31,8 @@ perfil_reposo="$(mktemp -d)"
 BTODICTA_DIR="$perfil_reposo" BTODICTA_BITACORAREPOSOTEST=1 .build/debug/BtoDicta
 python3 scripts/qa-deteccion-voz.py
 python3 scripts/qa-memoria-en-disco.py Sources/BtoDicta
-python3 /ruta/al/skill/sdd/scripts/puerta.py docs/specs/013-bitacora-solo-de-grabaciones implementar
+python3 /ruta/al/skill/sdd/scripts/verificar-spec.py docs/specs/013-bitacora-solo-de-grabaciones/spec.md
+python3 /ruta/al/skill/sdd/scripts/verificar-tasks.py docs/specs/013-bitacora-solo-de-grabaciones
 ```
 
 Los perfiles temporales se conservan para inspección. El arnés de reposo se ejecuta antes del arranque normal, con planificador/procesado desactivados, maestro activo durante el minuto completo, fuentes habilitadas y llamadas repetidas de arranque/rearme. Incluye dos reconfiguraciones; al final prueba además maestro apagado. No llama proveedores ni abre capturadores.
@@ -53,3 +54,5 @@ No se ha instalado una app ni publicado una release. Se compilaron los binarios,
 El script existente de calidad texto frente a OCR leyó únicamente datos históricos y no aprobó su ratio de aporte frente al umbral; encontró 0 páginas con texto esperando OCR. No se usa ese indicador de contenido antiguo como prueba de regresión del nuevo modo. Su script, umbral y datos se conservaron. No se ejecutó la suite de paquete completa, que incluye grabación/permisos y controles con datos reales; sí los controles aislados anteriores.
 
 La auditoría de ElevenLabs y sus cifras de cuenta permanecen privadas; una clave compartida no permite atribuir todo el gasto al proyecto. El modo reduce captura futura y congela STT ambiental automático, sin prometer una cantidad de ahorro aún no observada.
+
+El control Semillas informó recurso no disponible en el contexto SPM; no es parte de los 32 casos nuevos. Código publicado y reconciliado en GitHub: 476a4696257db50ef04bebf18977337ab5857486. La puerta de hito se comprueba antes de cambiar el estado aprobado a Implementada.

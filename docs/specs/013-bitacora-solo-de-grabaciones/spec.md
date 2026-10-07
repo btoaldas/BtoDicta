@@ -1,6 +1,6 @@
 # Spec 013 — Bitácora solo de grabaciones
 
-- Estado: Aprobada
+- Estado: Implementada
 - Tipo: funcionalidad
 - Nivel: X (heredado del ROADMAP)
 - Fecha: 2026-10-06
@@ -166,4 +166,8 @@ resúmenes pueden consumir IA; no se promete un ahorro porcentual fijo.
 - Confirmación sobre el oyente independiente: «Sí: también pausar la activación por voz; usar notch o teclado».
 - Propuesta técnica: valor true por ausencia de preferencia; la elección explícita posterior false se conserva. Sin reescritura de configuración ni imposición repetida.
 - Diagnóstico privado separado; no atribuir todo el gasto de la cuenta a esta aplicación.
-- Pendientes: aprobación de spec, plan y tareas; implementación y activación en instalación viva.
+- Cierre: plan, tareas e implementación autorizados por «si dale»; código publicado en 476a469, verificación y hito registrados. Instalación y distribución quedan fuera de este hito.
+
+## 10. Cierre de implementación
+
+[Verificación por requisito](verificacion.md), [evidencia y límites](evidencia.md) y [hito](../../hitos/2026-10-06-bitacora-solo-de-grabaciones.md). Puerta de hito abierta antes de registrar este estado Implementada; 8 tareas con evidencia.

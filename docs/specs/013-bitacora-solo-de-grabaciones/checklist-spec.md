@@ -10,7 +10,7 @@ Fecha: 2026-10-06. Revisión del requerimiento; no verificación de la funcional
 - [x] CHK06 Se contrastó con MANIFIESTO: originales conservados, continuidad del dictado y sin dependencias nuevas para grabar.
 - [x] CHK07 Los RF describen comportamiento; las observaciones sobre componentes están en research.md.
 - [x] CHK08 Hay datos personales como antes; se reduce recogida y se conservan permisos/exclusiones/destinatarios. No se incorporan cobros o facturación.
-- [x] CHK09 No quedan marcadores de decisión dentro de los RF; la aprobación de la propuesta sigue pendiente y explícita.
+- [x] CHK09 No quedan marcadores de decisión dentro de los RF; la aprobación se registró expresamente después de la revisión.
 - [x] CHK10 Spec de 8 RF; investigación y revisión separadas.
 
 Evidencia: `verificar-spec.py spec.md` → 8 RF, 3 RNF, 0 pendientes de decisión,
@@ -19,4 +19,4 @@ ambigüedades de pausa, ventana de captura y respuesta ambiental ya solicitada.
 Corrección posterior: default activado al instalar/actualizar y suspensión del
 oyente de voz; aplicación automática por ausencia sin reescritura de ajustes.
 
-La puerta de plan permanece cerrada: `Estado: Borrador` y `Aprobada por: PENDIENTE`.
+Al terminar la revisión, la puerta de plan estaba cerrada. Alberto aprobó después continuar con plan, tareas e implementación («si dale»); al cierre se verificó la puerta de hito abierta con 8 tareas respaldadas. Ver evidencia.md y verificacion.md.

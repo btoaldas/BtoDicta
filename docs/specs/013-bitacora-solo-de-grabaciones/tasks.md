@@ -21,4 +21,5 @@
 - [x] T07 (RF-02, RF-03, RF-05, RNF-02) QA aislada y regresión nativa/paquete — `Tests/BtoDictaTests/BitacoraGrabacionesSesionTests.swift`, `scripts/qa-paquete.sh` — Evidencia esperada: compilación, suites y revisión de segundo ángulo sin llamadas de pago.
   - Evidencia (2026-10-06): 114 pruebas Swift/63 JavaScript sin fallos, reposo real 61 s con maestro activo, build debug y release correctos; revisión independiente de segundo ángulo. Límites y control histórico separado en evidencia.md.
 
-- [ ] T08 (RF-01, RF-07, RNF-03) Registrar evidencia y cierre, commit y push — `docs/specs/013-bitacora-solo-de-grabaciones/evidencia.md`, `docs/bitacora/2026-10-06.md`, `ROADMAP.md` — Evidencia esperada: verificadores SDD, árbol y remoto alineados, hito en Obsidian.
+- [x] T08 (RF-01, RF-07, RNF-03) Registrar evidencia y cierre, commit y push — `docs/specs/013-bitacora-solo-de-grabaciones/evidencia.md`, `docs/bitacora/2026-10-06.md`, `ROADMAP.md` — Evidencia esperada: verificadores SDD, árbol y remoto alineados, hito en Obsidian.
+  - Evidencia (2026-10-06): Commit 476a469 publicado en origin/main; HEAD, ls-remote y API GitHub coinciden. Hito de Obsidian creado con autor Codex, releído y verificado. Documentación pública neutral y manifestada; cierre documental posterior separado.
