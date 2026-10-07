@@ -92,7 +92,9 @@ def main():
         global FACTOR, MINIMO
         FACTOR, MINIMO = 0.0, fijo
         print(f"VOZ modo comparación: umbral FIJO de {fijo}")
-    carpeta = os.path.expanduser("~/.btodicta/dictados")
+    perfil = os.environ.get("BTODICTA_DIR")
+    carpeta = (os.path.join(os.path.expanduser(perfil), "dictados") if perfil
+               else os.path.expanduser("~/.btodicta/dictados"))
     archivos = sorted(glob.glob(os.path.join(carpeta, "*.wav")), key=os.path.getmtime)[-12:]
     if not archivos:
         print("VOZ OMITIDA — no hay grabaciones de dictado en este equipo")

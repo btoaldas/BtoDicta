@@ -497,34 +497,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if probarBitacoraGrabacionesSiSePidio() { return }
+        let entorno = ProcessInfo.processInfo.environment
+        let pruebaAislada = !(entorno["BTODICTA_DIR"] ?? "").isEmpty
+            && entorno.contains { clave, valor in
+                clave.hasPrefix("BTODICTA_") && !valor.isEmpty && valor != "0"
+                    && (clave.hasSuffix("TEST") || clave == "BTODICTA_MODEREGRESSION"
+                        || clave == "BTODICTA_MODOAUDIOQA")
+            }
         // Saber si ESTE equipo tiene red: un corte propio no aparta proveedores y
         // lo de fondo espera a que vuelva (2026-09-24).
         EstadoRed.shared.arrancar()
         // La extensión del navegador, al día en su ruta fija (spec 006, RF-11).
         // En segundo plano: comparar dos versiones y copiar ocho archivos no
         // debe retrasar el arranque de la aplicación ni un milisegundo.
-        DispatchQueue.global(qos: .utility).async { ExportarExtension.refrescarRutaFija() }
+        // Los arneses del candidato no actualizan la extensión de la app que
+        // el usuario conserva instalada. Su exportación explícita sí se prueba.
+        if !pruebaAislada {
+            DispatchQueue.global(qos: .utility).async { ExportarExtension.refrescarRutaFija() }
+        }
 
         // Cuerpos de subida que quedaran de una sesión anterior: un cierre
         // inesperado puede dejarlos, y son del tamaño del dictado que se estaba
         // enviando. Solo borra lo que crea esa función, en su propia carpeta.
         CuerpoMultipart.barrerHuerfanos()
         // La API local, si está encendida. Apagada de fábrica.
-        ApiLocal.arrancar()
+        if !pruebaAislada { ApiLocal.arrancar() }
         // Audios de trabajo de dictados viejos, según el ajuste (0 = nunca).
         Recorder.barrerDictadosViejos()
         // Los modelos del catálogo, contra su huella fijada. En segundo plano y
         // con retraso: son varios gigas y no puede estorbar al arranque. Solo
         // avisa; que un modelo cambie puede ser legítimo y lo decide su dueño.
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 60) {
-            let malos = ModeloDescargado.revisarCatalogoInstalado()
-            for m in malos {
-                Log.log(.ia, "modelo: «\(m.archivo)» NO coincide con su huella conocida "
-                           + "(\(m.encontrada.prefix(12))… en vez de \(m.esperada.prefix(12))…). "
-                           + "O se actualizó en su repositorio, o el archivo se alteró")
-            }
-            if malos.isEmpty {
-                Log.debug("modelos: los del catálogo coinciden con su huella")
+        if !pruebaAislada {
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 60) {
+                let malos = ModeloDescargado.revisarCatalogoInstalado()
+                for m in malos {
+                    Log.log(.ia, "modelo: «\(m.archivo)» NO coincide con su huella conocida "
+                               + "(\(m.encontrada.prefix(12))… en vez de \(m.esperada.prefix(12))…). "
+                               + "O se actualizó en su repositorio, o el archivo se alteró")
+                }
+                if malos.isEmpty {
+                    Log.debug("modelos: los del catálogo coinciden con su huella")
+                }
             }
         }
 
@@ -937,8 +950,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // arranque, que es lo que convierte una carrera en una prueba fiable: no
         // se espera a que coincida, se provoca.
         if ProcessInfo.processInfo.environment["BTODICTA_CARRERAMICROTEST"] == "1" {
+            guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+                print("CARRERAMICRO FALLA — se niega a correr sin BTODICTA_DIR"); exit(2)
+            }
+            let raiz = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
+            try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+            Config.set("continuo_solo_grabaciones", to: false) // Fixture del modo continuo heredado.
             Config.set("continuo_activo", to: true)
+            Config.set("continuo_carpeta", to: raiz.path)
             Config.set("continuo_audio_modo", to: "siempre")
+            Config.set("continuo_sistema_activo", to: false)
+            Config.set("continuo_pantalla_activa", to: false)
             ContinuoBitacora.arrancar()
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
@@ -1134,6 +1156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             let raiz = URL(fileURLWithPath: dir).appendingPathComponent("bitacora", isDirectory: true)
             try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+            Config.set("continuo_solo_grabaciones", to: false) // Fixture del modo continuo heredado.
             Config.set("continuo_activo", to: true)
             Config.set("continuo_carpeta", to: raiz.path)
             Config.set("continuo_audio_modo", to: "siempre")
@@ -4905,7 +4928,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         probarCesionLentaSiSePidio()
 
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
-        registerHotKey()
+        if !pruebaAislada { registerHotKey() }
 
         // Clic en el letrero del motor (notch) → selector rápido de proveedor.
         // Tocar el cuerpo del notch cancela lo que esté en curso (grabación / agente / voz).
@@ -4970,48 +4993,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                  segundos: 4)
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: recuperarGrabaciones)
-        // Un `screencapture` huérfano puede tardar unos segundos en cerrar tras
-        // reabrir BtoDicta. El segundo pase es idempotente.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: recuperarGrabaciones)
+        if !pruebaAislada {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: recuperarGrabaciones)
+            // Un `screencapture` huérfano puede tardar unos segundos en cerrar
+            // tras reabrir BtoDicta. El segundo pase es idempotente.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: recuperarGrabaciones)
+        }
         // Compila en segundo plano el inventario de apps una sola vez; así "modo
         // abrir aplicación Word" no paga un recorrido de disco en el primer parcial.
         if Config.modoAplicaciones() { AplicacionesMac.precalentar() }
         // Arranca el LATIDO de red: mantiene túnel + conexión TLS calientes para que
         // el pulido responda rápido aunque dictes cada varios minutos.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { CalientaRed.iniciarLatido() }
-        // Preactiva el clon local (modelo XTTS en RAM) si es el motor activo → voz rápida.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { Voz.preactivarLocal(arranque: true) }
-        // Modo AHORRO: reloj de inactividad global que libera lo pesado (clon + latido)
-        // tras N min sin usar; fn (grabar) despierta todo.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { Ahorro.iniciar() }
+        if !pruebaAislada {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { CalientaRed.iniciarLatido() }
+            // Preactiva el clon local si es el motor activo → voz rápida.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { Voz.preactivarLocal(arranque: true) }
+            // Modo AHORRO: libera lo pesado tras N min; fn lo despierta.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { Ahorro.iniciar() }
+        }
 
         // Caja negra: rescatar dictados de sesiones que murieron a medias,
         // y matar whisper-servers huérfanos de crashes anteriores.
-        DispatchQueue.global(qos: .utility).async {
-            HistoryWriter.rescatarHuerfanos()
-            // Reloj del correo: cada minuto mira si toca un envío programado.
-            // Va aparte del de la bitácora, que solo corre si hay rutinas.
-            let relojCorreo = Timer(timeInterval: 60, repeats: true) { _ in
-                ResumenCorreo.revisarHorarios()
-                // El saldo se consulta de fondo; la caché lo limita a una vez
-                // cada media hora y el aviso, a una al día por proveedor. Nunca
-                // en el camino del dictado.
-                SaldoAPI.consultar { _ in }
+        // Los servidores locales pertenecen a la app instalada: la copia de
+        // QA no puede considerarlos huérfanos ni consultar sus cuentas.
+        if !pruebaAislada {
+            DispatchQueue.global(qos: .utility).async {
+                HistoryWriter.rescatarHuerfanos()
+                // Reloj del correo: cada minuto mira si toca un envío programado.
+                // Va aparte del de la bitácora, que solo corre si hay rutinas.
+                let relojCorreo = Timer(timeInterval: 60, repeats: true) { _ in
+                    ResumenCorreo.revisarHorarios()
+                    // El saldo se consulta de fondo; la caché lo limita a una vez
+                    // cada media hora y el aviso, a una al día por proveedor.
+                    SaldoAPI.consultar { _ in }
+                }
+                RunLoop.main.add(relojCorreo, forMode: .common)
+                WhisperServer.limpiarHuerfanos()
+                VoxtralServer.limpiarHuerfanos()
             }
-            RunLoop.main.add(relojCorreo, forMode: .common)
-            WhisperServer.limpiarHuerfanos()
-            VoxtralServer.limpiarHuerfanos()
         }
         Config.endurecerSecretosExistentes()   // 0600 a .env/gateways/config si venían 0644
         ChatIA.cargarPreciosArchivo()  // precios reales de CHAT desde precios_ia.json (LiteLLM)
         UsageLog.cargarTarifasArchivo()  // precios reales de STT/audio desde precios_stt.json (LiteLLM)
-        ChatIA.detectarLocales()   // ¿LM Studio / Ollama corriendo? (pulido local)
-        ChatIA.detectarSTTLocales()  // ¿algún local puede TRANSCRIBIR? (whisper/asr)
-        if AgenteCodex.disponible { AgenteCodex.estado { _ in } }
         Updater.estaGrabando = { [weak self] in self?.recorder.isRecording ?? false }
-        Updater.buscarAlArrancar() // ¿versión nueva? avisa abajo-izq (o instala si Autoactualizar)
-        Updater.iniciarMonitoreo() // cron liviano mientras la app permanezca abierta
+        if !pruebaAislada {
+            ChatIA.detectarLocales()   // ¿LM Studio / Ollama corriendo? (pulido local)
+            ChatIA.detectarSTTLocales()  // ¿algún local puede TRANSCRIBIR? (whisper/asr)
+            if AgenteCodex.disponible { AgenteCodex.estado { _ in } }
+            Updater.buscarAlArrancar() // ¿versión nueva? avisa abajo-izq (o instala si Autoactualizar)
+            Updater.iniciarMonitoreo() // cron liviano mientras la app permanezca abierta
+        }
         AutoAyudaControles.shared.activar()
         TareasRecordatorios.shared.iniciar { [weak self] aviso in
             self?.presentarAvisoPendiente(aviso)
@@ -5127,11 +5158,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             && Config.ultimaVersionVista() != Version.numero
         Config.set("ultima_version_vista", to: Version.numero)
 
-        if mostrarWizard {
+        if mostrarWizard && !pruebaAislada {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 WizardWindowController.shared.show()
             }
-        } else if mostrarNovedades {
+        } else if mostrarNovedades && !pruebaAislada {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 NovedadesWindowController.shared.show()
             }
@@ -5157,8 +5188,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         ContinuoLote.publicarOcupado(activacionVozOcupada)
         DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
-            ContinuoBitacora.arrancar()
-            ContinuoBitacora.purgaAutomaticaSiCorresponde()
+            if !pruebaAislada {
+                ContinuoBitacora.arrancar()
+                ContinuoBitacora.purgaAutomaticaSiCorresponde()
+            }
             // Siempre, aunque la bitácora esté apagada: si una pausa venció con la
             // aplicación cerrada, se da por terminada y se avisa; si sigue vigente,
             // queda vigilada hasta su hora (spec 010, RF-06).
@@ -5169,8 +5202,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // nunca volvía a aplicar la retención que el usuario fijó: seguía
         // guardando material que ya debería haberse ido. El propio método
         // comprueba si toca, así que llamarlo de más no cuesta.
-        purgaTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in
-            ContinuoBitacora.purgaAutomaticaSiCorresponde()
+        if !pruebaAislada {
+            purgaTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in
+                ContinuoBitacora.purgaAutomaticaSiCorresponde()
+            }
         }
     }
 

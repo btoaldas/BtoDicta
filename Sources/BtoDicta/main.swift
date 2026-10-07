@@ -41,9 +41,30 @@ if AsistenteMudanza.esPuente {
     exit(0)
 }
 
-// La app se llamaba BetoDicta: lo PRIMERO es poner sus carpetas a nombre del
-// nuevo, antes de que nadie lea configuración ni abra un índice. Ver Rebautizo.
-Rebautizo.aplicar()
+// Hooks puros del pipeline: verifican el artefacto antes de cualquier mudanza
+// o acceso a datos personales, también con la app instalada cerrada.
+if let dmg = ProcessInfo.processInfo.environment["BTODICTA_DMGVERIFYTEST"] {
+    guard let sig = ProcessInfo.processInfo.environment["BTODICTA_DMGVERIFY_SIG"],
+          let firma = try? Data(contentsOf: URL(fileURLWithPath: sig)) else {
+        print("DMGVERIFYTEST FALLA — no se pudo leer la firma")
+        exit(3)
+    }
+    let ok = Updater.firmaDMGValida(URL(fileURLWithPath: dmg), firma: firma)
+    print("DMGVERIFYTEST \(ok ? "OK" : "FALLA")")
+    exit(ok ? 0 : 3)
+}
+if let appPath = ProcessInfo.processInfo.environment["BTODICTA_VERIFYTEST"] {
+    // El hook se ejecuta después de autenticar el DMG con Ed25519.
+    let ok = Updater.firmaConfiable(URL(fileURLWithPath: appPath), contenidoAutenticado: true)
+    print("VERIFYTEST \(appPath) -> identidadConfiable=\(ok)")
+    exit(ok ? 0 : 3)
+}
+
+// La app se llamaba BetoDicta: antes de leer configuración o abrir un índice se
+// mudan sus carpetas. Un perfil aislado no migra carpetas del usuario real.
+if (ProcessInfo.processInfo.environment["BTODICTA_DIR"] ?? "").isEmpty {
+    Rebautizo.aplicar()
+}
 
 // Puente para UN Atajo universal de macOS:
 //   BtoDicta --universal-input orden.json --universal-output respuesta.json
@@ -79,23 +100,6 @@ if let i = argumentos.firstIndex(of: "--universal-input"), i + 1 < argumentos.co
         exit(3)
     }
     print(respuesta.mensaje); exit(respuesta.ok ? 0 : 2)
-}
-
-// Hooks puros del pipeline de release. Corren antes de crear NSApplication para
-// que también funcionen con la app instalada cerrada y en una sesión sin GUI.
-if let dmg = ProcessInfo.processInfo.environment["BTODICTA_DMGVERIFYTEST"],
-   let sig = ProcessInfo.processInfo.environment["BTODICTA_DMGVERIFY_SIG"],
-   let firma = try? Data(contentsOf: URL(fileURLWithPath: sig)) {
-    let ok = Updater.firmaDMGValida(URL(fileURLWithPath: dmg), firma: firma)
-    print("DMGVERIFYTEST \(ok ? "OK" : "FALLA")")
-    exit(ok ? 0 : 3)
-}
-if let appPath = ProcessInfo.processInfo.environment["BTODICTA_VERIFYTEST"] {
-    // El hook del pipeline se ejecuta después de verificar la firma Ed25519
-    // del DMG, igual que el actualizador real.
-    let ok = Updater.firmaConfiable(URL(fileURLWithPath: appPath), contenidoAutenticado: true)
-    print("VERIFYTEST \(appPath) -> identidadConfiable=\(ok)")
-    exit(ok ? 0 : 3)
 }
 
 AutoAyudaQA.ejecutarSiSePidio()

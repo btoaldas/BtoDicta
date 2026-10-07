@@ -127,6 +127,7 @@ rm -f "$TMPCERT"
 ok "Bundle firmado con el certificado propio exacto y fijado ($CERT_SHA1)"
 codesign --verify --deep --strict "$BUILD_DIR/BtoDicta.app" || fail "Firma del bundle inválida"
 BTODICTA_QA_BIN="$PWD/$BUILD_DIR/BtoDicta.app/Contents/MacOS/BtoDicta" \
+  BTODICTA_QA_APP="$PWD/$BUILD_DIR/BtoDicta.app" \
   scripts/qa-paquete.sh --automatico --salida "$PWD/$BUILD_DIR/qa" \
   || fail "La suite del paquete release falló"
 ok "Suite automática del paquete final aprobada"

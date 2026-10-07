@@ -8,11 +8,17 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.82.0"
-    static let fecha = "2026-09-24"
+    static let numero = "0.83.0"
+    static let fecha = "2026-10-06"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.83.0", "2026-10-06", [
+            "BITÁCORA SOLO DE GRABACIONES. La nueva opción «Activar solo de grabaciones» viene marcada también al actualizar. La bitácora recoge tu voz, el audio del sistema, las capturas y el contexto del navegador únicamente mientras grabas desde el notch o el teclado. Fuera de esa grabación no captura ninguna fuente",
+            "LA ACTIVACIÓN POR VOZ TAMBIÉN DESCANSA. Con esta opción marcada, usa el notch o el teclado para empezar. Se conserva tu preferencia de manos libres para cuando vuelvas al modo continuo",
+            "MENOS TRANSCRIPCIONES REPETIDAS. La bitácora reutiliza el audio y el texto del dictado; sus resúmenes y rutinas siguen disponibles. Los pendientes ambientales anteriores se conservan y dejan de procesarse automáticamente mientras uses este modo",
+            "CONTEXTO DEL NAVEGADOR CON PERMISO. La extensión 0.6.0 comprueba antes de leer la página o capturarla que exista una grabación autorizada. Recarga la extensión en el navegador después de actualizar",
+        ]),
         ("0.82.0", "2026-09-24", [
             "EL DICTADO YA NO SE MUERE CUANDO EL MICRÓFONO CAMBIA DE FRECUENCIA. Desde el 21 de septiembre, a veces pulsabas fn fn y no grababa nada, y solo reiniciar BtoDicta lo arreglaba. La causa: el dictado usaba un único motor de audio para toda la sesión, que recordaba la frecuencia del micrófono de la primera vez. Cuando otra aplicación la cambiaba —de 48 000 a 44 100 Hz— o entraban unos AirPods en llamada (24 000), el motor ya no arrancaba, y el fallo no quedaba escrito en ningún sitio. Ahora cada dictado usa un motor nuevo, y si el micrófono elegido no arranca, graba con el del sistema. Reproducido y comprobado: antes fallaba, ahora graba",
             "EL DICTADO NO ESPERA A LA BITÁCORA. Antes de grabar le pide el micrófono a la bitácora; si ella tardaba en soltarlo, el dictado se quedaba esperando sin grabar. Ahora espera como mucho un segundo y medio y arranca igual",

@@ -34,6 +34,21 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.83.0
+
+- **Bitácora solo de grabaciones**, activada por defecto también al actualizar:
+  recoge voz, audio del sistema, pantalla y navegador mientras grabas desde el
+  notch o el teclado. Fuera de la grabación no captura ninguna fuente.
+- **La activación por voz queda en pausa** con esta opción marcada. Inicia desde
+  el notch o el teclado; tu preferencia de manos libres queda guardada.
+- **Reutiliza la transcripción del dictado** y conserva resúmenes, rutinas e
+  historial. Los pendientes ambientales antiguos dejan de procesarse
+  automáticamente en este modo y siguen disponibles para una petición manual.
+- La bitácora conserva su interruptor principal y tus fuentes elegidas.
+  Desmarca la nueva opción si quieres volver al modo continuo.
+- La extensión incluida sube a **0.6.0**; recárgala en el navegador después de
+  actualizar para aplicar la comprobación previa a leer páginas y capturas.
+
 ### Novedades 0.77.1
 
 - **El gestor de contraseñas del navegador pisaba el campo de la clave**: era

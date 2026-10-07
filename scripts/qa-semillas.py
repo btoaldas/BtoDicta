@@ -36,6 +36,16 @@ MIN_APPS = 3
 
 def rutas_posibles():
     aqui = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app = os.environ.get("BTODICTA_QA_APP")
+    binario = os.environ.get("BTODICTA_QA_BIN")
+    if not app and binario and binario.endswith("/Contents/MacOS/BtoDicta"):
+        app = os.path.dirname(os.path.dirname(os.path.dirname(binario)))
+    if app:
+        # Con candidato explícito no se aprueba el recurso de otra versión.
+        return [os.path.join(app, "Contents", "Resources", "semillas-exclusion.json")]
+    if binario:
+        # El ejecutable suelto no contiene recursos que puedan viajar al usuario.
+        return []
     return [
         os.path.join(aqui, "build", "BetoDicta.app", "Contents", "Resources", "semillas-exclusion.json"),
         os.path.join(aqui, "build", "BtoDicta.app", "Contents", "Resources", "semillas-exclusion.json"),
@@ -47,6 +57,9 @@ def rutas_posibles():
 def main():
     ruta = next((r for r in rutas_posibles() if os.path.exists(r)), None)
     if not ruta:
+        if os.environ.get("BTODICTA_QA_APP") or (os.environ.get("BTODICTA_QA_BIN") or "").endswith("/Contents/MacOS/BtoDicta"):
+            print("SEMILLAS FALLA — el paquete candidato no trae el catálogo")
+            return 1
         print("SEMILLAS OMITIDA — no se encontró el catálogo en ninguna ruta conocida")
         return 0
 

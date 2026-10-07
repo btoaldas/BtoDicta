@@ -30,7 +30,7 @@ medían algo que sonaba parecido pero no era el requisito.
 
 Código de salida: 0 cumple · 1 no cumple · 2 sin datos suficientes.
 """
-import os, re, sqlite3, sys, unicodedata
+import json, os, re, sqlite3, sys, unicodedata
 
 # Cuánto texto debe aportar la extensión frente al OCR, PÁGINA A PÁGINA.
 #
@@ -59,7 +59,20 @@ def normalizar(t):
 
 def main():
     umbral = float(sys.argv[1]) if len(sys.argv) > 1 else 90.0
-    base = os.path.expanduser("~/BtoDicta Bitácora/bitacora.sqlite")
+    perfil = os.environ.get("BTODICTA_DIR")
+    if perfil:
+        # En QA se mide solo el perfil de prueba, aunque esté vacío. Recurrir a
+        # los datos personales convertiría su historial en un gate del paquete.
+        perfil = os.path.expanduser(perfil)
+        config = os.path.join(perfil, "config.json")
+        preferencias = {}
+        if os.path.exists(config):
+            with open(config, encoding="utf-8") as archivo:
+                preferencias = json.load(archivo)
+        carpeta = preferencias.get("continuo_carpeta") or os.path.join(perfil, "bitacora")
+        base = os.path.join(os.path.expanduser(carpeta), "bitacora.sqlite")
+    else:
+        base = os.path.expanduser("~/BtoDicta Bitácora/bitacora.sqlite")
     if not os.path.exists(base):
         print("TEXTOOCR OMITIDA — no hay bitácora en este equipo")
         return 0

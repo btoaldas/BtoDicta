@@ -80,6 +80,21 @@ fi
   exit 2
 }
 
+# Las pruebas de LaunchServices deben abrir el mismo paquete que el resto del
+# QA. Con un candidato explícito jamás se sustituye por la app instalada.
+APP_QA="${BTODICTA_QA_APP:-}"
+if [[ "$BIN" == */Contents/MacOS/BtoDicta ]]; then
+  app_del_binario="${BIN:h:h:h}"
+  if [[ -n "$APP_QA" && "${APP_QA:A}" != "${app_del_binario:A}" ]]; then
+    print -u2 "BTODICTA_QA_APP no corresponde a BTODICTA_QA_BIN; no abriré otro paquete."
+    exit 2
+  fi
+  APP_QA="$app_del_binario"
+fi
+# También los comprobadores externos reciben el candidato exacto.
+export BTODICTA_QA_BIN="$BIN"
+[[ -z "$APP_QA" ]] || export BTODICTA_QA_APP="$APP_QA"
+
 marca="$(/bin/date '+%Y%m%d-%H%M%S')"
 [[ -n "$salida" ]] || salida="$QA_DIR/evidencia-$marca"
 /bin/mkdir -p "$salida/logs-automaticos" "$salida/logs-app"
@@ -141,12 +156,19 @@ omitidas=0
 ejecutar_por_sistema() {
   local id="$1" variable="$2" marca="$3" limite="${4:-90}"
   local log="$salida/logs-automaticos/$id.log"
-  local app="${BTODICTA_QA_APP:-/Applications/BtoDicta.app}"
+  local app="$APP_QA"
   local dir="$salida/config-de-prueba-$id"
   local inicio fin estado
   : > "$log"                      # `--stdout` añade: se vacía antes
   /bin/mkdir -p "$dir"
   inicio="$(/bin/date +%s)"
+  if [[ -z "$app" || ! -d "$app" ]]; then
+    print "$marca FALLA — falta el paquete del candidato; define BTODICTA_QA_APP para probar un binario suelto" > "$log"
+    total=$((total + 1)); fallos=$((fallos + 1))
+    print "[FALLA] $id"
+    print "$id\tFALLA\t2\t0\t$id.log" >> "$salida/resumen.tsv"
+    return
+  fi
   # `-g`: en segundo plano. Sin él, abrir la prueba le quita el foco a lo que el
   # usuario tenga delante, incluida una aplicación a pantalla completa.
   /usr/bin/perl -e 'alarm shift; exec @ARGV' "$limite" \
@@ -198,12 +220,20 @@ estatica() {
   local id="$1"; shift
   local log="$salida/logs-automaticos/$id.log"
   local inicio fin codigo estado
+  local dir="$salida/config-de-prueba-$id"
+  /bin/mkdir -p "$dir"
   inicio="$(/bin/date +%s)"
-  "$@" > "$log" 2>&1
+  /usr/bin/env "BTODICTA_DIR=$dir" "$@" > "$log" 2>&1
   codigo=$?
   fin="$(/bin/date +%s)"
   total=$((total + 1))
-  if (( codigo == 0 )); then estado="PASA"; else estado="FALLA"; fallos=$((fallos + 1)); fi
+  if (( codigo != 0 )); then
+    estado="FALLA"; fallos=$((fallos + 1))
+  elif /usr/bin/grep -Eq '^[A-Z][A-Z0-9_]* OMITIDA' "$log"; then
+    estado="OMITIDA"; omitidas=$((omitidas + 1))
+  else
+    estado="PASA"
+  fi
   print "$id\t$estado\t$codigo\t$((fin - inicio))\t${log:t}" >> "$salida/resumen.tsv"
   print "[$estado] $id"
 }

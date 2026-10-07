@@ -69,6 +69,10 @@ enum ContinuoBitacora {
         // Un stream ambiental anterior tiene otra generación y debe cerrarse.
         if #available(macOS 14.0, *) { ContinuoPantalla.shared.detener() }
         if #available(macOS 13.0, *) { ContinuoAudioSistema.shared.detener() }
+        // El primer dictado puede llegar antes del arranque diferido de la
+        // bitácora. Abrir aquí evita perder su material por un índice aún
+        // cerrado, sin crear la base si esta grabación no está autorizada.
+        if contexto != nil { ContinuoIndice.shared.abrir() }
         arrancarCapturadores()
         return contexto
     }

@@ -805,9 +805,37 @@ Si prefieres no revisar nada a mano, activa **Autoactualizar** (*Ajustes → Ava
 
 **Pestaña Bitácora.** Apagada de fábrica: nada se graba hasta que tú la enciendas.
 
-Encendida, registra tu jornada en segundo plano para poder reconstruirla después: qué dijiste, qué sonó en el equipo, qué había en pantalla — y convertirlo en documentos con la IA que elijas. Todo vive en `~/BtoDicta Bitácora` (carpeta configurable, botón **Abrir carpeta**), organizado por día.
+Desde **0.83.0**, **Activar solo de grabaciones** viene marcada por defecto,
+también al actualizar una instalación existente. Con el interruptor principal
+encendido, la bitácora recoge contexto **solo mientras grabas desde el notch o
+el teclado**: tu voz, el audio del sistema, capturas de pantalla, OCR y contexto
+del navegador, según las fuentes que tengas habilitadas y sus permisos.
+
+Cuando no grabas, está en pausa o detienes la grabación, no captura micrófono,
+audio del sistema, pantalla ni navegador. **También se pausa la activación por
+voz**, incluso si el interruptor principal de bitácora está apagado: inicia el
+dictado con el notch o el teclado. La preferencia de manos libres se conserva.
+
+El audio y texto del dictado se reutilizan sin volver a transcribirlos para la
+bitácora. Los resúmenes, rutinas, OCR, explorador y procesamiento manual siguen
+funcionando. El material ambiental guardado antes de actualizar se conserva;
+en este modo queda fuera de las tandas automáticas, pero puedes procesarlo
+expresamente con los botones manuales.
+
+Para registrar la jornada en segundo plano, **desmarca Activar solo de
+grabaciones**. Esa elección se conserva en los siguientes reinicios y
+actualizaciones. El interruptor principal no se enciende al actualizar si
+estaba apagado. Todo vive en `~/BtoDicta Bitácora` (carpeta configurable, botón
+**Abrir carpeta**), organizado por día.
+
+La extensión incluida es **0.6.0**. Después de actualizar la app, recárgala en
+la página de extensiones del navegador para que compruebe el permiso de la
+bitácora antes de leer la página o capturarla.
 
 ### Qué captura
+
+Con **Activar solo de grabaciones** marcada, estas fuentes se limitan a la
+grabación explícita. Desmarcada, se aplican sus controles de modo continuo.
 
 - **Tu voz (micrófono)** — tres modos: *Siempre*, *Solo cuando hay voz* (con sensibilidad ajustable) o *Solo al dictar*. **El dictado por doble Fn manda siempre**: la bitácora le cede el micrófono y vuelve sola al terminar — eso no es un ajuste, es una regla del código. El audio de tus dictados se incorpora a la línea de tiempo para que la cesión no deje hueco.
 - **El audio del sistema** — la otra parte de una videollamada, un video, una reunión. Pista separada de la tuya, con puerta de silencio (solo guarda cuando suena algo) y **puerta anti-eco**: mientras suena el altavoz, el micrófono exige más nivel para no registrar como tuyo lo que salió por los parlantes.

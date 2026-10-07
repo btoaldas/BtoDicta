@@ -57,6 +57,10 @@ AJUSTES_PREVIOS = {
 
 def binario():
     aqui = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    candidato = os.environ.get("BTODICTA_QA_BIN")
+    if candidato:
+        # No sustituir un candidato ausente por una compilación anterior.
+        return candidato if os.path.isfile(candidato) and os.access(candidato, os.X_OK) else None
     # El binario SUELTO primero, no el de dentro del paquete (spec 011): ejecutar
     # el del paquete desde una terminal apunta el icono de la barra a nombre de
     # esa terminal. Estas pruebas no necesitan el icono.
@@ -120,6 +124,7 @@ def t13(bin_):
     os.makedirs(carpeta, exist_ok=True)
     with open(os.path.join(d, "config.json"), "w", encoding="utf-8") as f:
         json.dump({"continuo_activo": True, "continuo_carpeta": carpeta,
+                   "continuo_solo_grabaciones": False,
                    "continuo_audio_modo": "siempre", "continuo_sistema_activo": False,
                    "continuo_pantalla_activa": False}, f)
 
@@ -153,6 +158,9 @@ def t13(bin_):
 def main():
     bin_ = binario()
     if not bin_:
+        if os.environ.get("BTODICTA_QA_BIN"):
+            print("RAPIDO FALLA — el binario candidato no existe o no es ejecutable")
+            return 2
         print("RAPIDO OMITIDA — no hay aplicación construida")
         return 0
     solo = sys.argv[1] if len(sys.argv) > 1 else "todo"
