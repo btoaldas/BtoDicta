@@ -202,7 +202,9 @@ ejecutar() {
   codigo=$?
   fin="$(/bin/date +%s)"
   total=$((total + 1))
-  if (( codigo == 0 )); then
+  if (( codigo == 0 )) && /usr/bin/grep -Eq '^[A-Z][A-Z0-9_]* OMITIDA' "$log"; then
+    estado="OMITIDA"; omitidas=$((omitidas + 1))
+  elif (( codigo == 0 )); then
     estado="PASA"
   elif (( codigo == 4 )) && [[ "$id" == audio_* || "$id" == ia_* ]]; then
     estado="OMITIDA"; omitidas=$((omitidas + 1))

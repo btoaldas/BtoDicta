@@ -6133,11 +6133,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Monitor de flags para atajos de puros modificadores (fn, ctrl+opt…).
     /// Se dispara al SOLTAR el combo exacto, si no se usó junto a otra tecla.
-    private func installFlagsMonitor() {
+    private func installFlagsMonitor(escucharEventos: Bool = true) {
         guard !fnMonitorsInstalled else { return }
-        fnMonitorsInstalled = true
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
+        if escucharEventos {
+            fnMonitorsInstalled = true
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+        }
 
         let flagsHandler: (NSEvent) -> Void = { [weak self] event in
             guard let self, !self.comboMods.isEmpty else { return }
@@ -6299,6 +6301,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         manejadorFlags = flagsHandler
+        // El arnés inyecta eventos en este mismo manejador, sin pedir permisos
+        // ni escuchar el teclado real o interferir con la copia instalada.
+        guard escucharEventos else { return }
         NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: flagsHandler)
         NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: keyHandler)
         NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
@@ -10607,6 +10612,8 @@ extension AppDelegate {
         Config.set("hold_para_hablar", to: false)
         Config.set("silencio_max_seg", to: 0.0)           // que el dictado de prueba no se corte
         Config.set("continuo_activo", to: false)
+        comboMods = ["fn"]
+        installFlagsMonitor(escucharEventos: false)
         ModoRapido.ponerReunion(false)
         pruebaDetenerSinTranscribir = true
 

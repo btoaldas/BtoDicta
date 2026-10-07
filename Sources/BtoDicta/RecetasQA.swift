@@ -3,6 +3,10 @@ import Foundation
 enum RecetasQA {
     static func ejecutarSiSePidio() {
         guard ProcessInfo.processInfo.environment["BTODICTA_RECIPETEST"] == "1" else { return }
+        guard let dir = ProcessInfo.processInfo.environment["BTODICTA_DIR"], !dir.isEmpty else {
+            print("RECIPETEST FALLA — se niega a correr sin BTODICTA_DIR")
+            exit(2)
+        }
         var fallos = 0
         func check(_ nombre: String, _ ok: @autoclosure () -> Bool) {
             let pasa = ok(); if !pasa { fallos += 1 }
@@ -147,19 +151,52 @@ enum RecetasQA {
             rutina: recetaURL, texto: "hola mundo", simular: true, completion: $0) }
         check("URL portable codifica variables", salidaURL?.ok == true)
 
-        // Recorre las recetas completas sin abrir apps, controlar HomeKit,
-        // capturar, hablar ni escribir datos reales. Las tres escenas pueden
-        // quedar denegadas si su Atajo no fue habilitado: ese bloqueo es el
-        // comportamiento seguro esperado, no un fallo del motor.
+        // El consentimiento pertenece al perfil de prueba: no se presupone el
+        // ajuste del usuario ni se lee su catálogo. Todo Atajo se simula.
         let escenas = Set(["beto-modo-oficina", "beto-modo-noche", "beto-apagar-luces"])
+        let recetasEscena = incluidas.filter { escenas.contains($0.id) }
+        let catalogo = recetasEscena.enumerated().compactMap { indice, receta -> AtajoAppleDescubierto? in
+            guard let paso = receta.pasos.first, paso.tipo == "atajo" else { return nil }
+            return .init(id: "qa-escena-\(indice)", nombre: paso.valor,
+                         habilitado: false, riesgo: .externo, disponible: true)
+        }
+        check("fixture contiene las tres escenas", catalogo.count == 3)
+        AppleAtajosCatalogo.guardar(catalogo)
+        if let escena = recetasEscena.first, let atajo = escena.pasos.first?.valor {
+            Config.set("agente_tool_atajos", to: false)
+            let apagada = esperar { RutinasAgenteRunner.ejecutar(
+                rutina: escena, texto: "prueba", simular: true, completion: $0) }
+            check("pasarela apagada bloquea la escena", apagada?.ok == false
+                && apagada?.mensaje.contains("La pasarela de Atajos está apagada.") == true
+                && apagada?.evidencia["paso_1"] == "fallo"
+                && apagada?.evidencia["paso_1_simulado"] == nil)
+            Config.set("agente_tool_atajos", to: true)
+            let denegada = esperar { RutinasAgenteRunner.ejecutar(
+                rutina: escena, texto: "prueba", simular: true, completion: $0) }
+            check("Atajo sin consentimiento bloquea la escena", denegada?.ok == false
+                && denegada?.mensaje.contains("El Atajo «\(atajo)» no está habilitado como herramienta en Ajustes → Asistente.") == true
+                && denegada?.evidencia["paso_1"] == "fallo"
+                && denegada?.evidencia["paso_1_simulado"] == nil)
+        }
+        AppleAtajosCatalogo.guardar(catalogo.map { item in
+            var habilitado = item; habilitado.habilitado = true; return habilitado
+        })
+        // Recorre las recetas completas sin abrir apps, controlar HomeKit,
+        // capturar, hablar ni escribir datos reales. Las escenas solo pasan si
+        // el motor verifica el permiso y devuelve evidencia de simulación.
         for receta in incluidas {
             let r = esperar { RutinasAgenteRunner.ejecutar(
                 rutina: receta, texto: "contenido de prueba", simular: true,
                 completion: $0) }
             check("receta completa: \(receta.nombre)", r != nil
                 && !(r?.mensaje.contains("no es compatible") ?? true)
-                && ((r?.ok == true) || (escenas.contains(receta.id)
-                    && (r?.mensaje.contains("no está habilitado") == true))))
+                && r?.ok == true)
+            if escenas.contains(receta.id) {
+                check("escena simulada con Atajo autorizado: \(receta.nombre)",
+                      r?.evidencia["paso_1"] == "ok"
+                        && r?.evidencia["paso_1_atajo"] == receta.pasos.first?.valor
+                        && r?.evidencia["paso_1_simulado"] == "true")
+            }
         }
         if let cierre = incluidas.first(where: { $0.id == "beto-cerrar-jornada" }) {
             let r = esperar { RutinasAgenteRunner.ejecutar(
@@ -184,11 +221,14 @@ enum RecetasQA {
             simular: false)
         check("universal externo exige confirmación", externoSinConfirmar?.ok == false
             && externoSinConfirmar?.evidencia["requiere_confirmacion"] == "true")
+        let nombreDesconocido = "BtoDicta QA \(UUID().uuidString)"
         let atajoDesconocido = esperar {
-            AppleAtajos.ejecutarVerificado(nombre: "BtoDicta QA \(UUID().uuidString)",
+            AppleAtajos.ejecutarVerificado(nombre: nombreDesconocido,
                                             texto: "", simular: true, completion: $0)
         }
-        check("Atajo desconocido no se autoautoriza", atajoDesconocido?.ok == false)
+        check("Atajo desconocido no se autoautoriza", atajoDesconocido?.ok == false
+            && atajoDesconocido?.mensaje == "El Atajo «\(nombreDesconocido)» no está habilitado como herramienta en Ajustes → Asistente."
+            && atajoDesconocido?.evidencia["simulado"] == nil)
 
         print(fallos == 0 ? "RECIPETEST TODO OK" : "RECIPETEST ✗ \(fallos) FALLOS")
         fflush(stdout); exit(fallos == 0 ? 0 : 4)
