@@ -4,15 +4,18 @@ import CryptoKit
 enum PoliticaPulido {
     /// Presupuesto de pared por proveedor. Incluye contexto (instrucciones y
     /// glosario), no solo dictado. Los largos conservan hasta dos minutos.
+    /// Pendiente medida: Groq pule un trozo de 9 000 caracteres en 1–2 s y
+    /// Anthropic, el más lento que responde, 11 500 en 39 s; 250 caracteres
+    /// por segundo de margen cubre a ambos sin esperar minutos a uno colgado.
     static func espera(texto: Int, contexto: Int, base: Double = 8) -> TimeInterval {
-        min(120, max(5, base) + Double(max(0, texto - 500)) / 90
+        min(120, max(3, base) + Double(max(0, texto - 500)) / 250
             + Double(max(0, contexto - 3000)) / 400)
     }
 
     /// Evita N × 120 s cuando varios respaldos se cuelgan. El presupuesto se
-    /// comparte entre intentos: base normal 24 s, hasta 240 s para textos largos.
+    /// comparte entre intentos: tres esperas, mínimo 12 s, hasta 240 s.
     static func esperaTotal(texto: Int, contexto: Int, base: Double = 8) -> TimeInterval {
-        min(240, max(24, espera(texto: texto, contexto: contexto, base: base) * 3))
+        min(240, max(12, espera(texto: texto, contexto: contexto, base: base) * 3))
     }
 }
 

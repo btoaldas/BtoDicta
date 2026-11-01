@@ -682,7 +682,7 @@ enum AgenteCoreQA {
                     == "La palabra empty aparece en el informe.")
         comprobar("pulido adapta espera al texto y al contexto",
                   PoliticaPulido.espera(texto: 120, contexto: 2000) == 8
-                    && PoliticaPulido.espera(texto: 10000, contexto: 12000) > 90
+                    && PoliticaPulido.espera(texto: 10000, contexto: 12000) > 40
                     && PoliticaPulido.espera(texto: 120, contexto: 15000) > 30)
         let historialPrincipalQA = URL(fileURLWithPath: "/tmp/12-34-56.txt")
         let historialRecuperadoQA = HistoryWriter.textoRecuperadoURL(para: historialPrincipalQA)

@@ -40,7 +40,7 @@ final class CascadaTests: XCTestCase {
     }
     func testPresupuestosYCuerpo() throws {
         XCTAssertEqual(PoliticaPulido.espera(texto: 130, contexto: 2200), 8)
-        XCTAssertGreaterThan(PoliticaPulido.espera(texto: 6000, contexto: 8000), 60)
+        XCTAssertGreaterThan(PoliticaPulido.espera(texto: 6000, contexto: 8000), 30)
         XCTAssertGreaterThan(PoliticaPulido.espera(texto: 130, contexto: 16000), 30)
         XCTAssertEqual(PoliticaPulido.espera(texto: 100000, contexto: 130000), 120)
         let deepseek = ChatIA.fijos.first { $0.id == "deepseek" }!
@@ -48,7 +48,16 @@ final class CascadaTests: XCTestCase {
         let req = try XCTUnwrap(deepseek.requestChat(prompt: String(repeating: "a", count: 16000), temperatura: 0, textLen: 10000))
         let body = try JSONSerialization.jsonObject(with: req.httpBody!) as! [String: Any]
         XCTAssertEqual((body["thinking"] as? [String: String])?["type"], "disabled")
-        XCTAssertGreaterThan(req.timeoutInterval, 90)
+        XCTAssertGreaterThan(req.timeoutInterval, 40)
+        let zai = ChatIA.fijos.first { $0.id == "zai" }!
+        let reqZai = try XCTUnwrap(zai.requestChat(prompt: "hola", temperatura: 0, textLen: 4))
+        let bodyZai = try JSONSerialization.jsonObject(with: reqZai.httpBody!) as! [String: Any]
+        XCTAssertEqual((bodyZai["thinking"] as? [String: String])?["type"], "disabled")
+        XCTAssertNil(bodyZai["temperature"])
+        XCTAssertEqual(ChatIA.fijos.first { $0.id == "gemini" }?.modelo, "gemini-3.5-flash-lite")
+        XCTAssertEqual(PoliticaPulido.esperaTotal(texto: 120, contexto: 2000, base: 3), 12)
+        XCTAssertEqual(PoliticaPulido.espera(texto: 100, contexto: 1000, base: 4), 4)
+        XCTAssertGreaterThan(PoliticaPulido.espera(texto: 11500, contexto: 13000, base: 4), 39)
         let groq = ChatIA.fijos.first { $0.id == "groq" }!
         XCTAssertEqual(groq.modelo, "openai/gpt-oss-20b")
         XCTAssertFalse(ChatIA.modeloAptoParaPulido("meta-llama/llama-prompt-guard-2-86m"))
@@ -140,7 +149,7 @@ final class CascadaTests: XCTestCase {
     func testTextoLargoNoSeRecortaAEsperaCorta() {
         let proveedor = ia("largo"), original = String(repeating: "Hay que revisar el documento. ", count: 350)
         RespuestaQA.responder = { req in
-            XCTAssertGreaterThan(req.timeoutInterval, 90)
+            XCTAssertGreaterThan(req.timeoutInterval, 40)
             return (200, self.respuesta(original))
         }
         let fin = expectation(description: "largo")

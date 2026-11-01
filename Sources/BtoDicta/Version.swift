@@ -8,11 +8,16 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.83.0"
-    static let fecha = "2026-10-06"
+    static let numero = "0.83.1"
+    static let fecha = "2026-11-01"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.83.1", "2026-11-01", [
+            "EL PULIDO YA NO SE QUEDA VEINTE SEGUNDOS ESPERANDO. Con un corte breve de red, Groq agotaba su plazo de 8 s y la cascada probaba uno tras otro a proveedores sin saldo o con modelos retirados: 23 s para pulir dos frases, y a veces se entregaba el texto sin pulir. Ahora la espera base puede bajar a 3 s (recomendado 4) y crece con el largo del texto según lo medido —Groq pule 9 000 caracteres en 1–2 s—: unos 38 s por trozo largo en vez de 100. Toda la cascada junta se rinde a los 12 s en un texto corto, no a los 24",
+            "Z.AI (GLM) RESPONDE SIN PENSAR DE MÁS. La app no le apagaba el razonamiento y GLM gastaba el plazo pensando antes de corregir. Ahora se lo apaga, como a DeepSeek",
+            "GEMINI CON UN MODELO VIGENTE. Google retiró `gemini-2.5-flash` para cuentas nuevas y respondía 404. El pulido usa ahora `gemini-3.5-flash-lite`, que corrige en alrededor de un segundo",
+        ]),
         ("0.83.0", "2026-10-06", [
             "BITÁCORA SOLO DE GRABACIONES. La nueva opción «Activar solo de grabaciones» viene marcada también al actualizar. La bitácora recoge tu voz, el audio del sistema, las capturas y el contexto del navegador únicamente mientras grabas desde el notch o el teclado. Fuera de esa grabación no captura ninguna fuente",
             "LA ACTIVACIÓN POR VOZ TAMBIÉN DESCANSA. Con esta opción marcada, usa el notch o el teclado para empezar. Se conserva tu preferencia de manos libres para cuando vuelvas al modo continuo",

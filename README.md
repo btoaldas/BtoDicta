@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.83.1
+
+- **Pulido sin esperas largas.** La espera base puede bajar a 3 s y crece con el
+  largo del texto según lo medido, en vez de un margen de minutos. Un proveedor
+  colgado ya no frena el dictado veinte segundos.
+- **Z.ai (GLM)** responde sin razonamiento previo y **Gemini** usa
+  `gemini-3.5-flash-lite`, porque el modelo anterior fue retirado.
+
 ### Novedades 0.83.0
 
 - **Bitácora solo de grabaciones**, activada por defecto también al actualizar:

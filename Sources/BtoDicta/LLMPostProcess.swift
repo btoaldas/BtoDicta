@@ -112,7 +112,7 @@ struct ChatIA {
             // temperatura arbitraria. Para el pulido interesa respuesta rápida,
             // por eso desactivamos el razonamiento largo de forma oficial.
             // Kimi Code también gestiona el razonamiento según el modelo/plan.
-            if id == "moonshot" || id == "deepseek" {
+            if id == "moonshot" || id == "deepseek" || id == "zai" {
                 body["thinking"] = ["type": "disabled"]
             } else if id != "kimi_code" {
                 body["temperature"] = temperatura
@@ -217,7 +217,7 @@ struct ChatIA {
         ChatIA(id: "openrouter", nombre: "OpenRouter",           base: "https://openrouter.ai/api/v1",   modelo: "openai/gpt-4o-mini",      keyEnv: "OPENROUTER_API_KEY", local: false),
         ChatIA(id: "deepseek",   nombre: "DeepSeek · V4.1 Flash", base: "https://api.deepseek.com",       modelo: "deepseek-flash",          keyEnv: "DEEPSEEK_API_KEY",   local: false),
         ChatIA(id: "xai",        nombre: "xAI · Grok",           base: "https://api.x.ai/v1",            modelo: "grok-2-latest",           keyEnv: "XAI_API_KEY",        local: false),
-        ChatIA(id: "gemini",     nombre: "Gemini · Flash",       base: "https://generativelanguage.googleapis.com/v1beta/openai", modelo: "gemini-2.5-flash", keyEnv: "GEMINI_API_KEY", local: false),
+        ChatIA(id: "gemini",     nombre: "Gemini · Flash",       base: "https://generativelanguage.googleapis.com/v1beta/openai", modelo: "gemini-3.5-flash-lite", keyEnv: "GEMINI_API_KEY", local: false),
         ChatIA(id: "anthropic",  nombre: "Anthropic · Claude",   base: "https://api.anthropic.com",      modelo: "claude-haiku-4-5",        keyEnv: "ANTHROPIC_API_KEY",  local: false,
                authHeader: "x-api-key", authPrefix: "", headersExtra: ["anthropic-version": "2023-06-01"], formato: .anthropic),
         // Proveedores GRATIS / open (OpenAI-compat). El usuario pone su key y
@@ -1005,9 +1005,21 @@ enum LLMPostProcess {
             return
         }
         if ia.esCuentaCodex {
+            // El cliente Codex se toma como mínimo 5 s: si no caben en el
+            // plazo compartido, se salta en vez de pasarse de él.
+            guard restante >= 5 else {
+                continuarFailover(desde: ia, motivo: "sin tiempo para Codex", textoOriginal: text,
+                                  salvaguarda: salvaguarda, prompt: prompt, temp: temp,
+                                  resto: resto, plazo: vencimiento, completion: completion)
+                return
+            }
             AgenteCodex.transformar(prompt, modelo: ia.modeloEfectivo,
                                     timeout: min(restante, PoliticaPulido.espera(texto: text.count, contexto: prompt.count,
                                                                   base: Config.pulidoTimeout()))) { respuesta in
+                guard Date() < vencimiento else {
+                    Log.write("pulido: plazo total agotado → texto original")
+                    completion(text); return
+                }
                 let pulido = respuesta?.trimmingCharacters(in: .whitespacesAndNewlines)
                 if let pulido, !pulido.isEmpty {
                     if let motivo = razonFugaPrompt(original: text, pulido: pulido) {

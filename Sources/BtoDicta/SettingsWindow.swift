@@ -1250,7 +1250,7 @@ struct SettingsView: View {
                         Divider()
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Espera base del pulido: \(Int(m.pulidoTimeout)) s por proveedor").font(.subheadline)
-                            Slider(value: $m.pulidoTimeout, in: 5...60, step: 1).tint(acento)
+                            Slider(value: $m.pulidoTimeout, in: 3...60, step: 1).tint(acento)
                             Text("Textos cortos: salto rápido al siguiente modelo. Texto o contexto largo: se amplía automáticamente hasta 120 s. Sin conexión o cuota, el proveedor entra en cuarentena temporal. Si ninguno responde, se conserva el original.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
