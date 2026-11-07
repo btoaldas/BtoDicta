@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.83.2
+
+- **El pulido no contesta tus dictados.** Si dictas algo con forma de pedido
+  («dame un resumen de…»), la IA lo limpia en vez de responderlo o negarse. Si
+  aun así devuelve una negativa o un texto que no conserva tus palabras, se
+  descarta y se entrega tu dictado original.
+
 ### Novedades 0.83.1
 
 - **Pulido sin esperas largas.** La espera base puede bajar a 3 s y crece con el
