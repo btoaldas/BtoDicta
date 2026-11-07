@@ -1288,15 +1288,23 @@ enum LLMPostProcess {
         }
         let po = palabras(o), pp = palabras(p)
         let textoP = " " + pp.joined(separator: " ") + " ", textoO = " " + po.joined(separator: " ") + " "
-        let negativas = ["lo siento", "no puedo ayudar", "no puedo cumplir", "no puedo hacer eso",
-                         "no puedo proporcionar", "como modelo de lenguaje", "como asistente de ia",
-                         "i m sorry", "i am sorry", "i can t help", "i cannot help"]
+        let negativas = ["lo siento", "lo lamento", "no puedo", "no me es posible", "como modelo de lenguaje",
+                         "como asistente de ia", "i m sorry", "i am sorry", "sorry", "i can t", "i cannot",
+                         "i m unable", "i am unable", "unable to"]
         if let n = negativas.first(where: { textoP.contains(" \($0) ") && !textoO.contains(" \($0) ") }) {
             return "respondió en vez de pulir («\(n)»)"
         }
-        let claveO = Set(po.filter { $0.count >= 4 })
+        // Pulir puntúa y quita muletillas: no duplica el texto. Una respuesta
+        // al pedido (el resumen, la lista) sí lo hace.
+        if letrasOriginal >= 20, letrasPulido > letrasOriginal * 2 {
+            return "creció como respuesta (\(o.count)→\(p.count) chars)"
+        }
+        // Se compara por raíz (4 primeras letras) para que un estilo pedido
+        // por el usuario («trato de usted»: revisa → revise) no cuente como
+        // palabra perdida.
+        let claveO = Set(po.filter { $0.count >= 4 }.map { String($0.prefix(4)) })
         if claveO.count >= 4 {
-            let conservadas = claveO.intersection(pp).count
+            let conservadas = claveO.intersection(pp.filter { $0.count >= 4 }.map { String($0.prefix(4)) }).count
             if conservadas * 10 < claveO.count * 4 {
                 return "no conserva las palabras del dictado (\(conservadas)/\(claveO.count))"
             }

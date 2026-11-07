@@ -1966,6 +1966,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "pero pulir el pedido se acepta")
             chk(LLMPostProcess.razonPulidoInvalidoQA(original: "Lo siento, llego tarde a la reunión de hoy.", pulido: "Lo siento, llego tarde a la reunión de hoy.") == nil,
                 "y un dictado que ya decía «lo siento» se respeta")
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: pedido, pulido: "No puedo darte un resumen de lo que se hizo aquí en tres líneas.") != nil,
+                "una negativa que repite el pedido también se rechaza")
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: pedido, pulido: "Resumen de lo que se hizo aquí en tres líneas:\n1. Se corrigió el pulido para que no responda.\n2. Se añadieron pruebas de los casos.\n3. Se publicó la versión nueva.") != nil,
+                "y una respuesta que arranca copiando el pedido")
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: "Revisa, corrige, guarda y envía el informe cuando termines.", pulido: "Revise, corrija, guarde y envíe el informe cuando termine.") == nil,
+                "pero el estilo «trato de usted» pedido por el usuario se acepta")
 
             CuarentenaPulido.reiniciarContadores()
             print("PULIDO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)
