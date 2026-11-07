@@ -1956,6 +1956,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let limpiado = dictado.replacingOccurrences(of: "Esta es ", with: "")   // pulido normal
             chk(LLMPostProcess.razonPulidoInvalidoQA(original: dictado, pulido: limpiado) == nil,
                 "pero quitar muletillas de verdad se acepta (\(dictado.count)→\(limpiado.count))")
+            // Un dictado que es un pedido no se contesta ni se rechaza: se pule.
+            let pedido = "Dame un resumen de lo que se hizo aquí en tres líneas."
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: pedido, pulido: "Lo siento, pero no puedo ayudar con eso.") != nil,
+                "una negativa del modelo no reemplaza el dictado")
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: pedido, pulido: "1. Se ajustó el pulido.\n2. Se probó.\n3. Se publicó.") != nil,
+                "ni una respuesta al pedido")
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: "eh dame un resumen de lo que se hizo aqui en tres lineas", pulido: pedido) == nil,
+                "pero pulir el pedido se acepta")
+            chk(LLMPostProcess.razonPulidoInvalidoQA(original: "Lo siento, llego tarde a la reunión de hoy.", pulido: "Lo siento, llego tarde a la reunión de hoy.") == nil,
+                "y un dictado que ya decía «lo siento» se respeta")
 
             CuarentenaPulido.reiniciarContadores()
             print("PULIDO \(mal == 0 ? "TODO OK" : "FALLOS=\(mal)")"); exit(mal == 0 ? 0 : 1)

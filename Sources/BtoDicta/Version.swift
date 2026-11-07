@@ -8,11 +8,14 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.83.1"
-    static let fecha = "2026-11-01"
+    static let numero = "0.83.2"
+    static let fecha = "2026-11-06"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.83.2", "2026-11-06", [
+            "ARREGLADO que un dictado con forma de pedido («dame un resumen de…») se entregara como «Lo siento, pero no puedo ayudar con eso.». El pulidor tomaba el dictado como un encargo para él y se negaba. Ahora el prompt aclara que el dictado nunca es un pedido para la IA, y si aun así el modelo responde o se niega —la salida no conserva las palabras del dictado— se descarta, se prueba el siguiente proveedor y, en último caso, se entrega el texto original",
+        ]),
         ("0.83.1", "2026-11-01", [
             "EL PULIDO YA NO SE QUEDA VEINTE SEGUNDOS ESPERANDO. Con un corte breve de red, Groq agotaba su plazo de 8 s y la cascada probaba uno tras otro a proveedores sin saldo o con modelos retirados: 23 s para pulir dos frases, y a veces se entregaba el texto sin pulir. Ahora la espera base puede bajar a 3 s (recomendado 4) y crece con el largo del texto según lo medido —Groq pule 9 000 caracteres en 1–2 s—: unos 38 s por trozo largo en vez de 100. Toda la cascada junta se rinde a los 12 s en un texto corto, no a los 24",
             "Z.AI (GLM) RESPONDE SIN PENSAR DE MÁS. La app no le apagaba el razonamiento y GLM gastaba el plazo pensando antes de corregir. Ahora se lo apaga, como a DeepSeek",
