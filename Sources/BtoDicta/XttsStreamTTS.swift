@@ -34,7 +34,8 @@ final class XttsStreamTTS: NSObject {
         guard let c = activo else { return }
         c.terminado = true
         c.proceso?.terminationHandler = nil
-        c.proceso?.terminate(); c.proceso = nil
+        if c.proceso?.isRunning == true { c.proceso?.terminate() }   // sin lanzar, terminate() lanza excepción
+        c.proceso = nil
         c.player.stop(); c.engine.stop(); c.done = nil
         activo = nil
     }
