@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.83.4
+
+- **La voz XTTS en streaming ya no corta el final.** Si el motor terminaba antes
+  de leer sus últimos trozos de audio, el final de la frase se perdía. Ahora se
+  espera a leerlo todo.
+
 ### Novedades 0.83.3
 
 - **Sin calentar la Mac.** Tras cada dictado con texto en vivo local (Voxtral

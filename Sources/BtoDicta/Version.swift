@@ -8,11 +8,14 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.83.3"
+    static let numero = "0.83.4"
     static let fecha = "2026-11-19"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.83.4", "2026-11-19", [
+            "ARREGLADO que la voz XTTS en streaming pudiera cortar el final de la frase. Si el motor terminaba antes de que se leyeran sus últimos trozos de audio, esos trozos se perdían. Ahora BtoDicta espera a leer todo el audio y a que el motor termine antes de dar la frase por hablada",
+        ]),
         ("0.83.3", "2026-11-19", [
             "ARREGLADO QUE BTODICTA CALENTARA LA MAC. Cada dictado con texto en vivo local (Voxtral Realtime, Nemotron) dejaba, al terminar, un lector del motor girando sin parar: se acumulaban dictado tras dictado hasta ocupar núcleos enteros, y solo reiniciar la app lo calmaba. Ahora el lector se apaga solo cuando el motor termina. La misma corrección se aplicó a la voz XTTS en streaming",
         ]),

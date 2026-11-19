@@ -224,6 +224,9 @@ audio —el orden que requiere el servidor multimodal— para evitar respuestas 
 rechazo en lugar de la transcripción. Los modelos descargados no cambian ni se
 vuelven a bajar.
 
+**Desde 0.83.4** la voz XTTS en streaming espera a leer todo el audio del motor
+antes de dar la frase por hablada: ya no se pierde el final.
+
 **Desde 0.83.3** el texto en vivo local no deja consumo de CPU al terminar el
 dictado: antes, cada uso dejaba un lector del motor girando hasta reiniciar la app.
 
