@@ -39,15 +39,23 @@ final class XttsStreamTTS: NSObject {
         activo = nil
     }
 
+    /// Instancia nueva como `activo`. La anterior se cancela (como Cancelar, sin
+    /// callback): si no, su proceso python quedaba huérfano.
+    static func nuevo() -> XttsStreamTTS {
+        cancelar()
+        let c = XttsStreamTTS(); activo = c
+        return c
+    }
+
     /// Habla en vivo por los parlantes (streaming).
     static func hablar(paquete: URL, texto: String, completion: @escaping (Bool) -> Void) {
-        let c = XttsStreamTTS(); activo = c; c.reproducir = true
+        let c = nuevo(); c.reproducir = true
         c.correr(paquete: paquete, texto: texto, completion: completion)
     }
 
     /// Captura el PCM a un WAV (para pruebas). No reproduce.
     static func capturarWav(paquete: URL, texto: String, salida: URL, completion: @escaping (Bool) -> Void) {
-        let c = XttsStreamTTS(); activo = c
+        let c = nuevo()
         var f32 = Data()
         c.onPCM = { f32.append($0) }
         c.correr(paquete: paquete, texto: texto) { ok in

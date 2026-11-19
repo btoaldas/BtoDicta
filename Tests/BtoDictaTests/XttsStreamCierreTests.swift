@@ -31,4 +31,20 @@ final class XttsStreamCierreTests: XCTestCase {
         XCTAssertTrue(r.ok)
         XCTAssertEqual(r.bytes, 4096)
     }
+
+    func testUnaInstanciaNuevaCortaElProcesoDeLaAnterior() {
+        let marca = "sleep 31.7"
+        let a = XttsStreamTTS.nuevo()
+        a.lanzar(ejecutable: URL(fileURLWithPath: "/bin/sh"), argumentos: ["-c", "exec \(marca)"])
+        Thread.sleep(forTimeInterval: 0.3)
+        _ = XttsStreamTTS.nuevo()
+        Thread.sleep(forTimeInterval: 0.3)
+        let pg = Process()
+        pg.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        pg.arguments = ["-f", marca]
+        pg.standardOutput = FileHandle.nullDevice
+        try? pg.run(); pg.waitUntilExit()
+        XttsStreamTTS.cancelar()
+        XCTAssertNotEqual(pg.terminationStatus, 0, "el proceso de la instancia anterior sigue vivo")
+    }
 }
