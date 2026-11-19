@@ -27,6 +27,7 @@ final class XttsStreamTTS: NSObject {
     private let cola = DispatchQueue(label: "beto.xtts.stream")
     private var eof = false               // solo en `cola`
     private var estadoSalida: Int32?      // solo en `cola`
+    private var cerrado = false           // solo en `cola`
 
     /// Corta el streaming local en curso de raíz (proceso python + audio). Para Cancelar.
     static func cancelar() {
@@ -94,19 +95,24 @@ final class XttsStreamTTS: NSObject {
         }
         p.terminationHandler = { [weak self] proc in
             self?.cola.async { self?.estadoSalida = proc.terminationStatus; self?.cerrarSiListo() }
+            // Un hijo que herede stdout podría no soltarlo nunca: tras la salida,
+            // 2 s de gracia para drenar y se cierra con lo recibido.
+            self?.cola.asyncAfter(deadline: .now() + 2) { self?.eof = true; self?.cerrarSiListo() }
         }
         proceso = p
         do { try p.run() } catch { finish(false) }
     }
 
     private func cerrarSiListo() {
-        guard eof, let st = estadoSalida else { return }
+        guard !cerrado, eof, let st = estadoSalida else { return }
+        cerrado = true
         let ok = st == 0 && recibioAudio
         DispatchQueue.main.async { [weak self] in self?.finish(ok) }
     }
 
     /// Convierte bytes → floats (alineando a 4 bytes) → buffer → cola/captura.
     private func procesar(_ d: Data) {
+        guard !cerrado else { return }
         recibioAudio = true
         var buf = resto; buf.append(d)
         let usable = buf.count - (buf.count % 4)
