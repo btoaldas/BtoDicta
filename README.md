@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.83.3
+
+- **Sin calentar la Mac.** Tras cada dictado con texto en vivo local (Voxtral
+  Realtime, Nemotron) quedaba un proceso interno consumiendo CPU sin parar; se
+  acumulaban hasta reiniciar la app. Ahora se cierran solos al terminar.
+
 ### Novedades 0.83.2
 
 - **El pulido no contesta tus dictados.** Si dictas algo con forma de pedido

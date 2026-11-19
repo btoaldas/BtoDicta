@@ -224,6 +224,9 @@ audio —el orden que requiere el servidor multimodal— para evitar respuestas 
 rechazo en lugar de la transcripción. Los modelos descargados no cambian ni se
 vuelven a bajar.
 
+**Desde 0.83.3** el texto en vivo local no deja consumo de CPU al terminar el
+dictado: antes, cada uso dejaba un lector del motor girando hasta reiniciar la app.
+
 **La comprobación de arranque ya no pesa** (0.69.0). Al abrirse, la aplicación
 comprueba que tus modelos siguen siendo los que descargaste, contrastando su
 huella. Esa comprobación llegó a ocupar **casi 5 GB de memoria** en cada arranque
