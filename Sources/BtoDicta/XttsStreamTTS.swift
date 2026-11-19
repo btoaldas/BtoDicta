@@ -75,7 +75,7 @@ final class XttsStreamTTS: NSObject {
         p.standardError = FileHandle.nullDevice   // los warnings de python NO ensucian el PCM
         outPipe.fileHandleForReading.readabilityHandler = { [weak self] fh in
             let d = fh.availableData
-            guard !d.isEmpty else { return }
+            if d.isEmpty { fh.readabilityHandler = nil; return }   // EOF
             self?.procesar(d)
         }
         p.terminationHandler = { [weak self] proc in

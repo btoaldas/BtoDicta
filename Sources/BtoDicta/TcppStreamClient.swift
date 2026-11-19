@@ -72,7 +72,9 @@ final class TcppStreamClient {
         process.standardError = errores
         errores.fileHandleForReading.readabilityHandler = { h in
             let d = h.availableData
-            guard !d.isEmpty, let s = String(data: d, encoding: .utf8) else { return }
+            // EOF: sin anular, el handler se dispara sin fin y gira la CPU.
+            if d.isEmpty { h.readabilityHandler = nil; return }
+            guard let s = String(data: d, encoding: .utf8) else { return }
             for linea in s.split(separator: "\n") {
                 let l = linea.trimmingCharacters(in: .whitespaces)
                 guard !l.isEmpty, !l.hasPrefix("ggml_"), !l.hasPrefix("load"),
@@ -83,7 +85,7 @@ final class TcppStreamClient {
 
         salida.fileHandleForReading.readabilityHandler = { [weak self] h in
             let data = h.availableData
-            guard !data.isEmpty else { return }
+            if data.isEmpty { h.readabilityHandler = nil; return }
             DispatchQueue.main.async { self?.procesar(data) }
         }
         try process.run()

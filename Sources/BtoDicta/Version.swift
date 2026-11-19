@@ -8,11 +8,14 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.83.2"
-    static let fecha = "2026-11-06"
+    static let numero = "0.83.3"
+    static let fecha = "2026-11-19"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.83.3", "2026-11-19", [
+            "ARREGLADO QUE BTODICTA CALENTARA LA MAC. Cada dictado con texto en vivo local (Voxtral Realtime, Nemotron) dejaba, al terminar, un lector del motor girando sin parar: se acumulaban dictado tras dictado hasta ocupar núcleos enteros, y solo reiniciar la app lo calmaba. Ahora el lector se apaga solo cuando el motor termina. La misma corrección se aplicó a la voz XTTS en streaming",
+        ]),
         ("0.83.2", "2026-11-06", [
             "ARREGLADO que un dictado con forma de pedido («dame un resumen de…») se entregara como «Lo siento, pero no puedo ayudar con eso.». El pulidor tomaba el dictado como un encargo para él y se negaba. Ahora el prompt aclara que el dictado nunca es un pedido para la IA, y si aun así el modelo responde o se niega —la salida no conserva las palabras del dictado— se descarta, se prueba el siguiente proveedor y, en último caso, se entrega el texto original",
         ]),
