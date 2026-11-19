@@ -1,6 +1,6 @@
 # Verificación 006 — Extensión de navegador para la bitácora
 
-- Fecha: 2026-09-20
+- Fecha: 2026-09-20 (RF-07 y RNF-02 verificados el 2026-11-19)
 - Spec: `spec.md` (Aprobada 2026-09-20, nivel X)
 - Estado del QA al verificar: **26 pruebas, 0 fallos** (código de salida 0)
 
@@ -14,7 +14,7 @@
 | RF-04 | Sin la extensión, todo igual | `qa-paquete.sh` pasa igual con y sin ella. La prueba de exportación se omite sola cuando no hay paquete | Tres formas de degradar probadas en RF-01 | Cumple |
 | RF-05 | Excluir dominios: 0 envíos | 12 comprobaciones: normalización, subdominios incluidos, dominios parecidos excluidos, lista vacía no excluye nada | De un dominio excluido se calla URL y título, pero se mantiene el dato de que suena — sin contenido, y es el que evita anotar una película como trabajo | Cumple |
 | RF-06 | Un paquete para Chrome, Edge y Brave | Manifest V3 válido, 10 archivos, cero declarados que falten. **Cargado y funcionando en Edge** | Huella SHA256 del código idéntica en ambos paquetes: `3bcce352fb2824b3`. Chrome y Brave sin cargar, pero comparten motor | Cumple |
-| RF-07 | Firefox | Manifiesto propio con `scripts` e identificador de Gecko; capa `chrome.*`/`browser.*` | **Nadie lo ha cargado en Firefox**: decisión de probar solo con Edge | No cumple |
+| RF-07 | Firefox | **Verificado el 2026-11-19** con `scripts/qa-firefox-extension.py`: Firefox 150 oculto, perfil temporal, extensión instalada como complemento temporal por el protocolo de depuración. Se presenta como Firefox, reporta la pestaña activa y la que suena en segundo plano, y envía el texto de la página | Sin la contraseña ni el valor de los campos. Las comprobaciones salieron en rojo cuando faltaba la condición (pestaña oculta, audio bloqueado), así que distinguen. Copia de laboratorio: solo cambia el puerto de la API, contra una API simulada | Cumple |
 | RF-08 | Avisar si la extensión envejece | Con 0.0.1 frente a 0.1.0: detectada, con ambas versiones. Aviso en Ajustes y en la respuesta al informe | Una al día no avisa; una que no dice su versión tampoco — mejor callar que avisar en falso | Cumple |
 | RF-09 | Sacarla de la app con su manual | Botón en Ajustes. Deja `manifest.json`, el código y `COMO-INSTALAR.md` con la versión de la que salió | Exportar dos veces reemplaza sin fallar; lo anterior va a la Papelera por si había algo dentro | Cumple |
 | RF-10 | Menú en el icono, excluir con un clic | `default_popup` declarado y presente. Cuatro estados de conexión distinguidos | El mismo botón excluye y devuelve. Comprobado en pantalla el 2026-09-20 sobre Edge | Cumple |
@@ -26,7 +26,7 @@
 | RNF | Exigía | Resultado | Veredicto |
 |---|---|---|---|
 | RNF-01 | Token y solo loopback | Sin token 401 · token falso 401 · JSON inválido 400 · cuerpo de 1,6 MB **413** · desde la IP de la red, sin respuesta | Cumple |
-| RNF-02 | < 50 ms y < 30 MB en el navegador | **No medido**: aislarlo exige comparar el navegador con y sin la extensión, y eso pasa por descargarla del que está en uso. Consta: 60 kB en disco, 638 líneas, un trabajo por página | No cumple |
+| RNF-02 | < 50 ms y < 30 MB en el navegador | **Medido el 2026-11-19** con `scripts/qa-coste-extension.py` (Chromium oculto, 10 páginas locales, 3 corridas, extensión trabajando: 10/10 páginas con texto). Carga: peor diferencia 10–30 ms. Hilo principal: < 1 ms por página. Memoria con 10 pestañas: **+52 a +61 MB**. De eso, una extensión MV3 vacía ya cuesta ~29 MB (suelo de la plataforma: proceso propio de 27–28 MB); lo propio de BtoDicta es 23–33 MB (≈35 MB de proceso de fondo y ≈1,5 MB por pestaña) | Carga cumple · **memoria no cumple** el < 30 MB tal como está escrito |
 | RNF-03 | 0 envíos de contraseñas o formularios | 0 coincidencias de los 2 valores tecleados. Probado **en las dos direcciones**: al retirar la exclusión de campos, las 2 comprobaciones de secreto dan rojo | Cumple |
 | RNF-04 | Con la app cerrada: ≤ 1 intento/min y 0 acumulado | Un fallo impone 60 s de espera; nada se guarda pendiente. La prueba encontró que `leerToken()` lanzaba sin almacén — corregido | Cumple |
 
@@ -82,10 +82,10 @@ revés. Queda como decisión pendiente de Alberto, no como defecto.
 
 ## Riesgos residuales
 
-- **Firefox sin probar.** El código está; nadie lo ha cargado.
+- **Firefox probado en laboratorio, no en uso diario** (2026-11-19): perfil temporal y API simulada; el camino Firefox → BtoDicta real no se ha recorrido.
 - **Chrome y Brave sin cargar.** El paquete es el mismo que funciona en Edge, y
   comparten motor, pero «debería funcionar» no es «funciona».
-- **El coste en el navegador no está medido** (RNF-02).
+- **La memoria de la extensión supera el límite escrito** (RNF-02): +52–61 MB con 10 pestañas, de los que ~29 MB son el suelo de cualquier extensión.
 - **«Leer todo salvo lo excluido»** es la postura con más superficie. Se compensa
   con que nunca se leen campos de contraseña y con que excluir cuesta un clic,
   pero el riesgo de capturar algo sensible **antes** de excluirlo es real y fue
@@ -104,22 +104,14 @@ revés. Queda como decisión pendiente de Alberto, no como defecto.
   30 s de lo que no se quería.
 
 
-## Por qué este hito NO se puede cerrar todavía
+## Estado tras verificar (2026-11-19)
 
-Dos requisitos quedan en **No cumple**, y no por estar mal hechos sino por no
-estar comprobados:
+RF-07 queda **Cumple**. RNF-02 queda **medido**: la carga cumple con holgura; la
+memoria no cumple el límite tal como está escrito. Ese límite comparaba con «sin
+extensión», y solo el suelo de la plataforma —una extensión vacía— ya consume
+~29 MB. Ninguna extensión con guion de contenido en todas las páginas cabe en
+30 MB medidos así. Lo propio de BtoDicta, sobre ese suelo, son 23–33 MB.
 
-- **RF-07 (Firefox)**: el código está escrito y el paquete se construye, pero
-  nadie lo ha cargado en Firefox. Decisión de Alberto: probar solo con Edge por
-  ahora.
-- **RNF-02 (coste en el navegador)**: medirlo exige comparar el navegador con y
-  sin la extensión, y eso pasa por descargarla del que está en uso.
-
-Marcarlos «Cumple» sería exactamente la clase de afirmación sin prueba que este
-documento existe para evitar. Un requisito no verificado no es un requisito
-cumplido, por mucho que el código esté escrito.
-
-Hay dos salidas legítimas, y la elección es de Alberto:
-
-1. **Verificarlos**: cargar la extensión en Firefox y medir el coste.
-2. **Diferirlos** a otra spec, con lo ya hecho cerrado como está.
+Observación hallada al medir: si la extensión arranca sin clave, el sondeo de
+permiso se aplaza 60 s y pegar la clave no lo adelanta. Durante ese minuto no se
+leen páginas. Menor; al backlog.

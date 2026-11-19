@@ -61,6 +61,7 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
   - Evidencia (2026-09-20): `empaquetar.sh chromium` produce `dist/chromium` con 8 archivos; manifest_version 3, permisos `tabs, storage, alarms, scripting`, y cero archivos declarados que falten. Envío simulado de extremo a extremo: `{"recibido":2,"audibles":1,"texto_guardado":true}`. **Falta la carga real en los tres navegadores, que la hace Alberto**
 - [x] T16 (RF-07) Capa de compatibilidad `chrome.*` / `browser.*` y manifiesto de Firefox — `extension/src/navegador.js`, `extension/manifest.firefox.json` — Evidencia esperada: Firefox reporta pestaña activa y audibles igual que Chrome
   - Evidencia (2026-09-20): `navegador.js` resuelve `browser.*` o `chrome.*`, y el manifiesto de Firefox declara el fondo como `scripts` y lleva identificador propio. **Sin comprobar en vivo**: Alberto decidió probar solo con Edge por ahora
+  - Evidencia (2026-11-19): `scripts/qa-firefox-extension.py` en Firefox 150 oculto con perfil temporal: 8/8 — instalación, fondo, permiso `<all_urls>`, se presenta como Firefox, pestaña activa, pestaña audible en segundo plano, texto enviado y sin contraseña
 - [x] T17 (RF-06, RF-07) Empaquetado reproducible de los dos paquetes desde un solo código — `extension/empaquetar.sh` — Evidencia esperada: el script produce los dos archivos y `unzip -l` muestra el mismo código en ambos
   - Evidencia (2026-09-20): huella SHA256 del código (excluyendo el manifiesto) **idéntica** en los dos paquetes: `3bcce352fb2824b3`. Y los manifiestos sí difieren donde deben — `service_worker` frente a `scripts`, más el identificador de Firefox
 
@@ -68,6 +69,7 @@ hechas con la carga real en Edge y la construcción verificada para el resto.
 
 - [x] T18 (RNF-02) Medición del coste en el navegador: 10 páginas con y sin extensión — `scripts/qa-coste-extension.py` — Evidencia esperada: < 50 ms de diferencia al cargar y < 30 MB de memoria
   - Evidencia (2026-09-20): **NO MEDIDO.** Aislar el coste exige comparar el navegador con y sin la extensión, lo que pasa por descargarla del navegador en uso. Lo que sí consta: 60 kB en disco, 638 líneas y un solo trabajo por página. Queda como riesgo residual declarado
+  - Evidencia (2026-11-19): medido con `scripts/qa-coste-extension.py` en Chromium oculto. Carga: peor Δ 10–30 ms (cumple). Memoria: Δ 52–61 MB (no cumple < 30); suelo de una extensión vacía ~29 MB, propio de BtoDicta 23–33 MB
 - [x] T19 (RF-04) Instalador: la extensión viaja con la aplicación, no se instala sola, y se explica cómo cargarla — `Makefile`, `docs/MANUAL.md` — Evidencia esperada: el paquete de la aplicación contiene la extensión y el manual explica los pasos
   - Evidencia (2026-09-20): la extensión viaja en `Contents/Resources/extension`; el Makefile la copia. Sección nueva en `docs/MANUAL.md` con los pasos, el menú del icono, lo que nunca se lee y cómo funcionan las actualizaciones
 - [x] T20 (RF-05, RNF-03) Las pruebas de la extensión entran en el paquete de QA — `scripts/qa-paquete.sh` — Evidencia esperada: el QA pasa de 22 a 23 pruebas, con las negativas incluidas
