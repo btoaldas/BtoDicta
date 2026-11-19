@@ -20,10 +20,13 @@ final class XttsStreamTTS: NSObject {
     private var proceso: Process?
     private var resto = Data()          // bytes sueltos (< 4) entre lecturas
     private var recibioAudio = false
-    private var onPCM: ((Data) -> Void)?
+    var onPCM: ((Data) -> Void)?
     private var reproducir = false
-    private var done: ((Bool) -> Void)?
+    var done: ((Bool) -> Void)?
     private var terminado = false
+    private let cola = DispatchQueue(label: "beto.xtts.stream")
+    private var eof = false               // solo en `cola`
+    private var estadoSalida: Int32?      // solo en `cola`
 
     /// Corta el streaming local en curso de raíz (proceso python + audio). Para Cancelar.
     static func cancelar() {
@@ -66,23 +69,40 @@ final class XttsStreamTTS: NSObject {
             guard AudioSeguro.arrancar(engine, player, contexto: "XTTS streaming") else { finish(false); return }
         }
 
+        lanzar(ejecutable: VozEngine.pythonURL,
+               argumentos: [VozEngine.streamRunnerURL.path, paquete.path, texto])
+    }
+
+    func lanzar(ejecutable: URL, argumentos: [String]) {
         let p = Process()
-        p.executableURL = VozEngine.pythonURL
-        p.arguments = [VozEngine.streamRunnerURL.path, paquete.path, texto]
+        p.executableURL = ejecutable
+        p.arguments = argumentos
         var env = ProcessInfo.processInfo.environment; env["COQUI_TOS_AGREED"] = "1"
         p.environment = env
         let outPipe = Pipe(); p.standardOutput = outPipe
         p.standardError = FileHandle.nullDevice   // los warnings de python NO ensucian el PCM
+        // procesar, EOF y salida pasan por la cola serial; se termina solo con
+        // EOF (stdout drenado) Y proceso salido, en cualquier orden.
         outPipe.fileHandleForReading.readabilityHandler = { [weak self] fh in
             let d = fh.availableData
-            if d.isEmpty { fh.readabilityHandler = nil; return }   // EOF
-            self?.procesar(d)
+            if d.isEmpty {   // EOF
+                fh.readabilityHandler = nil
+                self?.cola.async { self?.eof = true; self?.cerrarSiListo() }
+                return
+            }
+            self?.cola.async { self?.procesar(d) }
         }
         p.terminationHandler = { [weak self] proc in
-            DispatchQueue.main.async { self?.finish(proc.terminationStatus == 0 && (self?.recibioAudio ?? false)) }
+            self?.cola.async { self?.estadoSalida = proc.terminationStatus; self?.cerrarSiListo() }
         }
         proceso = p
         do { try p.run() } catch { finish(false) }
+    }
+
+    private func cerrarSiListo() {
+        guard eof, let st = estadoSalida else { return }
+        let ok = st == 0 && recibioAudio
+        DispatchQueue.main.async { [weak self] in self?.finish(ok) }
     }
 
     /// Convierte bytes → floats (alineando a 4 bytes) → buffer → cola/captura.
