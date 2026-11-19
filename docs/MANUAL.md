@@ -224,6 +224,9 @@ audio —el orden que requiere el servidor multimodal— para evitar respuestas 
 rechazo en lugar de la transcripción. Los modelos descargados no cambian ni se
 vuelven a bajar.
 
+**Desde 0.83.5** una frase nueva de la voz XTTS en streaming corta la que estuviera
+sonando, igual que Cancelar, y no deja su proceso trabajando en segundo plano.
+
 **Desde 0.83.4** la voz XTTS en streaming espera a leer todo el audio del motor
 antes de dar la frase por hablada: ya no se pierde el final.
 

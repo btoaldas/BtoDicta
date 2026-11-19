@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.83.5
+
+- **La voz XTTS en streaming no deja procesos sueltos.** Una frase nueva que
+  empezaba con otra en marcha dejaba vivo el proceso de la primera, con el modelo
+  en memoria. Ahora la nueva corta la anterior.
+
 ### Novedades 0.83.4
 
 - **La voz XTTS en streaming ya no corta el final.** Si el motor terminaba antes
