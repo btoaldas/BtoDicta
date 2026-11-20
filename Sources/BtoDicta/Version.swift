@@ -8,11 +8,14 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.83.5"
-    static let fecha = "2026-11-19"
+    static let numero = "0.84.0"
+    static let fecha = "2026-11-20"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.84.0", "2026-11-20", [
+            "NUEVO caché local de frases comunes. Las frases fijas que BtoDicta dice a menudo (por ejemplo «Resumen del día. No tienes tareas pendientes.») se generan una sola vez con tu voz de ElevenLabs y el modelo eleven_v4 con expresiones, y se guardan en ~/.btodicta/frases. Después suenan desde disco: sin internet, sin gastar créditos y sin caer a la voz de macOS. Al arrancar con red solo se generan las que falten. Se desactiva con tts_frases_cache y no se usa si elegiste la voz de macOS o un clon local",
+        ]),
         ("0.83.5", "2026-11-19", [
             "ARREGLADO que la voz XTTS en streaming dejara un proceso de voz trabajando en segundo plano. Si empezaba una frase nueva mientras otra seguía en marcha, el proceso de la primera quedaba vivo, con el modelo cargado en memoria. Ahora la frase nueva corta la anterior, como el botón Cancelar",
         ]),

@@ -224,6 +224,17 @@ audio —el orden que requiere el servidor multimodal— para evitar respuestas 
 rechazo en lugar de la transcripción. Los modelos descargados no cambian ni se
 vuelven a bajar.
 
+**Desde 0.84.0** las frases fijas que BtoDicta dice a menudo (el resumen del día o
+de la tarde sin tareas, «No tienes tareas para hoy», las preguntas del agente cuando
+hay varios contactos o aplicaciones parecidas y la prueba de voz) se generan una
+sola vez con tu voz de ElevenLabs y el modelo `eleven_v4` con expresiones, y se
+guardan en `~/.btodicta/frases/`. Después suenan desde disco, aunque no haya
+internet, y no gastan créditos. Al arrancar con red solo se generan las que falten;
+si cambias de voz o de modelo se generan de nuevo. Ajustes en `config.json`:
+`tts_frases_cache` (activado por defecto) y `tts_frases_modelo` (`eleven_v4`). No se
+usa si elegiste la voz de macOS o un clon local, para no cambiar de persona. Las
+frases con datos que cambian (cuántas tareas tienes) siguen necesitando red.
+
 **Desde 0.83.5** una frase nueva de la voz XTTS en streaming corta la que estuviera
 sonando, igual que Cancelar, y no deja su proceso trabajando en segundo plano.
 

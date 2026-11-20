@@ -34,6 +34,13 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.84.0
+
+- **Frases comunes con tu voz, sin internet.** Las frases fijas que BtoDicta dice
+  a menudo, como el resumen del día sin tareas, se generan una vez con tu voz de
+  ElevenLabs (modelo eleven_v4, con expresiones) y se guardan en la Mac. Luego
+  suenan desde disco: sin red, sin créditos y sin caer a la voz de macOS.
+
 ### Novedades 0.83.5
 
 - **La voz XTTS en streaming no deja procesos sueltos.** Una frase nueva que
