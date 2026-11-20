@@ -267,7 +267,7 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
 
     /// Visible para QA. Resume sin IA y sin enviar datos fuera de la Mac.
     static func resumenTexto(items: [Pendiente], ahora: Date,
-                             incluirSinFecha: Bool = true) -> String {
+                             incluirSinFecha: Bool = true, titulos: Int = 5) -> String {
         let tareas = items.filter { $0.tipo == "tarea" && !$0.hecho }
         guard !tareas.isEmpty else { return "No tienes tareas pendientes." }
         let c = conteos(items: items, ahora: ahora)
@@ -286,7 +286,7 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
             }
         // Una frase por tarea, con ordinal y pausa: leído de corrido no se entiende.
         let ordinales = ["La primera", "La segunda", "La tercera", "La cuarta", "La quinta"]
-        let frases = zip(ordinales, relevantes).map { orden, item -> String in
+        let frases = zip(ordinales.prefix(titulos), relevantes).map { orden, item -> String in
             guard let e = item.fechaObjetivo else { return "\(orden): \(breve(item.texto))." }
             let f = Date(timeIntervalSince1970: e)
             let cuando: String
@@ -302,8 +302,9 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
             return "\(orden): \(breve(item.texto)), \(cuando)."
         }
         let total = relevantes.count
+        guard total > 0 else { return "No tienes tareas pendientes." }
         var texto = "Tienes \(n(total, "tarea pendiente", "tareas pendientes"))"
-        texto += bloques.count > 1 ? ": \(bloques.joined(separator: ", "))." : "."
+        texto += bloques.isEmpty ? "." : ": \(bloques.joined(separator: ", "))."
         if !frases.isEmpty { texto += " " + frases.joined(separator: " ") }
         if total > frases.count { texto += " Y \(total - frases.count) más." }
         return texto
@@ -406,7 +407,9 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
                                         ahora: ahora) else { return }
         Config.set("tareas_resumen_periodico_ultimo", to: ahora.timeIntervalSince1970)
         let items = Self.cercanas(NotasStore.todos(), ahora: ahora, horas: Config.tareasResumenHorasAntes())
-        guard items.contains(where: { $0.tipo == "tarea" && !$0.hecho }) else { return }  // nada que recordar
+        let sinFecha = Config.tareasResumenIncluirSinFecha()
+        guard items.contains(where: { $0.tipo == "tarea" && !$0.hecho && (sinFecha || $0.fechaObjetivo != nil) })
+        else { return }  // nada que recordar
         let c = Calendar.current.dateComponents([.hour, .minute], from: ahora)
         let minutos = (c.hour ?? 0) * 60 + (c.minute ?? 0)
         let quietas = Config.tareasQuietasActivo()
@@ -459,10 +462,13 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func publicarResumen(titulo: String, ahora: Date, periodo: String) {
+        // Con IA activa el texto puede salir de la Mac: como mucho tres títulos,
+        // lo que promete el consentimiento de ese ajuste.
         let local = Self.resumenTexto(items: Self.cercanas(NotasStore.todos(), ahora: ahora,
                                                            horas: Config.tareasResumenHorasAntes()),
                                       ahora: ahora,
-                                      incluirSinFecha: Config.tareasResumenIncluirSinFecha())
+                                      incluirSinFecha: Config.tareasResumenIncluirSinFecha(),
+                                      titulos: Config.tareasResumenIA() ? 3 : 5)
         let id = "resumen.\(periodo).\(Self.claveDia(ahora))"
         let aviso: (String) -> Void = { [weak self] cuerpo in
             self?.publicar(.init(titulo: titulo, cuerpo: cuerpo,
@@ -566,6 +572,11 @@ enum TareasNotasQA {
             && resumen.contains("1 sin fecha") && resumen.contains("La primera: de ayer")
             && resumen.contains("La quinta:") && resumen.contains("Y 1 más.")
             && resumen.contains("vencida a las")
+            && !TareasRecordatorios.resumenTexto(items: pruebas, ahora: ahora, titulos: 3).contains("La cuarta")
+            && TareasRecordatorios.resumenTexto(items: [Pendiente(tipo: "tarea", texto: "x")], ahora: ahora,
+                                                incluirSinFecha: false) == "No tienes tareas pendientes."
+            && TareasRecordatorios.resumenTexto(items: [pruebas[0], pruebas[1]], ahora: ahora)
+                .hasPrefix("Tienes 2 tareas pendientes: 2 vencidas.")
             && TareasRecordatorios.breve(larga.texto).hasSuffix("doce…")
             && TareasRecordatorios.cercanas(pruebas + [lejana], ahora: ahora, horas: 72).count == pruebas.count - 1
             && TareasRecordatorios.cercanas(pruebas + [lejana], ahora: ahora, horas: 0).count == pruebas.count + 1

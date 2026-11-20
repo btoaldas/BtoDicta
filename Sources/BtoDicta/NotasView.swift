@@ -83,8 +83,10 @@ struct NotasView: View {
         Config.set("tareas_resumen_manana", to: resumenManana)
         Config.set("tareas_resumen_tarde", to: resumenTarde)
         Config.set("tareas_resumen_sin_fecha", to: incluirSinFecha)
+        let cantidad = min(365, max(1, antesCantidad))
+        if cantidad != antesCantidad { antesCantidad = cantidad }
         Config.set("tareas_resumen_horas_antes",
-                   to: antesUnidad == "todas" ? 0 : max(1, antesCantidad) * (antesUnidad == "dias" ? 24 : 1))
+                   to: antesUnidad == "todas" ? 0 : cantidad * (antesUnidad == "dias" ? 24 : 1))
         Config.set("tareas_resumen_ia", to: resumenIA)
         Config.set("tareas_resumen_manana_min", to: Self.minutos(horaManana))
         Config.set("tareas_resumen_tarde_min", to: Self.minutos(horaTarde))
@@ -205,7 +207,7 @@ struct NotasView: View {
                             Text("cualquier fecha").tag("todas")
                         }.labelsHidden().frame(width: 140)
                     }
-                    Text("Las vencidas y las sin fecha siempre se nombran.")
+                    Text("Las vencidas siempre se nombran.")
                         .font(.caption2).foregroundStyle(.secondary)
                     Toggle("Dar forma al resumen con IA (opcional)", isOn: $resumenIA)
                         .toggleStyle(.checkbox)

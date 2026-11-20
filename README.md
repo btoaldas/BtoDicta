@@ -34,6 +34,12 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.85.0
+
+- **Resumen de tareas que se entiende.** Dice cuántas tienes y luego una frase por
+  tarea («La primera…, la segunda…»), con títulos breves. Solo nombra lo vencido, lo
+  sin fecha y lo que vence dentro del plazo que elijas (por defecto 3 días).
+
 ### Novedades 0.84.0
 
 - **Frases comunes con tu voz, sin internet.** Las frases fijas que BtoDicta dice

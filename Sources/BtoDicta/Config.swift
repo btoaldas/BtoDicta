@@ -373,7 +373,8 @@ struct Config {
     /// Los resúmenes solo nombran tareas que vencen dentro de estas horas (y las
     /// vencidas). 0 = todas, sin importar lo lejos que estén. Por defecto, 3 días.
     static func tareasResumenHorasAntes() -> Int {
-        min(8_760, max(0, (json()["tareas_resumen_horas_antes"] as? Int) ?? 72))
+        let h = (json()["tareas_resumen_horas_antes"] as? Int) ?? 72
+        return h < 0 ? 72 : min(8_760, h)
     }
     /// Reescribe el resumen determinista con la IA de pulido seleccionada. Es
     /// opt-in porque puede enviar hasta tres títulos de tareas al proveedor; si

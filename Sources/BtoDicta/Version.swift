@@ -8,11 +8,14 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.84.0"
+    static let numero = "0.85.0"
     static let fecha = "2026-11-20"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.85.0", "2026-11-20", [
+            "ARREGLADO que el resumen de tareas se leyera de corrido y repitiera a diario tareas de dentro de meses. Ahora dice cuántas tienes y luego una frase por tarea («La primera: …, hoy a las 10:00. La segunda: …»), acorta los títulos largos a la primera línea y 12 palabras, y solo nombra las vencidas, las sin fecha y las que vencen dentro del plazo que elijas en Tareas (por defecto 3 días; en horas, en días o cualquier fecha). Con el resumen por IA activo sigue enviando como mucho tres títulos",
+        ]),
         ("0.84.0", "2026-11-20", [
             "NUEVO caché local de frases comunes. Las frases fijas que BtoDicta dice a menudo (por ejemplo «Resumen del día. No tienes tareas pendientes.») se generan una sola vez con tu voz de ElevenLabs y el modelo eleven_v4 con expresiones, y se guardan en ~/.btodicta/frases. Después suenan desde disco: sin internet, sin gastar créditos y sin caer a la voz de macOS. Al arrancar con red solo se generan las que falten. Se desactiva con tts_frases_cache y no se usa si elegiste la voz de macOS o un clon local",
         ]),
