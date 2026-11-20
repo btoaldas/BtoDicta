@@ -27,6 +27,8 @@ struct NotasView: View {
     @State private var resumenManana = Config.tareasResumenManana()
     @State private var resumenTarde = Config.tareasResumenTarde()
     @State private var incluirSinFecha = Config.tareasResumenIncluirSinFecha()
+    @State private var antesCantidad = Self.antesInicial().cantidad
+    @State private var antesUnidad = Self.antesInicial().unidad   // "horas" | "dias" | "todas"
     @State private var resumenIA = Config.tareasResumenIA()
     @State private var horaManana = Self.hoy(minutos: Config.tareasResumenMananaMinutos())
     @State private var horaTarde = Self.hoy(minutos: Config.tareasResumenTardeMinutos())
@@ -81,6 +83,8 @@ struct NotasView: View {
         Config.set("tareas_resumen_manana", to: resumenManana)
         Config.set("tareas_resumen_tarde", to: resumenTarde)
         Config.set("tareas_resumen_sin_fecha", to: incluirSinFecha)
+        Config.set("tareas_resumen_horas_antes",
+                   to: antesUnidad == "todas" ? 0 : max(1, antesCantidad) * (antesUnidad == "dias" ? 24 : 1))
         Config.set("tareas_resumen_ia", to: resumenIA)
         Config.set("tareas_resumen_manana_min", to: Self.minutos(horaManana))
         Config.set("tareas_resumen_tarde_min", to: Self.minutos(horaTarde))
@@ -93,6 +97,12 @@ struct NotasView: View {
         TareasRecordatorios.shared.solicitarPermisoSiHaceFalta()
         TareasRecordatorios.shared.revisarAhora()
         recargar()
+    }
+
+    private static func antesInicial() -> (cantidad: Int, unidad: String) {
+        let h = Config.tareasResumenHorasAntes()
+        if h == 0 { return (3, "todas") }
+        return h % 24 == 0 ? (h / 24, "dias") : (h, "horas")
     }
 
     var body: some View {
@@ -183,6 +193,20 @@ struct NotasView: View {
                     Divider()
                     Toggle("Incluir tareas sin fecha en los resúmenes", isOn: $incluirSinFecha)
                         .toggleStyle(.checkbox)
+                    HStack {
+                        Text("Nombrar tareas que vencen en").font(.caption)
+                        if antesUnidad != "todas" {
+                            TextField("", value: $antesCantidad, format: .number)
+                                .frame(width: 50).multilineTextAlignment(.trailing)
+                            Stepper("", value: $antesCantidad, in: 1...365).labelsHidden()
+                        }
+                        Picker("", selection: $antesUnidad) {
+                            Text("horas").tag("horas"); Text("días").tag("dias")
+                            Text("cualquier fecha").tag("todas")
+                        }.labelsHidden().frame(width: 140)
+                    }
+                    Text("Las vencidas y las sin fecha siempre se nombran.")
+                        .font(.caption2).foregroundStyle(.secondary)
                     Toggle("Dar forma al resumen con IA (opcional)", isOn: $resumenIA)
                         .toggleStyle(.checkbox)
                     Text(resumenIA
@@ -225,6 +249,8 @@ struct NotasView: View {
                 .onChange(of: resumenManana) { _, _ in guardarConfiguracion() }
                 .onChange(of: resumenTarde) { _, _ in guardarConfiguracion() }
                 .onChange(of: incluirSinFecha) { _, _ in guardarConfiguracion() }
+                .onChange(of: antesCantidad) { _, _ in guardarConfiguracion() }
+                .onChange(of: antesUnidad) { _, _ in guardarConfiguracion() }
                 .onChange(of: resumenIA) { _, _ in guardarConfiguracion() }
                 .onChange(of: horaManana) { _, _ in guardarConfiguracion() }
                 .onChange(of: horaTarde) { _, _ in guardarConfiguracion() }
