@@ -64,6 +64,9 @@ BUILD_DIR="${BTODICTA_RELEASE_DIR:-build/releases/v$V}"
 [ ! -e "$BUILD_DIR" ] || fail "$BUILD_DIR ya existe; consérvalo y elige otro BTODICTA_RELEASE_DIR"
 git diff --quiet && git diff --cached --quiet || fail "Hay cambios sin commit"
 RELEASE_COMMIT=$(git rev-parse HEAD)
+# GitHub rechaza un --target que no existe en el remoto: comprobarlo antes del build.
+git fetch -q origin main && git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main \
+  || fail "HEAD no está en origin/main: haz push de main antes de publicar"
 
 # ── Gate 3: manual + README tocados en este ciclo (desde el último tag) ─────
 git fetch --tags -q 2>/dev/null || true
