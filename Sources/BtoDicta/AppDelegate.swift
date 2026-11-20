@@ -3988,7 +3988,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ElevenLabsTTS.marcarSinCreditos(minutos: 1, motivo: "test")
             chk(ElevenLabsTTS.sinCreditos, "breaker de créditos activo")
             let t0 = Date()
-            Voz.decir("Respaldo listo.", completion: {
+            // Sin caché: esta prueba mide la caída a la voz de macOS, no la frase guardada.
+            Voz.decir("Autoprueba interna de audio.", usarCache: false, completion: {
                 chk(Date().timeIntervalSince(t0) < 8, "failover a voz de macOS completó en \(String(format: "%.1f", Date().timeIntervalSince(t0)))s")
                 // e) AssemblyAI REAL con el body corregido (opcional, requiere key + red)
                 if let w = ProcessInfo.processInfo.environment["BTODICTA_STTWAV"], let d = try? Data(contentsOf: URL(fileURLWithPath: w)) {

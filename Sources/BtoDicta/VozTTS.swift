@@ -112,7 +112,8 @@ enum Voz {
     /// la voz REALMENTE arranca (para sincronizar el texto del notch con el habla);
     /// `completion` al terminar. CONTRATO: ambos callbacks llegan siempre en MAIN, aunque
     /// el motor sea URLSession/WebSocket y responda desde su cola de red.
-    static func decir(_ texto: String, empezar: (() -> Void)? = nil, completion: (() -> Void)? = nil) {
+    static func decir(_ texto: String, usarCache: Bool = true,
+                      empezar: (() -> Void)? = nil, completion: (() -> Void)? = nil) {
         let t = texto.trimmingCharacters(in: .whitespacesAndNewlines)
         let inicioMain: (() -> Void)? = empezar.map { cb in { ejecutarEnMain(cb) } }
         let finMain: (() -> Void)? = completion.map { cb in { ejecutarEnMain(cb) } }
@@ -121,7 +122,7 @@ enum Voz {
             cancelado = false
             // Frase común ya guardada: suena desde disco, sin red. Con voz de macOS o
             // un clon local elegidos no se usa, para no cambiar de persona.
-            if !["apple", "xtts_local"].contains(Config.ttsProveedor()),
+            if usarCache, !["apple", "xtts_local"].contains(Config.ttsProveedor()),
                let data = FrasesBeto.audio(para: t) {
                 Log.log(.ia, "TTS frase en caché (\(t.count) caracteres)")
                 reproducir(data, inicioMain, finMain) { intentar(t, cadena(), 0, inicioMain, finMain) }
