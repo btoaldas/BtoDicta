@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import AVFoundation
 
 // MARK: - Caché estática de frases comunes
 //
@@ -53,6 +54,21 @@ enum FrasesBeto {
         return String(limpio).split(separator: " ").joined(separator: " ")
     }
 
+    /// Solo letras y dígitos ASCII, `_` y `-`: un id raro en config.json no puede
+    /// sacar la ruta de la carpeta de frases ni alterar la URL de la API.
+    static func idSeguro(_ s: String) -> Bool {
+        !s.isEmpty && s.unicodeScalars.allSatisfy {
+            ($0.isASCII && CharacterSet.alphanumerics.contains($0)) || $0 == "_" || $0 == "-"
+        }
+    }
+
+    /// ¿Se usa la caché? No con la voz de macOS ni con un clon local elegidos, para no
+    /// cambiar de persona.
+    static func aplica() -> Bool {
+        Config.ttsFrasesCache() && !["apple", "xtts_local"].contains(Config.ttsProveedor())
+            && idSeguro(Config.ttsElevenVoz()) && idSeguro(Config.ttsFrasesModelo())
+    }
+
     /// La carpeta depende de voz y modelo: al cambiarlos, la caché vieja deja de
     /// usarse sola y se regenera.
     static func carpeta() -> URL {
@@ -70,20 +86,23 @@ enum FrasesBeto {
     /// Audio guardado para este texto, solo si es una frase del catálogo.
     static func audio(para texto: String) -> Data? {
         let n = normalizar(texto)
-        guard Config.ttsFrasesCache(), catalogo.contains(where: { normalizar($0.texto) == n })
+        guard aplica(), catalogo.contains(where: { normalizar($0.texto) == n })
         else { return nil }
         return try? Data(contentsOf: archivo(texto))
     }
 
     static func faltantes() -> [Frase] {
-        catalogo.filter { !FileManager.default.fileExists(atPath: archivo($0.texto).path) }
+        // Un mp3 que no se puede decodificar cuenta como faltante y se regenera.
+        catalogo.filter { (try? AVAudioPlayer(contentsOf: archivo($0.texto))) == nil }
     }
 
     /// Genera en serie las frases que faltan. Sin red o sin clave no hace nada y se
     /// reintenta en el próximo arranque. `completion(generadas, fallidas)`.
     static func generarFaltantes(completion: ((Int, Int) -> Void)? = nil) {
         let pendientes = faltantes()
-        guard Config.ttsFrasesCache(), !pendientes.isEmpty,
+        // Solo si la voz está activa y la caché se usaría: no gastar créditos de quien
+        // tiene la clave de ElevenLabs solo para transcribir.
+        guard Config.ttsActivo(), aplica(), !pendientes.isEmpty,
               let key = Config.apiKey(), !key.isEmpty else { completion?(0, 0); return }
         try? FileManager.default.createDirectory(at: carpeta(), withIntermediateDirectories: true)
         var ok = 0, fallo = 0
@@ -145,6 +164,9 @@ enum FrasesBetoQA {
         let unicas = Set(FrasesBeto.catalogo.map { FrasesBeto.normalizar($0.texto) }).count
             == FrasesBeto.catalogo.count
         let fuera = FrasesBeto.audio(para: "Tienes vencidas: 2.") == nil
+            && FrasesBeto.idSeguro("qoHnXuIkkICzacInt72I") && FrasesBeto.idSeguro("eleven_v4")
+            && !FrasesBeto.idSeguro("../../tmp/voz") && !FrasesBeto.idSeguro("a/b")
+            && !FrasesBeto.idSeguro("")
         let ok = iguales && unicas && fuera
         print("FRASESTEST normalizar=\(iguales) unicas=\(unicas) fuera_catalogo=\(fuera) → \(ok ? "OK" : "FALLO")")
         exit(ok ? 0 : 1)
@@ -154,7 +176,9 @@ enum FrasesBetoQA {
         let listo = DispatchSemaphore(value: 0)
         var res = (0, 0)
         FrasesBeto.generarFaltantes { ok, fallo in res = (ok, fallo); listo.signal() }
-        listo.wait()
+        guard listo.wait(timeout: .now() + 600) == .success else {
+            print("FRASESGEN sin respuesta en 10 min"); exit(1)
+        }
         let faltan = FrasesBeto.faltantes().count
         print("FRASESGEN generadas=\(res.0) fallidas=\(res.1) faltan=\(faltan) carpeta=\(FrasesBeto.carpeta().path)")
         exit(faltan == 0 ? 0 : 1)

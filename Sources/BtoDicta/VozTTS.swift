@@ -120,10 +120,8 @@ enum Voz {
         guard !t.isEmpty else { inicioMain?(); finMain?(); return }
         ejecutarEnMain {
             cancelado = false
-            // Frase común ya guardada: suena desde disco, sin red. Con voz de macOS o
-            // un clon local elegidos no se usa, para no cambiar de persona.
-            if usarCache, !["apple", "xtts_local"].contains(Config.ttsProveedor()),
-               let data = FrasesBeto.audio(para: t) {
+            // Frase común ya guardada: suena desde disco, sin red (ver FrasesBeto.aplica).
+            if usarCache, let data = FrasesBeto.audio(para: t) {
                 Log.log(.ia, "TTS frase en caché (\(t.count) caracteres)")
                 reproducir(data, inicioMain, finMain) { intentar(t, cadena(), 0, inicioMain, finMain) }
                 return
@@ -346,6 +344,8 @@ enum Voz {
     private static func reproducir(_ data: Data, _ empezar: (() -> Void)?,
                                    _ done: (() -> Void)?, fallo: (() -> Void)? = nil) {
         DispatchQueue.main.async {
+            // Cancelado mientras esperaba su turno en main: no debe empezar a sonar.
+            if cancelado { done?(); return }
             let fallar: (String) -> Void = { detalle in
                 fin.cancelar(); player?.stop(); player = nil
                 Log.log(.ia, "TTS: audio no reproducible (\(detalle)) → siguiente motor")
