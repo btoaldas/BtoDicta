@@ -5058,6 +5058,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if AgenteCodex.disponible { AgenteCodex.estado { _ in } }
             Updater.buscarAlArrancar() // ¿versión nueva? avisa abajo-izq (o instala si Autoactualizar)
             Updater.iniciarMonitoreo() // cron liviano mientras la app permanezca abierta
+            // Frases comunes con la voz de ElevenLabs: solo genera las que falten.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30) { FrasesBeto.generarFaltantes() }
         }
         AutoAyudaControles.shared.activar()
         TareasRecordatorios.shared.iniciar { [weak self] aviso in

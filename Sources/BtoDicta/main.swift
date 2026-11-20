@@ -103,6 +103,7 @@ if let i = argumentos.firstIndex(of: "--universal-input"), i + 1 < argumentos.co
 }
 
 AutoAyudaQA.ejecutarSiSePidio()
+FrasesBetoQA.ejecutarSiSePidio()
 PermisosSistemaQA.ejecutarSiSePidio()
 ModoPlanQA.ejecutarSiSePidio()
 ModoRegressionQA.ejecutarSiSePidio()

@@ -777,6 +777,10 @@ struct Config {
     /// voice_id de ElevenLabs para TTS (tu voz clonada "Bto"). Vacío = usar el default.
     static func ttsElevenVoz() -> String { (json()["tts_eleven_voz"] as? String) ?? "qoHnXuIkkICzacInt72I" }
     static func ttsElevenModelo() -> String { (json()["tts_eleven_modelo"] as? String) ?? "eleven_flash_v2_5" }
+    /// Frases comunes guardadas en disco con la voz de ElevenLabs (sin red). Default ON.
+    static func ttsFrasesCache() -> Bool { (json()["tts_frases_cache"] as? Bool) ?? true }
+    /// Modelo con expresiones para generar esas frases una sola vez.
+    static func ttsFrasesModelo() -> String { (json()["tts_frases_modelo"] as? String) ?? "eleven_v4" }
     /// Streaming por WebSocket para ElevenLabs (suena mientras se genera). Default ON.
     static func ttsElevenStreaming() -> Bool { (json()["tts_eleven_streaming"] as? Bool) ?? true }
     /// Parámetros POR proveedor TTS de nube (voz/modelo/streaming). Todo parametrizable.
