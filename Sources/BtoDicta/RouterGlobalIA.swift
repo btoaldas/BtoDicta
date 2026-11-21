@@ -54,7 +54,9 @@ enum RouterGlobalIA {
         guard let data = extraerJSON(contenido),
               let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         let tipo = (j["tipo"] as? String ?? "").trimmingCharacters(in: .whitespaces)
-        let clave = (j["clave"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+        var clave = (j["clave"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+        // El catálogo se muestra como «[tipo:clave]» y algunos modelos copian el prefijo.
+        if clave.hasPrefix(tipo + ":") { clave = String(clave.dropFirst(tipo.count + 1)) }
         guard !tipo.isEmpty, !clave.isEmpty else { return nil }
         // DEBE resolver a una capacidad REAL del catálogo (anti-invención). Match
         // tolerante: la IA a veces devuelve el NOMBRE en vez de la clave, o cambia

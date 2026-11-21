@@ -63,6 +63,14 @@ final class ModoIATests: XCTestCase {
         XCTAssertNil(AgenteOrdenes.tareaACompletar("marca a Juan"))
     }
 
+    func testRouterAceptaClaveConPrefijoDeTipo() {
+        let caps = [Capacidad(tipo: "modo", clave: "buscar", nombre: "Buscar", descripcion: "busca",
+                              frases: [], riesgo: .reversible, fuente: "", hijos: [])]
+        let d = RouterGlobalIA.interpretar(#"{"tipo":"modo","clave":"modo:buscar","contenido":"x","confianza":1}"#,
+                                           catalogo: caps, texto: "x")
+        XCTAssertEqual(d?.clave, "buscar")
+    }
+
     func testInterpretarPlanTerminal() {
         let r = """
         Claro: {"respuesta":"Reviso el disco","comandos":[{"cmd":"df -h","sudo":false,"proposito":"espacio"},{"cmd":"sudo purge","proposito":"memoria"}]}
@@ -191,6 +199,34 @@ final class ModoIAZCodeRealTests: XCTestCase {
                 e.fulfill()
             }
             wait(for: [e], timeout: 150)
+        }
+    }
+}
+
+/// Prueba real por API (solo con BTODICTA_IA_REAL=<id de proveedor>, p. ej. zai):
+/// el plan mixto hace algo con la IA configurada del usuario.
+final class ModoIAAPIRealTests: XCTestCase {
+    func testPlanMixtoPorAPI() throws {
+        let id = ProcessInfo.processInfo.environment["BTODICTA_IA_REAL"] ?? ""
+        try XCTSkipIf(id.isEmpty)
+        let base = try XCTUnwrap(ChatIA.catalogo.first { $0.id == id })
+        let modelo = ProcessInfo.processInfo.environment["BTODICTA_IA_MODELO"] ?? ""
+        let ia = modelo.isEmpty ? base : base.conModelo(modelo)
+        try XCTSkipIf(ia.key == nil, "sin clave para \(id)")
+        let caps = CatalogoCapacidades.todas()
+        for pedido in ["Haz un borrador de correo para persona@ejemplo.com con asunto Prueba y texto: esto es una prueba.",
+                       "Abre el navegador y busca información sobre seguridad de los autos BMW."] {
+            let e = expectation(description: pedido)
+            let inicio = Date()
+            let p = AgenteTerminal.promptMixto(pedido: pedido, contexto: "", catalogo: CatalogoCapacidades.paraIA(caps))
+            RouterGlobalIA.llamarIA(ia, prompt: p, textLen: p.count) { r in
+                print(String(format: "IAREAL %.1f s:", Date().timeIntervalSince(inicio)), r ?? "nil")
+                let d = r.flatMap(AgenteTerminal.capacidadMixta).flatMap { RouterGlobalIA.interpretar($0, catalogo: caps, texto: pedido) }
+                let comandos = r.flatMap(AgenteTerminal.interpretar)?.comandos ?? []
+                XCTAssertTrue(d != nil || !comandos.isEmpty)
+                e.fulfill()
+            }
+            wait(for: [e], timeout: 60)
         }
     }
 }
