@@ -116,6 +116,13 @@ enum HabilidadesExternas {
         return orden.filter { $0.1 == mejor }.prefix(maximo).map(\.0)
     }
 
+    /// Nombra la habilidad que corresponde al encargo, si hay una clara (para delegar). Vacío si no.
+    static func sugerencia(para encargo: String) -> String {
+        guard Config.arnesExternoActivo() else { return "" }
+        let h = seleccionar(encargo, de: todas(), maximo: 1)
+        return h.first.map { " Usa la habilidad «\($0.nombre)» (\($0.archivo.path))." } ?? ""
+    }
+
     /// Bloque para el prompt; vacío si está apagado o nada viene al caso. Si BtoDicta ya
     /// tiene su propia habilidad para el pedido, no entra ninguna externa: BtoDicta manda.
     static func bloque(para pedido: String, hayDeBtoDicta: Bool = false) -> String {

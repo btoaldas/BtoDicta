@@ -9703,8 +9703,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "delegar_agente":
             // Para HACER lo que describe una habilidad externa: se le pasa a Claude Code o Codex en la terminal.
             // El usuario lo confirma aquí y aprueba cada paso allá (sin saltarse permisos).
-            let encargo = plan.contenido.trimmingCharacters(in: .whitespacesAndNewlines)
+            var encargo = plan.contenido.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !encargo.isEmpty else { decir("¿Qué le encargo exactamente?", nil); break }
+            encargo += HabilidadesExternas.sugerencia(para: encargo)
             let s: OficinaAgente.SesionIA = OficinaAgente.SesionIA.desde((plan.asunto ?? "") + " " + pedido) == .codex ? .codex : .claudeCode
             let carpeta = (plan.lugar ?? "").isEmpty ? nil : OficinaAgente.carpetaProyecto(plan.lugar ?? "")
             guard autorizarDecisionIA("¿Encargárselo a \(s.nombre)?",

@@ -72,3 +72,13 @@ final class HabilidadesExternasRealesTests: XCTestCase {
         }
     }
 }
+
+extension HabilidadesExternasRealesTests {
+    func testEncargoNombraLaHabilidad() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["BTODICTA_EXTERNAS"] == "1")
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let todas = HabilidadesExternas.escanear(HabilidadesExternas.carpetasPorDefecto.map { home.appendingPathComponent($0) })
+        let e = "Preparar la proforma SERCOP para la empresa Mitad del Mundo usando la habilidad externa de proformas del usuario. Servicio: mantenimiento de Quipux."
+        XCTAssertEqual(HabilidadesExternas.seleccionar(e, de: todas, maximo: 1).first?.nombre, "sercop-proforma")
+    }
+}
