@@ -184,6 +184,16 @@ enum Arnes {
         - «Resume mi día / mi bitácora de ayer»: [herramienta:resumen_bitacora] (requiere la bitácora activa).
         - «Transcribe este audio / el último audio que bajé»: [herramienta:transcribir_archivo].
         """))
+        f.append(("pantalla-y-seleccion.md", """
+        ---
+        palabras: pantalla, veo, ves, esto, error, selección, seleccionado, corrige, mejora, formal, traduce, reescribe, edita, habilidad, aprende
+        ---
+        # Pantalla, selección y habilidades
+        - «¿Qué dice esto?», «resume lo que veo», «¿qué significa este error?»: [herramienta:ver_pantalla].
+        - «Corrige esto», «hazlo más formal», «tradúcelo» (sobre texto seleccionado): [herramienta:editar_seleccion].
+        - «Crea una habilidad: cuando pida X, haz Y» o «aprende que…» como procedimiento: [herramienta:crear_habilidad].
+        - «Recuerda que…» (un dato, no un procedimiento): [herramienta:recordar].
+        """))
         return f
     }
 
@@ -264,6 +274,27 @@ enum Arnes {
         }
         Log.write("arnés: dato añadido a la memoria (\(d.count) caracteres)")
         return true
+    }
+
+    /// Guarda una habilidad propia nueva (nunca sobrescribe). Devuelve su archivo.
+    @discardableResult
+    static func crearHabilidad(nombre: String, palabras: String, instrucciones: String) -> URL? {
+        let texto = instrucciones.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !texto.isEmpty, texto.count <= 4000 else { return nil }
+        try? FileManager.default.createDirectory(at: dirPropias, withIntermediateDirectories: true)
+        let limpio = nombre.folding(options: [.diacriticInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }
+            .prefix(6).joined(separator: "-").lowercased()
+        let raiz = limpio.isEmpty ? "habilidad" : limpio
+        var u = dirPropias.appendingPathComponent(raiz).appendingPathExtension("md")
+        var n = 2
+        while FileManager.default.fileExists(atPath: u.path) {
+            u = dirPropias.appendingPathComponent("\(raiz)-\(n)").appendingPathExtension("md"); n += 1
+        }
+        let claves = palabras.isEmpty ? nombre : palabras
+        escribir("---\npalabras: \(claves.replacingOccurrences(of: "\n", with: " "))\n---\n# \(nombre)\n\(texto)\n", en: u)
+        Log.write("arnés: habilidad propia creada (\(u.lastPathComponent))")
+        return u
     }
 
     /// La memoria guarda datos, no órdenes: lo que suena a instrucción para la IA se rechaza.

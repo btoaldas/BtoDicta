@@ -1,6 +1,6 @@
 # Spec 017 — Arnés del asistente: gobernanza, habilidades, memoria y evaluación
 
-- Estado: En implementación (fases 1, 2 y 3 hechas; 4 y 5 pendientes)
+- Estado: En implementación (fases 1 a 4 hechas; 5 pendiente)
 - Tipo: funcionalidad
 - Nivel: P (heredado del ROADMAP; lo fija sw-ciclo)
 - Fecha: 2026-11-21
@@ -118,3 +118,11 @@ prueba real; la evaluación automática dará la cifra medida.
 - [x] Herramientas del modo «Todo»: `crear_documento`, `crear_hoja`, `buscar_historial`, `resumen_bitacora` (usa `ContinuoResumen`), `transcribir_archivo` (usa `AudioArchivo.transcribir`, guarda el .txt y lo abre).
 - [x] Fichas del arnés actualizadas; regla: abrir apps con `open -a`.
 - Evidencia: `DocumentosAgenteTests` 6/6; `textutil` real produce «Microsoft Word 2007+» con la plantilla; evaluación 30 casos: 97 % → **100 % y 97 %** (el fallo restante pregunta un dato, conducta aceptada).
+
+### Fase 4 y ampliación (aprobada el 2026-11-21, «sigamos también con la fase 4»; pedido: «que pueda ver lo que veo y editar lo que pido»)
+
+- [x] `ver_pantalla`: captura de la pantalla principal, lectura con el OCR local de Apple (`ContinuoOCR.leer`), la imagen temporal se borra; la IA responde sobre ese texto marcado como no confiable. Requiere permiso de Grabación de pantalla.
+- [x] `editar_seleccion`: toma el texto seleccionado (`SeleccionMac.capturar`, restaura el portapapeles), lo transforma con la IA y lo reemplaza con `pasteText`; ⌘Z lo deshace; en Aprobación pregunta y devuelve el foco a la app antes de pegar.
+- [x] Fase 4 — `crear_habilidad`: habilidades propias por voz en `habilidades-propias/`, nunca sobrescribe; entran en la selección por palabras clave.
+- [x] Tipo de documento deducido del pedido cuando la IA no lo indica (el «oficio formal» salía como documento genérico).
+- Evidencia: OCR real sobre imagen generada lee «servidor»; evaluación 33 casos: **100 % y 100 %** (glm-5.3).

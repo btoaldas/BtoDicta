@@ -153,6 +153,9 @@ enum AgenteTerminal {
             + "\n- [herramienta:buscar_historial] Buscar en los dictados anteriores de BtoDicta. \"contenido\" = palabras clave."
             + "\n- [herramienta:resumen_bitacora] Resumen de la bitácora (lo que hizo el usuario en el equipo). \"contenido\" = hoy o ayer."
             + "\n- [herramienta:transcribir_archivo] Transcribir un audio o video. \"contenido\" = la ruta, o vacío para el más reciente de Descargas o Escritorio."
+            + "\n- [herramienta:ver_pantalla] Mirar lo que el usuario tiene en pantalla para responder sobre ello («¿qué dice esto?», «resume lo que veo», «¿qué significa este error?»). \"contenido\" = la pregunta."
+            + "\n- [herramienta:editar_seleccion] Editar el texto que el usuario tiene SELECCIONADO en cualquier app y reemplazarlo («corrige esto», «hazlo más formal», «tradúcelo al inglés»). \"contenido\" = la instrucción de edición."
+            + "\n- [herramienta:crear_habilidad] Guardar una habilidad propia del usuario («crea una habilidad: cuando pida X, haz Y»). \"asunto\" = nombre corto; \"palabras\" = palabras clave separadas por comas; \"contenido\" = las instrucciones."
         return """
         <INSTRUCCIONES_INTERNAS_NO_REPRODUCIR>
         Eres el operador de BtoDicta en una Mac (macOS, zsh). El usuario te habla por voz y quiere que HAGAS cosas.
@@ -222,13 +225,15 @@ enum AgenteTerminal {
         var lugar: String?
         var tipoDocumento: String?
         var filas: [[String]]?
+        var palabras: String?
     }
 
     static let herramientasGraph: Set<String> = ["leer_correo", "buscar_correo", "buscar_persona", "borrador_correo",
                                                  "modificar_borrador", "responder_correo", "reenviar_correo", "enviar_borrador",
                                                  "ver_agenda", "crear_evento", "tareas_resumen", "recordar",
                                                  "crear_documento", "crear_hoja", "buscar_historial",
-                                                 "resumen_bitacora", "transcribir_archivo"]
+                                                 "resumen_bitacora", "transcribir_archivo",
+                                                 "ver_pantalla", "editar_seleccion", "crear_habilidad"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,
@@ -257,7 +262,15 @@ enum AgenteTerminal {
         return PlanGraph(herramienta: clave, contenido: s("contenido") ?? "", destinatario: s("destinatario"),
                          asunto: s("asunto"), numero: s("numero").flatMap { Int($0) },
                          inicio: fecha("inicio"), fin: fecha("fin"), lugar: s("lugar"),
-                         tipoDocumento: s("tipo_documento"), filas: filas)
+                         tipoDocumento: s("tipo_documento"), filas: filas, palabras: s("palabras"))
+    }
+
+    /// Tipo de documento pedido, si la IA no lo indicó: se deduce del pedido.
+    static func tipoDocumento(_ dado: String?, pedido: String) -> String {
+        if let d = dado, !d.isEmpty { return d }
+        let n = PerfilAgente.normalizar(pedido)
+        for t in ["oficio", "memorando", "memo", "informe", "carta"] where n.contains(t) { return t }
+        return "documento"
     }
 
     /// Días (1–7) a partir del contenido; por defecto 2.

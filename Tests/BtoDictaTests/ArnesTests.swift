@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import BtoDicta
 
@@ -53,5 +54,42 @@ final class ArnesTests: XCTestCase {
         let f = Arnes.fichasGeneradas(caps)
         let rutinas = f.first { $0.0 == "rutinas.md" }?.1 ?? ""
         XCTAssertTrue(rutinas.contains("[rutina:r1] Mañana"))
+    }
+}
+
+/// Fase 3–4: tipo de documento, habilidades propias y lectura local de la pantalla.
+final class PantallaYHabilidadesTests: XCTestCase {
+    func testTipoDeDocumentoDeducido() {
+        XCTAssertEqual(AgenteTerminal.tipoDocumento(nil, pedido: "Hazme un oficio formal para el director"), "oficio")
+        XCTAssertEqual(AgenteTerminal.tipoDocumento("", pedido: "un memo para TI"), "memo")
+        XCTAssertEqual(AgenteTerminal.tipoDocumento("carta", pedido: "oficio"), "carta")
+        XCTAssertEqual(AgenteTerminal.tipoDocumento(nil, pedido: "un texto cualquiera"), "documento")
+    }
+
+    func testCrearHabilidadNoSobrescribeYSeSelecciona() throws {
+        Arnes.preparar(catalogo: [])
+        let a = try XCTUnwrap(Arnes.crearHabilidad(nombre: "Informe semanal", palabras: "informe, semanal",
+                                                   instrucciones: "Usa secciones: logros, pendientes, riesgos."))
+        let b = try XCTUnwrap(Arnes.crearHabilidad(nombre: "Informe semanal", palabras: "informe",
+                                                   instrucciones: "Otra versión."))
+        XCTAssertNotEqual(a, b)
+        addTeardownBlock { try? FileManager.default.removeItem(at: a); try? FileManager.default.removeItem(at: b) }
+        let elegidas = Arnes.seleccionar("hazme el informe semanal", de: Arnes.fichas())
+        XCTAssertTrue(elegidas.contains { $0.texto.contains("logros, pendientes, riesgos") })
+        XCTAssertNil(Arnes.crearHabilidad(nombre: "x", palabras: "", instrucciones: "  "))
+    }
+
+    func testOCRLocalLeeUnaImagen() throws {
+        let img = NSImage(size: NSSize(width: 900, height: 200))
+        img.lockFocus()
+        NSColor.white.setFill(); NSRect(x: 0, y: 0, width: 900, height: 200).fill()
+        ("Error de conexion al servidor" as NSString).draw(at: NSPoint(x: 20, y: 80),
+            withAttributes: [.font: NSFont.systemFont(ofSize: 48), .foregroundColor: NSColor.black])
+        img.unlockFocus()
+        let rep = try XCTUnwrap(img.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
+        let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+        let u = FileManager.default.temporaryDirectory.appendingPathComponent("ocr-\(UUID().uuidString).png")
+        try png.write(to: u); addTeardownBlock { try? FileManager.default.removeItem(at: u) }
+        XCTAssertTrue(PerfilAgente.normalizar(ContinuoOCR.leer(u)).contains("servidor"))
     }
 }
