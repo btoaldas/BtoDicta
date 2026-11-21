@@ -9650,10 +9650,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             }
         case "ver_pantalla":
+            // El texto de la pantalla viaja a la IA: sin preguntar solo si el usuario lo pidió con sus palabras.
+            if !AgenteTerminal.pedidoMencionaPantalla(pedido) || Config.agenteIAConfirmacion() == "aprobacion",
+               !autorizarDecisionIA("¿Mirar tu pantalla y enviar su texto a la IA?",
+                                    detalle: NSWorkspace.shared.frontmostApplication?.localizedName ?? "") {
+                decir("Vale, no miro la pantalla.", nil); return true
+            }
             verPantallaYResponder(plan.contenido.isEmpty ? pedido : plan.contenido, ia: ia, decir: decir)
         case "editar_seleccion":
             editarSeleccion(instruccion: plan.contenido.isEmpty ? pedido : plan.contenido, ia: ia, decir: decir)
         case "crear_habilidad":
+            // Solo si lo pide el usuario con sus palabras, nunca por iniciativa del modelo.
+            let n = PerfilAgente.normalizar(pedido)
+            guard n.contains("habilidad") || n.contains("aprende") else {
+                decir("Si quieres que lo aprenda como habilidad, dímelo así: «crea una habilidad…».", nil); return true
+            }
             // Una habilidad es una instrucción permanente: se confirma siempre.
             guard !Arnes.habilidadPeligrosa(plan.contenido) else {
                 decir("Esa habilidad intenta saltarse una confirmación o borrar algo; no la guardo.", nil); return true
@@ -9726,9 +9737,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             """
             CerebroTexto.pedir(prompt, ia: ia) { [weak self] resultado in
                 guard let self else { return }
-                let nuevo = resultado?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                // Sin caracteres de control ni salto final: en una terminal, un salto ejecutaría.
+                let nuevo = AgenteTerminal.textoSeguroParaPegar(resultado ?? "")
                 guard !nuevo.isEmpty else { decir("No pude editar el texto.", nil); return }
-                if Config.agenteIAConfirmacion() == "aprobacion",
+                let esTerminal = AgenteTerminal.esTerminal(appActiva?.bundleIdentifier)
+                if esTerminal || Config.agenteIAConfirmacion() == "aprobacion",
                    !self.autorizarDecisionIA("¿Reemplazar el texto seleccionado?", detalle: String(nuevo.prefix(1200))) {
                     decir("Vale, no lo cambio.", nil); return
                 }

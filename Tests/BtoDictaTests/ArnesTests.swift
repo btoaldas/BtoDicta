@@ -59,6 +59,15 @@ final class ArnesTests: XCTestCase {
 
 /// Fase 3–4: tipo de documento, habilidades propias y lectura local de la pantalla.
 final class PantallaYHabilidadesTests: XCTestCase {
+    func testSalvaguardasDePantallaYPegado() {
+        XCTAssertTrue(AgenteTerminal.pedidoMencionaPantalla("¿Qué dice este error?"))
+        XCTAssertFalse(AgenteTerminal.pedidoMencionaPantalla("Hazme un borrador para Ana"))
+        XCTAssertTrue(AgenteTerminal.esTerminal("com.apple.Terminal"))
+        XCTAssertFalse(AgenteTerminal.esTerminal("com.microsoft.Word"))
+        XCTAssertEqual(AgenteTerminal.textoSeguroParaPegar("rm -rf ~\u{1B}[0m\n"), "rm -rf ~[0m")
+        XCTAssertEqual(AgenteTerminal.textoSeguroParaPegar("Hola\nmundo\n"), "Hola\nmundo")
+    }
+
     func testTipoDeDocumentoDeducido() {
         XCTAssertEqual(AgenteTerminal.tipoDocumento(nil, pedido: "Hazme un oficio formal para el director"), "oficio")
         XCTAssertEqual(AgenteTerminal.tipoDocumento("", pedido: "un memo para TI"), "memo")

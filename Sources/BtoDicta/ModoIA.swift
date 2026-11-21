@@ -265,6 +265,28 @@ enum AgenteTerminal {
                          tipoDocumento: s("tipo_documento"), filas: filas, palabras: s("palabras"))
     }
 
+    /// ¿El usuario pidió con sus palabras mirar la pantalla?
+    static func pedidoMencionaPantalla(_ pedido: String) -> Bool {
+        let n = " " + PerfilAgente.normalizar(pedido) + " "
+        return ["pantalla", "lo que veo", "lo que ves", "que veo", "esto", "este error", "aqui", "lo que tengo abierto",
+                "esta ventana", "este mensaje"].contains { n.contains($0) }
+    }
+
+    /// Terminales conocidas: pegar ahí puede ejecutar.
+    static func esTerminal(_ bundle: String?) -> Bool {
+        guard let b = bundle?.lowercased() else { return false }
+        return ["com.apple.terminal", "com.googlecode.iterm2", "dev.warp.warp", "com.mitchellh.ghostty",
+                "net.kovidgoyal.kitty", "org.alacritty", "com.github.wez.wezterm"].contains(b)
+    }
+
+    /// Quita caracteres de control (salvo salto y tabulador) y el salto final.
+    static func textoSeguroParaPegar(_ t: String) -> String {
+        let limpio = String(String.UnicodeScalarView(t.unicodeScalars.filter {
+            !CharacterSet.controlCharacters.contains($0) || $0 == "\n" || $0 == "\t"
+        }))
+        return limpio.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Tipo de documento pedido, si la IA no lo indicó: se deduce del pedido.
     static func tipoDocumento(_ dado: String?, pedido: String) -> String {
         if let d = dado, !d.isEmpty { return d }
