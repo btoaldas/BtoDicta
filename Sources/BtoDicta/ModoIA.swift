@@ -158,6 +158,7 @@ enum AgenteTerminal {
             + "\n- [herramienta:leer_documento] Leer un Word, Excel, PDF o texto que el usuario YA tiene y responder sobre él («resúmeme el informe que bajé», «¿qué dice el Excel de gastos?»). \"contenido\" = ruta o parte del nombre; vacío = el más reciente de Descargas, Escritorio o Documentos."
             + "\n- [herramienta:resumir_pagina] Leer una página web y responder sobre ella. \"contenido\" = la dirección."
             + "\n- [herramienta:abrir_sesion_ia] Abrir Claude, Claude Code, Codex, ChatGPT o Gemini. \"contenido\" = cuál; \"lugar\" = nombre del proyecto (opcional) para abrir Claude Code o Codex en su carpeta."
+            + "\n- [herramienta:reproducir_youtube] Poner algo en YouTube y que empiece a sonar (abre el primer video). Úsala SIEMPRE que el usuario nombre YouTube, en vez del modo música. \"contenido\" = qué buscar; \"lugar\" = navegador si lo nombra (Edge, Chrome…)."
             + "\n- [herramienta:firmar_documento] Preparar la firma de un PDF: lo abre en la app oficial de firma; BtoDicta NUNCA firma. \"contenido\" = ruta o parte del nombre; vacío = el PDF más reciente."
             + "\n- [herramienta:crear_habilidad] Guardar una habilidad propia del usuario («crea una habilidad: cuando pida X, haz Y»). \"asunto\" = nombre corto; \"palabras\" = palabras clave separadas por comas; \"contenido\" = las instrucciones."
         return """
@@ -211,7 +212,8 @@ enum AgenteTerminal {
         - [herramienta:modificar_borrador] Cambiar el último borrador creado. "asunto" y/o "contenido" con la versión completa nueva.
         - [herramienta:responder_correo] Preparar como borrador la respuesta a un correo de la última lista leída. "numero" = su número en la lista; "contenido" = texto de la respuesta.
         - [herramienta:reenviar_correo] Preparar como borrador el reenvío de un correo de la última lista. "numero"; "destinatario" = correo o nombre; "contenido" = comentario opcional.
-        - [herramienta:archivar_correo] Archivar correos de la última lista leída (salen de la bandeja de entrada; no se borran). "contenido" = sus números separados por comas, o «todos». BtoDicta pide confirmación.
+        - [herramienta:archivar_correo] Archivar correos de la última lista leída (salen de la bandeja de entrada; no se borran). "contenido" = sus números separados por comas, o «todos». Si no se leyó nada antes, BtoDicta lee la bandeja y el 1 es el más reciente («el último que llegó» = 1). BtoDicta pide confirmación.
+        - Para ACTUAR sobre correos (archivar, marcar, mover, papelera, adjuntos, responder, reenviar) elige DIRECTAMENTE esa herramienta, aunque no se haya leído nada: BtoDicta lee la bandeja solo y pide confirmación. No uses leer_correo como paso previo.
         - [herramienta:marcar_correo] Marcar correos de la última lista. "contenido" = números o «todos»; "asunto" = leído, no leído, destacado o sin destacar.
         - [herramienta:mover_correo] Mover correos de la última lista a una carpeta (o etiqueta de Gmail). "contenido" = números o «todos»; "lugar" = nombre de la carpeta. BtoDicta pide confirmación.
         - [herramienta:papelera_correo] Mandar a la papelera correos de la última lista (se recuperan; nunca borrado definitivo). "contenido" = números o «todos». BtoDicta pide confirmación.
@@ -248,7 +250,8 @@ enum AgenteTerminal {
                                                  "crear_documento", "crear_hoja", "buscar_historial",
                                                  "resumen_bitacora", "transcribir_archivo",
                                                  "ver_pantalla", "editar_seleccion", "crear_habilidad",
-                                                 "leer_documento", "resumir_pagina", "abrir_sesion_ia", "firmar_documento"]
+                                                 "leer_documento", "resumir_pagina", "abrir_sesion_ia", "firmar_documento",
+                                                 "reproducir_youtube"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,

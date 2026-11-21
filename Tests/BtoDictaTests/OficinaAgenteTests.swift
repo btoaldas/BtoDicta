@@ -113,3 +113,28 @@ final class OficinaPaginaRealTests: XCTestCase {
         wait(for: [e1, e2], timeout: 20)
     }
 }
+
+/// YouTube: primer video y navegador pedido.
+final class YouTubeTests: XCTestCase {
+    func testPrimerVideo() {
+        XCTAssertEqual(OficinaAgente.primerVideo(#"..."videoId":"dQw4w9WgXcQ","x":1,"videoId":"aaaaaaaaaaa""#), "dQw4w9WgXcQ")
+        XCTAssertNil(OficinaAgente.primerVideo("sin videos"))
+    }
+
+    func testNavegadorPedido() {
+        XCTAssertEqual(OficinaAgente.navegador("ábrelo en Safari")?.lastPathComponent, "Safari.app")
+        XCTAssertNil(OficinaAgente.navegador("pon música"))
+    }
+
+    func testResultadosRealesTraenVideo() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["BTODICTA_RED"] == "1")
+        let e = expectation(description: "youtube")
+        var req = URLRequest(url: URL(string: "https://www.youtube.com/results?search_query=musica+alegre")!)
+        req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+                     forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { d, _, _ in
+            XCTAssertNotNil(d.flatMap { String(data: $0, encoding: .utf8) }.flatMap(OficinaAgente.primerVideo)); e.fulfill()
+        }.resume()
+        wait(for: [e], timeout: 15)
+    }
+}

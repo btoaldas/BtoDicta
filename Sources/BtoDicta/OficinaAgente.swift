@@ -327,6 +327,43 @@ enum OficinaAgente {
         }
     }
 
+    // MARK: YouTube
+
+    /// Primer video de una página de resultados de YouTube (puro).
+    static func primerVideo(_ html: String) -> String? {
+        guard let r = html.range(of: "\"videoId\":\"[A-Za-z0-9_-]{11}\"", options: .regularExpression) else { return nil }
+        return String(html[r].dropFirst(11).dropLast())
+    }
+
+    /// Navegador que nombra el pedido, si está instalado.
+    static func navegador(_ texto: String) -> URL? {
+        let n = PerfilAgente.normalizar(texto)
+        let pares = [("edge", "Microsoft Edge"), ("chrome", "Google Chrome"), ("safari", "Safari"), ("firefox", "Firefox"), ("brave", "Brave Browser")]
+        guard let app = pares.first(where: { n.contains($0.0) })?.1 else { return nil }
+        let u = URL(fileURLWithPath: "/Applications/\(app).app")
+        return FileManager.default.fileExists(atPath: u.path) ? u : nil
+    }
+
+    /// Busca en YouTube y abre el primer video (así empieza a sonar); si no lo encuentra, abre la búsqueda. En main.
+    static func reproducirYouTube(_ busqueda: String, navegador app: URL?, fin: @escaping (_ video: Bool) -> Void) {
+        var c = URLComponents(string: "https://www.youtube.com/results")!
+        c.queryItems = [URLQueryItem(name: "search_query", value: busqueda)]
+        let resultados = c.url!
+        var req = URLRequest(url: resultados); req.timeoutInterval = 10
+        req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+                     forHTTPHeaderField: "User-Agent")
+        req.setValue("es", forHTTPHeaderField: "Accept-Language")
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            let id = data.flatMap { String(data: $0, encoding: .utf8) }.flatMap(primerVideo)
+            let destino = id.flatMap { URL(string: "https://www.youtube.com/watch?v=\($0)") } ?? resultados
+            DispatchQueue.main.async {
+                if let app { NSWorkspace.shared.open([destino], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration()) }
+                else { NSWorkspace.shared.open(destino) }
+                fin(id != nil)
+            }
+        }.resume()
+    }
+
     // MARK: Firma
 
     /// App de firma oficial instalada (FirmaEC), si hay.

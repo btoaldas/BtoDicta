@@ -12,6 +12,8 @@ final class EvaluacionAsistenteTests: XCTestCase {
         ("Revisa mi correo personal de hoy, por favor.", "graph:leer_correo"),
         ("Archiva esos tres correos que me leíste", "graph:archivar_correo"),
         ("Resúmeme el Excel de gastos que bajé", "graph:leer_documento"),
+        ("Abre YouTube en Edge y pon una canción alegre", "graph:reproducir_youtube"),
+        ("Archiva el último correo que me llegó a mi correo personal", "graph:archivar_correo"),
         ("Abre Claude Code en el proyecto BtoDicta", "graph:abrir_sesion_ia|comando"),
         ("Quiero firmar el PDF que me llegó, ábremelo para firmarlo", "graph:firmar_documento"),
         ("Busca los correos de persona@ejemplo.com", "graph:buscar_correo"),

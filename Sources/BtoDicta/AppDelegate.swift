@@ -9578,7 +9578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let locales: Set<String> = ["crear_documento", "crear_hoja", "buscar_historial",
                                     "resumen_bitacora", "transcribir_archivo", "ver_pantalla",
                                     "editar_seleccion", "crear_habilidad", "leer_documento", "resumir_pagina",
-                                    "abrir_sesion_ia", "firmar_documento"]
+                                    "abrir_sesion_ia", "firmar_documento", "reproducir_youtube"]
         guard locales.contains(plan.herramienta) else { return false }
         let decir: (String, String?) -> Void = { [weak self] t, memoria in
             guard let self else { return }
@@ -9700,6 +9700,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             OficinaAgente.abrirSesion(s, en: carpeta)
             decir("Listo, abrí \(s.nombre)" + (carpeta.map { " en \($0.lastPathComponent)" } ?? "") + ".",
                   "Abrí \(s.nombre)\(carpeta.map { " en \($0.lastPathComponent)" } ?? "").")
+        case "reproducir_youtube":
+            let q = plan.contenido.isEmpty ? pedido : plan.contenido
+            OficinaAgente.reproducirYouTube(q, navegador: OficinaAgente.navegador((plan.lugar ?? "") + " " + pedido)) { video in
+                decir(video ? "Listo, te puse en YouTube: \(q). ¿Algo más?" : "Abrí YouTube con la búsqueda «\(q)»; elige el video.",
+                      video ? "Puse en YouTube: \(q)." : "Abrí la búsqueda de YouTube: \(q).")
+            }
         case "firmar_documento":
             // BtoDicta NUNCA firma: abre el PDF en la app oficial y firma el titular con su clave.
             guard let u = OficinaAgente.documentoParaLeer(plan.contenido, extensiones: ["pdf"]) else {
@@ -9847,7 +9853,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func ejecutarGraph(_ plan: AgenteTerminal.PlanGraph, pedido: String, ia: ChatIA?, token: Int) {
         let decir: (String, String?) -> Void = { [weak self] t, memoria in
             guard let self else { return }
-            self.entregarRespuestaAgente(t, pedido: pedido, motor: "Microsoft", token: token,
+            self.entregarRespuestaAgente(t, pedido: pedido, motor: "Correo", token: token,
                                          crudo: "", wav: Data(), history: nil, memoria: memoria)
         }
         let fallo: (MicrosoftGraph.ErrorGraph) -> Void = { e in decir(e.mensaje, nil) }
@@ -9864,7 +9870,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                 detalle: [plan.destinatario, plan.asunto, plan.contenido].compactMap { $0 }.joined(separator: "\n")) {
             decir("Entendido, no hago nada.", nil); return
         }
-        if !recorder.isRecording { panel.update("📬 Microsoft…") }
+        if !recorder.isRecording { panel.update("📬 \(nueva?.alias ?? "Correo")…") }
+        // «Archiva el último que llegó» sin haber leído antes: se lee la bandeja (lo más nuevo primero)
+        // y se sigue. Cada acción sobre el buzón mantiene su confirmación.
+        let sobreLaLista: Set<String> = ["archivar_correo", "marcar_correo", "mover_correo", "papelera_correo",
+                                          "adjuntos_correo", "responder_correo", "reenviar_correo"]
+        if sobreLaLista.contains(plan.herramienta), graphUltimosCorreos.isEmpty {
+            opsCorreo.leerBandeja(dias: 7) { [weak self] r in
+                guard let self, self.agenteVigente(token) else { return }
+                switch r {
+                case .failure(let e): fallo(e)
+                case .success(let c) where c.isEmpty: decir("No tienes correos recientes en la bandeja.", nil)
+                case .success(let c):
+                    self.graphUltimosCorreos = Array(c.sorted { $0.fecha > $1.fecha }.prefix(20))
+                    self.ejecutarGraph(plan, pedido: pedido, ia: ia, token: token)
+                }
+            }
+            return
+        }
         switch plan.herramienta {
         case "leer_correo":
             // Con una cantidad («los tres últimos»): los N más recientes de la semana, no todo el día.
