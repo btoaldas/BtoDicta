@@ -9554,10 +9554,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                          token: Int, crudo: String, wav: Data,
                                          history: HistoryWriter?, memoria: String? = nil) {
         guard agenteVigente(token) else { return }
-        Log.write("  3·Agente/\(motor): \(respuesta)")
-        MemoriaAgente.registrar(usuario: pedido, asistente: memoria ?? respuesta)
+        // Con `memoria` (p. ej. un resumen de correos) se registra solo eso: la
+        // respuesta lleva texto de terceros que no debe quedar en los registros.
+        let registrable = memoria ?? respuesta
+        Log.write("  3·Agente/\(motor): \(registrable)")
+        MemoriaAgente.registrar(usuario: pedido, asistente: registrable)
         AgenteLog.registrar("respuesta", ["motor": motor, "pedido": pedido,
-                                           "respuesta": respuesta])
+                                           "respuesta": registrable])
         if Config.agenteRespuestaConVoz() {
             Voz.decir(respuesta, empezar: { [weak self] in self?.panel.respuestaIA(respuesta) },
                       completion: { [weak self] in
