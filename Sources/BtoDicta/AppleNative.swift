@@ -17,7 +17,7 @@ struct ResultadoHerramientaApple {
 // MARK: - Recordatorios y Calendario mediante EventKit
 
 enum AppleAgenda {
-    private struct FechaTexto {
+    struct FechaTexto {
         let fecha: Date?
         let titulo: String
         let error: String?
@@ -128,7 +128,45 @@ enum AppleAgenda {
         return titulo.trimmingCharacters(in: CharacterSet(charactersIn: " ,.:;—-"))
     }
 
-    private static func interpretar(_ texto: String, ahora: Date = Date()) -> FechaTexto {
+    /// «en 15 minutos», «dentro de 2 horas», «en media hora», «en una hora».
+    private static func plazoRelativo(_ t: String, ahora: Date) -> FechaTexto? {
+        let numeros = ["un": 1, "una": 1, "uno": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5,
+                       "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10, "quince": 15,
+                       "veinte": 20, "treinta": 30, "cuarenta": 40, "cuarenta y cinco": 45, "cincuenta": 50]
+        let palabra = numeros.keys.sorted { $0.count > $1.count }.joined(separator: "|")
+        let patron = #"(?i)\b(?:en|dentro\s+de)\s+(?:(\d{1,3})|("# + palabra
+            + #")|(media))\s*(minutos?|min|horas?|h)?\b(?:\s+m[aá]s)?"#
+        guard let re = try? NSRegularExpression(pattern: patron) else { return nil }
+        let ns = t as NSString
+        for m in re.matches(in: t, range: NSRange(location: 0, length: ns.length)) {
+            let unidad = m.range(at: 4).location == NSNotFound ? "" : ns.substring(with: m.range(at: 4)).lowercased()
+            let esMedia = m.range(at: 3).location != NSNotFound
+            var n: Double = 0
+            if m.range(at: 1).location != NSNotFound { n = Double(ns.substring(with: m.range(at: 1))) ?? 0 }
+            else if m.range(at: 2).location != NSNotFound {
+                n = Double(numeros[PerfilAgente.normalizar(ns.substring(with: m.range(at: 2)))] ?? 0)
+            }
+            let segundos: Double
+            if esMedia { guard unidad.hasPrefix("h") else { continue }; segundos = 1800 }
+            else if unidad.hasPrefix("h") { segundos = n * 3600 }
+            else if unidad.hasPrefix("m") { segundos = n * 60 }
+            else { continue }   // «en dos» sin unidad no es un plazo
+            guard segundos > 0 else { continue }
+            var titulo = ns.replacingCharacters(in: m.range, with: " ")
+            titulo = titulo.replacingOccurrences(of: #"^\s*(?:para|que)\b[\s,;:—-]*"#, with: "",
+                                                  options: [.regularExpression, .caseInsensitive])
+            titulo = titulo.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: CharacterSet(charactersIn: " ,.:;—-"))
+            guard !titulo.isEmpty else {
+                return FechaTexto(fecha: nil, titulo: "",
+                    error: "Entendí el plazo, pero falta lo que quieres recordar o agendar.")
+            }
+            return FechaTexto(fecha: ahora.addingTimeInterval(segundos), titulo: titulo, error: nil)
+        }
+        return nil
+    }
+
+    static func interpretar(_ texto: String, ahora: Date = Date()) -> FechaTexto {
         let original = texto.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !original.isEmpty else {
             return FechaTexto(fecha: nil, titulo: "", error: "Dime qué quieres recordar o agendar.")
@@ -136,6 +174,7 @@ enum AppleAgenda {
         let t = normalizarMeridiano(original)
         let ns = t as NSString
         let normal = PerfilAgente.normalizar(t)
+        if let r = plazoRelativo(t, ahora: ahora) { return r }
         var dia: Date?
         if normal.contains("pasado manana") { dia = Calendar.current.date(byAdding: .day, value: 2, to: ahora) }
         else if normal.contains("manana") { dia = Calendar.current.date(byAdding: .day, value: 1, to: ahora) }

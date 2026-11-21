@@ -86,6 +86,34 @@ final class ModoIATests: XCTestCase {
         XCTAssertEqual(RouterGlobalIA.resumenError("<html>x</html>".data(using: .utf8)), "(cuerpo de 14 bytes)")
     }
 
+    func testCamposMixtos() {
+        let r = #"{"respuesta":"Abro el borrador","capacidad":{"tipo":"modo","clave":"x","contenido":"Hola","destinatario":"a@b.com","asunto":"Prueba"},"comandos":[]}"#
+        let c = AgenteTerminal.camposMixtos(r)
+        XCTAssertEqual(c.destinatario, "a@b.com")
+        XCTAssertEqual(c.asunto, "Prueba")
+        XCTAssertNil(AgenteTerminal.camposMixtos(#"{"capacidad":{"clave":"x","asunto":" "}}"#).asunto)
+    }
+
+    func testRecordatorioDelPlanTieneHora() {
+        let p = AppleAgenda.interpretar("Comprobar que la inteligencia artificial de BetoDicta está funcionando correctamente, en 15 minutos")
+        XCTAssertNil(p.error)
+        XCTAssertNotNil(p.fecha)
+        if let f = p.fecha { XCTAssertEqual(f.timeIntervalSinceNow, 15 * 60, accuracy: 90) }
+        XCTAssertFalse(p.titulo.contains("15 minutos"))
+    }
+
+    func testPlazosRelativos() {
+        let ahora = Date(timeIntervalSince1970: 2_000_000_000)
+        func plazo(_ t: String) -> Double? { AppleAgenda.interpretar(t, ahora: ahora).fecha?.timeIntervalSince(ahora) }
+        XCTAssertEqual(plazo("llamar a Ana en 15 minutos"), 900)
+        XCTAssertEqual(plazo("dentro de 2 horas revisar el correo"), 7200)
+        XCTAssertEqual(plazo("tomar agua en media hora"), 1800)
+        XCTAssertEqual(plazo("en una hora salir"), 3600)
+        XCTAssertEqual(plazo("en veinte minutos apagar el horno"), 1200)
+        XCTAssertEqual(AppleAgenda.interpretar("llamar a Ana en 15 minutos", ahora: ahora).titulo, "llamar a Ana")
+        XCTAssertNil(plazo("pensar en dos cosas"))
+    }
+
     func testInterpretarPlanTerminal() {
         let r = """
         Claro: {"respuesta":"Reviso el disco","comandos":[{"cmd":"df -h","sudo":false,"proposito":"espacio"},{"cmd":"sudo purge","proposito":"memoria"}]}

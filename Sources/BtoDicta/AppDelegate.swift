@@ -6409,11 +6409,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Conversación hablada: tras la respuesta, otro turno del Agente.
-    private func continuarConversacionIA() {
+    private func continuarConversacionIA(intentos: Int = 60) {
         guard conversacionIA, Config.agenteGestoConversacion() else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
             guard let self, self.conversacionIA, !self.recorder.isRecording,
-                  !self.hayConfirmacion, !self.agenteActivo else { return }
+                  !self.hayConfirmacion else { return }
+            // Si Beto aún habla o el agente sigue trabajando, espera: abrir el
+            // micrófono ahora cortaría su voz.
+            if Voz.hablando || self.agenteActivo {
+                if intentos > 0 { self.continuarConversacionIA(intentos: intentos - 1) }
+                return
+            }
             self.activarModoIAPorGesto()
         }
     }
@@ -9391,8 +9397,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                ["modo", "conexion"].contains(d.tipo) {
                 AgenteLog.registrar("mixto_capacidad", ["tipo": d.tipo, "clave": d.clave, "contenido": d.contenido])
                 self.finAgente()
+                let acuse = AgenteTerminal.interpretar(bruto)?.respuesta ?? ""
+                let m = ModosStore.modo(d.clave)
+                if d.tipo == "modo", m.id == d.clave, m.base == "accion" {
+                    // Una acción recibe sus campos (destinatario, asunto) como en el
+                    // planificador determinista: así el borrador no mete todo en el asunto.
+                    if Config.agenteIAConfirmacion() == "aprobacion",
+                       !self.autorizarDecisionIA("La IA eligió: \(d.nombre)", detalle: d.contenido) {
+                        self.entregarRespuestaAgente("Entendido, no hago nada.", pedido: texto, motor: "Local",
+                                                     token: self.nuevoAgente(), crudo: crudo, wav: wav, history: history)
+                        return
+                    }
+                    let campos = AgenteTerminal.camposMixtos(bruto)
+                    MemoriaAgente.registrar(usuario: texto, asistente: acuse.isEmpty ? "Ejecuto \(d.nombre)." : acuse)
+                    self.responderBreveAgente(acuse, evento: "mixto_acuse")
+                    self.ejecutarAccion(d.contenido, modo: m, destinatario: campos.destinatario,
+                                        asunto: campos.asunto, wav: wav, history: history,
+                                        completion: { [weak self] in self?.continuarConversacionIA() },
+                                        contextoAgente: true)
+                    return
+                }
                 if self.ejecutarDecisionRouter(d, pedido: texto, crudo: crudo, wav: wav,
-                                               history: history, modoNormal: modoNormal) { return }
+                                               history: history, modoNormal: modoNormal) {
+                    MemoriaAgente.registrar(usuario: texto, asistente: acuse.isEmpty ? "Ejecuto \(d.nombre)." : acuse)
+                    self.responderBreveAgente(acuse, evento: "mixto_acuse")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.continuarConversacionIA() }
+                    return
+                }
                 // No ejecutable: sigue con comandos o respuesta.
                 _ = self.nuevoAgente()
             }
@@ -10070,6 +10101,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     panel.show((r.ok ? "✓ " : "⚠️ ") + r.mensaje)
                     panel.hide(after: id == "clima" ? 6 : (r.ok ? 2.6 : 3.6))
                 }
+            }
+            if contextoAgente {
+                MemoriaAgente.registrar(usuario: "(resultado de \(Acciones.nombre(id)))",
+                                        asistente: (r.ok ? "Hecho: " : "Falló: ") + r.mensaje)
             }
             if contextoAgente, !r.ok, id != "grabar_pantalla" {
                 responderBreveAgente(r.mensaje, evento: "fallo_herramienta")
