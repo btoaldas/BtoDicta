@@ -734,7 +734,24 @@ struct AgenteView: View {
                     Text("Cascada global de pulido").tag("")
                     ForEach(conectadas, id: \.id) { Text($0.etiqueta).tag($0.id) }
                 }
-                field("Modelo (opcional)", text: $m.modeloIA, placeholder: "Vacío = modelo activo del proveedor")
+                HStack {
+                    field("Modelo (opcional)", text: $m.modeloIA, placeholder: "Vacío = modelo activo del proveedor")
+                    if let ia = conectadas.first(where: { $0.id == m.proveedorIA }) {
+                        let lista = ChatIA.modelosAptosParaPulido(ChatIA.modelosPorProveedor[ia.id] ?? [])
+                        Menu("Elegir") {
+                            ForEach(lista, id: \.self) { id in Button(id) { m.modeloIA = id } }
+                            if lista.isEmpty { Text("Pulsa «Descubrir» para listar sus modelos") }
+                        }.frame(width: 80)
+                        Button("Descubrir") {
+                            m.aviso = "Consultando los modelos de \(ia.proveedorCorto)…"
+                            ChatIA.descubrirProveedor(ia) { ids, msg in
+                                DispatchQueue.main.async {
+                                    m.aviso = ids.isEmpty ? msg : "\(ids.count) modelos de \(ia.proveedorCorto): elige en «Elegir»."
+                                }
+                            }
+                        }.controlSize(.small)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     Text("El plan mensual de ChatGPT y el API de OpenAI siguen separados. La opción Codex sirve como cerebro conversacional oficial; STT y TTS continúan usando Apple, motores locales o sus propias APIs.")
                         .font(.caption).foregroundStyle(.secondary)
