@@ -5119,6 +5119,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         iniciarVigilanciaActivacionVoz()
         vigilarResumenManana()
+        vigilarDelegados()
+        vigilarSeguimientos()
         inicioCompleto = true
         let urlsAlArrancar = urlsPendientes
         urlsPendientes.removeAll()
@@ -9593,7 +9595,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                     "resumen_bitacora", "transcribir_archivo", "ver_pantalla",
                                     "editar_seleccion", "crear_habilidad", "leer_documento", "resumir_pagina",
                                     "abrir_sesion_ia", "firmar_documento", "reproducir_youtube", "delegar_agente",
-                                    "resumen_manana", "obsidian_anotar", "obsidian_buscar"]
+                                    "resumen_manana", "obsidian_anotar", "obsidian_buscar",
+                                    "grabar_reunion", "terminar_reunion"]
         guard locales.contains(plan.herramienta) else { return false }
         let decir: (String, String?) -> Void = { [weak self] t, memoria in
             guard let self else { return }
@@ -9717,6 +9720,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                   "Abrí \(s.nombre)\(carpeta.map { " en \($0.lastPathComponent)" } ?? "").")
         case "resumen_manana":
             contarResumenManana(ia: ia, decir: decir)
+        case "grabar_reunion":
+            if GrabadorReunion.shared.grabando {
+                decir("Ya estoy grabando la reunión. Cuando termine, dime «terminó la reunión».", nil); break
+            }
+            do {
+                _ = try GrabadorReunion.shared.empezar(alTope: { [weak self] in
+                    self?.terminarReunion(ia: ia, decir: { t, _ in self?.panel.flash(t, segundos: 6) })
+                })
+                decir("Listo, estoy grabando la reunión. Avisa a los participantes que se graba. Cuando termine, dime «terminó la reunión».",
+                      "Empecé a grabar una reunión.")
+            } catch {
+                decir("No pude empezar a grabar. Revisa el permiso del micrófono.", nil)
+            }
+        case "terminar_reunion":
+            terminarReunion(ia: ia, decir: decir)
         case "obsidian_anotar":
             guard let b = ObsidianAgente.boveda() else { decir("No encontré tu bóveda de Obsidian. Indícala en Ajustes, Asistente.", nil); break }
             do {
@@ -9812,6 +9830,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return true
     }
 
+    /// Detiene la grabación, transcribe, saca el acta con la IA, crea el Word y anota las tareas del usuario.
+    private func terminarReunion(ia: ChatIA?, decir: @escaping (String, String?) -> Void) {
+        guard let (audio, minutos) = GrabadorReunion.shared.terminar() else {
+            decir("No hay ninguna reunión grabándose. Para empezar, di «graba esta reunión».", nil); return
+        }
+        if !recorder.isRecording { panel.update("📝 Transcribiendo la reunión (\(minutos) min)…") }
+        AudioArchivo.transcribir(audio) { [weak self] r in
+            guard let self else { return }
+            guard case .success(let (texto, _, _)) = r, !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                decir("Grabé la reunión, pero no pude transcribirla. El audio quedó en Documentos, BtoDicta, Reuniones.", nil); return
+            }
+            let txt = audio.deletingPathExtension().appendingPathExtension("txt")
+            try? texto.write(to: txt, atomically: true, encoding: .utf8)
+            if !self.recorder.isRecording { self.panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
+            CerebroTexto.pedir(ActaReunion.prompt(transcripcion: texto), ia: ia) { bruto in
+                guard let acta = bruto.flatMap(ActaReunion.leer) else {
+                    decir("Transcribí la reunión, pero no pude armar el acta. La transcripción quedó en Documentos, BtoDicta, Reuniones.", nil)
+                    return
+                }
+                let mias = acta.tareas.filter(\.mia)
+                for t in mias { NotasStore.agregar(tipo: "tarea", texto: t.tarea, fechaObjetivo: t.fecha) }
+                DocumentosAgente.crearDocumento(tipo: "informe", asunto: "Acta — \(acta.titulo)", para: nil, de: nil,
+                                                cuerpo: ActaReunion.cuerpo(acta, minutos: minutos)) { r in
+                    let donde = (try? r.get()).map { " Quedó en Word: \($0.lastPathComponent)." } ?? ""
+                    decir("Listo, el acta de «\(acta.titulo)»: \(acta.acuerdos.count) acuerdos y \(acta.tareas.count) tareas; anoté las \(mias.count) tuyas.\(donde) ¿Preparo el correo de seguimiento?",
+                          "Acta de «\(acta.titulo)» (\(minutos) min). Resumen: \(acta.resumen.prefix(400)) Acuerdos: \(acta.acuerdos.prefix(6).joined(separator: "; ").prefix(500))")
+                }
+            }
+        }
+    }
+
     /// Resumen de la mañana: Mac + correo y agenda de todas las cuentas, contado por la IA.
     private func contarResumenManana(ia: ChatIA?, decir: @escaping (String, String?) -> Void) {
         if !recorder.isRecording { panel.update("☀️ Preparando tu resumen…") }
@@ -9823,6 +9872,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                       "Di el resumen de la mañana (\(d.cuentas.count) cuenta(s), \(n) correos).")
             }
         }
+    }
+
+    /// Revisa los seguimientos de correo cada 15 minutos, uno tras otro.
+    private func vigilarSeguimientos() {
+        let t = Timer(timeInterval: 900, repeats: true) { [weak self] _ in self?.revisarSeguimientos(SeguimientoCorreo.todos()[...]) }
+        RunLoop.main.add(t, forMode: .common)
+    }
+
+    private func revisarSeguimientos(_ resto: ArraySlice<Seguimiento>) {
+        guard CuentasNube.hayDisponible, let s = resto.first else { return }
+        let cuenta = CuentasNube.conectadas.first { $0.id == s.cuenta } ?? CuentasNube.elegir(nil)
+        OperacionesCorreo(cuenta: cuenta).buscarCorreo(SeguimientoCorreo.consulta(s.persona)) { [weak self] r in
+            guard let self else { return }
+            if case .success(let correos) = r {
+                let aviso: String?
+                switch SeguimientoCorreo.evaluar(s, correos: correos) {
+                case .respondio(let asunto): aviso = "\(s.persona) ya te escribió: «\(asunto.prefix(80))»."
+                case .vencio: aviso = s.conPlazo
+                    ? "\(s.persona) no te ha respondido. Si quieres, dime «escríbele a \(s.persona) recordándole»."
+                    : nil
+                case .sigue: aviso = nil
+                }
+                if case .sigue = SeguimientoCorreo.evaluar(s, correos: correos) {} else { SeguimientoCorreo.quitar(s.id) }
+                if let aviso {
+                    Log.write("seguimiento de correo: aviso")
+                    self.panel.flash("📬 " + aviso, segundos: 8)
+                    if !self.recorder.isRecording, !self.agenteActivo { Voz.decir(aviso) }
+                }
+            }
+            self.revisarSeguimientos(resto.dropFirst())
+        }
+    }
+
+    /// Avisa por voz cuando Claude Code o Codex terminan un turno de un encargo delegado.
+    private var delegadosVistos: [String: Date] = [:]
+    private func vigilarDelegados() {
+        _ = OficinaAgente.Delegados.nuevos(visto: &delegadosVistos)   // lo anterior al arranque no se anuncia
+        let t = Timer(timeInterval: 4, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            for (quien, encargo) in OficinaAgente.Delegados.nuevos(visto: &self.delegadosVistos) {
+                let corto = encargo.split(separator: ".").first.map { String($0.prefix(90)) } ?? ""
+                Log.write("delegado: \(quien) terminó un turno")
+                let aviso = "\(quien) ya respondió" + (corto.isEmpty ? "" : " sobre «\(corto)»") + ". Te espera en la Terminal."
+                if self.recorder.isRecording || self.agenteActivo {
+                    self.panel.flash("✅ " + aviso, segundos: 6)
+                } else {
+                    Voz.decir(aviso)
+                    self.panel.flash("✅ " + aviso, segundos: 6)
+                }
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
     }
 
     /// Revisa cada minuto si toca dar el resumen de la mañana solo.
@@ -10118,6 +10219,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     seguir(c.id, c.nombre)
                 }
             }
+        case "seguir_correo":
+            let persona = (plan.destinatario ?? plan.contenido).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !persona.isEmpty else { decir("¿De quién espero el correo?", nil); return }
+            let s = SeguimientoCorreo.agregar(persona: persona, cuenta: cuentaCorreo?.id, hasta: plan.inicio)
+            let f = DateFormatter(); f.locale = Locale(identifier: "es"); f.dateFormat = "EEEE d 'a las' HH:mm"
+            decir(s.conPlazo
+                  ? "Listo, si \(persona) no te responde hasta el \(f.string(from: s.hasta)), te aviso. ¿Algo más?"
+                  : "Listo, te aviso en cuanto te escriba \(persona). ¿Algo más?",
+                  "Vigilo el correo de \(persona)\(s.conPlazo ? " hasta el \(f.string(from: s.hasta))" : "").")
         case "correo_a_tarea":
             let n = plan.numero ?? Int(plan.contenido.prefix(3).filter(\.isNumber)) ?? 1
             guard n >= 1, n <= graphUltimosCorreos.count else { decir("¿De cuál correo hago la tarea? Dime su número.", nil); return }

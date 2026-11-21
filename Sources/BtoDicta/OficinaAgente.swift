@@ -309,8 +309,15 @@ enum OficinaAgente {
     static func entreComillas(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
 
     /// Línea que abre Claude Code o Codex en la carpeta, con un encargo opcional (puro).
-    static func ordenTerminal(_ s: SesionIA, carpeta: URL, encargo: String?) -> String {
-        let bin = s == .codex ? "codex" : "claude"
+    static func ordenTerminal(_ s: SesionIA, carpeta: URL, encargo: String?, aviso: URL? = nil) -> String {
+        var bin = s == .codex ? "codex" : "claude"
+        // Señal de «terminó un turno»: un archivo que BtoDicta vigila. Solo con una ruta simple
+        // (sin comillas ni espacios), para no romper el JSON ni el TOML de la opción.
+        if let a = aviso?.path, a.allSatisfy({ $0.isLetter || $0.isNumber || "/._-".contains($0) }) {
+            bin += s == .codex
+                ? " -c " + entreComillas("notify=[\"/bin/sh\",\"-c\",\"touch \(a)\",\"x\"]")
+                : " --settings " + entreComillas("{\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"touch \(a)\"}]}]}}")
+        }
         // El encargo nunca puede pasar por una opción del programa: sin guiones al inicio y tras «--».
         let e = encargo.map { $0.replacingOccurrences(of: "\u{0}", with: "").trimmingCharacters(in: .whitespacesAndNewlines) }
             .map { String($0.drop(while: { $0 == "-" || $0 == "—" || $0 == "–" || $0.isWhitespace })) }
@@ -325,7 +332,8 @@ enum OficinaAgente {
             let dir = carpeta ?? FileManager.default.homeDirectoryForCurrentUser
             let orden = s == .claudeCode ? "claude" : "codex"
             let guion = FileManager.default.temporaryDirectory.appendingPathComponent("btodicta-\(orden)-\(UUID().uuidString.prefix(6)).command")
-            let texto = "#!/bin/zsh -l\n" + ordenTerminal(s, carpeta: dir, encargo: encargo) + "\n"
+            let aviso = encargo.flatMap { Delegados.registrar(encargo: $0, herramienta: s.nombre) }
+            let texto = "#!/bin/zsh -l\n" + ordenTerminal(s, carpeta: dir, encargo: encargo, aviso: aviso) + "\n"
             guard (try? texto.write(to: guion, atomically: true, encoding: .utf8)) != nil else { return false }
             try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: guion.path)
             return NSWorkspace.shared.open(guion)
@@ -335,6 +343,40 @@ enum OficinaAgente {
             return NSWorkspace.shared.open(URL(string: s == .claude ? "https://claude.ai/new" : "https://chatgpt.com/")!)
         case .gemini:
             return NSWorkspace.shared.open(URL(string: "https://gemini.google.com/app")!)
+        }
+    }
+
+    // MARK: Encargos delegados
+
+    /// Cada encargo deja su señal en ~/.btodicta/delegados/<id>.fin cuando el agente termina un turno.
+    enum Delegados {
+        static var dir: URL { Config.dir.appendingPathComponent("delegados", isDirectory: true) }
+
+        /// Anota el encargo y devuelve la ruta de su señal.
+        static func registrar(encargo: String, herramienta: String) -> URL? {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let id = UUID().uuidString.prefix(8).lowercased()
+            let info: [String: Any] = ["encargo": String(encargo.prefix(300)), "herramienta": herramienta,
+                                       "inicio": Date().timeIntervalSince1970]
+            guard let d = try? JSONSerialization.data(withJSONObject: info),
+                  (try? d.write(to: dir.appendingPathComponent("\(id).json"))) != nil else { return nil }
+            return dir.appendingPathComponent("\(id).fin")
+        }
+
+        /// Señales nuevas desde la última revisión: (herramienta, encargo). `visto` guarda la fecha de cada una.
+        static func nuevos(visto: inout [String: Date]) -> [(String, String)] {
+            let fins = ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [])
+                .filter { $0.pathExtension == "fin" }
+            var res: [(String, String)] = []
+            for f in fins {
+                guard let m = try? f.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                      Date().timeIntervalSince(m) < 24 * 3600, visto[f.lastPathComponent] != m else { continue }
+                visto[f.lastPathComponent] = m
+                let info = (try? Data(contentsOf: f.deletingPathExtension().appendingPathExtension("json")))
+                    .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+                res.append(((info["herramienta"] as? String) ?? "El agente", (info["encargo"] as? String) ?? ""))
+            }
+            return res
         }
     }
 

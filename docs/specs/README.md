@@ -34,5 +34,6 @@ otra spec con `Modifica: NNN`.
 | 019 | Acciones de oficina y habilidades externas | En implementación | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 017, 018 | Implementación |
 | 020 | Pulido del asistente de oficina | Hecha | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 017, 019 | Implementación |
 | 021 | Oficina: Obsidian, WhatsApp, Quipux y actividades | Hecha | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 019, 020 | Implementación |
+| 022 | Acta de reunión, aviso de encargos y seguimiento de correos | Hecha | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 019, 020 | Implementación |
 
 <!-- sdd:indice:fin -->
