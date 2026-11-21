@@ -1679,4 +1679,12 @@ struct Config {
     static func agenteZCodeBin() -> String { (json()["agente_zcode_bin"] as? String) ?? "" }
     /// Un clic en el icono de la barra mientras BtoDicta habla la calla.
     static func agenteClicCalla() -> Bool { (json()["agente_clic_calla"] as? Bool) ?? true }
+
+    // MARK: Correo de Microsoft por Graph (spec 015)
+    /// Leer correo con Microsoft Graph. Apagado de fábrica: el texto va a la IA.
+    static func agenteGraphActivo() -> Bool { (json()["agente_graph_activo"] as? Bool) ?? false }
+    /// Identificador de la aplicación registrada en Microsoft Entra (client ID).
+    static func graphClientID() -> String { (json()["graph_client_id"] as? String) ?? "" }
+    /// Directorio: «common» (cualquier cuenta), «organizations», «consumers» o un tenant.
+    static func graphTenant() -> String { (json()["graph_tenant"] as? String) ?? "common" }
 }

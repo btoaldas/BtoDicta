@@ -27,5 +27,6 @@ otra spec con `Modifica: NNN`.
 | 012 | Red de seguridad del icono y triple fn para el modo reunión | Implementada | P | funcionalidad | 2026-09-22 | Alberto — 2026-09-22 — «todo si bajo goal y loop hasta resolver y que funcione todo bien y si red de seguridad y funcionalidad» | ninguna (complementa la 010 y la 011) | Especificando |
 | 013 | Bitácora solo de grabaciones | Implementada | X | funcionalidad | 2026-10-06 | Alberto, 2026-10-06 — «si dale», en respuesta a continuar con plan, tareas e implementación | ninguna; complementa la captura de bitácora existente | Especificando |
 | 014 | Modo IA por tecla propia | Implementada | P | funcionalidad | 2026-11-20 | Alberto — 2026-11-20 — «Creo que es tecla propia… todo parametrizable» | ninguna | Prueba real pendiente |
+| 015 | Leer correo con Microsoft Graph | En implementación | P | funcionalidad | 2026-11-21 | Alberto — 2026-11-21 — «Microsoft Graph» | ninguna | Prueba real pendiente |
 
 <!-- sdd:indice:fin -->

@@ -154,6 +154,31 @@ final class AgenteSettingsModel: ObservableObject {
     @Published var iaConfirmacion: String { didSet { Config.set("agente_ia_confirmacion", to: iaConfirmacion) } }
     @Published var terminalTimeout: Double { didSet { Config.set("agente_terminal_timeout", to: terminalTimeout) } }
     @Published var clicCalla: Bool { didSet { Config.set("agente_clic_calla", to: clicCalla) } }
+    // Correo de Microsoft por Graph (spec 015)
+    @Published var graphActivo: Bool { didSet { Config.set("agente_graph_activo", to: graphActivo) } }
+    @Published var graphClientID: String { didSet { Config.set("graph_client_id", to: graphClientID.trimmingCharacters(in: .whitespaces)) } }
+    @Published var graphTenant: String { didSet { Config.set("graph_tenant", to: graphTenant.trimmingCharacters(in: .whitespaces)) } }
+    @Published var graphConectado = MicrosoftGraph.conectado
+    @Published var graphCodigo: CodigoDispositivo?
+    @Published var graphEstado = ""
+
+    func conectarGraph() {
+        graphEstado = "Pidiendo el código a Microsoft…"
+        MicrosoftGraph.conectar(mostrar: { [weak self] c in
+            self?.graphCodigo = c
+            self?.graphEstado = "Escribe el código en la página de Microsoft que se abrió."
+            if let u = URL(string: c.url) { NSWorkspace.shared.open(u) }
+        }, fin: { [weak self] error in
+            self?.graphCodigo = nil
+            self?.graphConectado = MicrosoftGraph.conectado
+            self?.graphEstado = error ?? "Cuenta conectada. Ya puedes pedir «revisa mis correos de hoy»."
+        })
+    }
+
+    func desconectarGraph() {
+        MicrosoftGraph.cancelarConexion(); MicrosoftGraph.desconectar()
+        graphCodigo = nil; graphConectado = false; graphEstado = "Cuenta desconectada."
+    }
     @Published var volumenPaso: Double {
         didSet { Config.set("agente_volumen_paso", to: Int(volumenPaso)) }
     }
@@ -251,6 +276,8 @@ final class AgenteSettingsModel: ObservableObject {
         gestoVentana = Config.agenteGestoVentana(); gestoConversacion = Config.agenteGestoConversacion()
         iaDecision = Config.agenteIADecision(); iaConfirmacion = Config.agenteIAConfirmacion()
         terminalTimeout = Config.agenteTerminalTimeout(); clicCalla = Config.agenteClicCalla()
+        graphActivo = Config.agenteGraphActivo(); graphClientID = Config.graphClientID()
+        graphTenant = Config.graphTenant()
         volumenPaso = Double(Config.agenteVolumenPaso())
         toolNotasApple = Config.agenteHerramientaNotasApple()
         toolConexiones = Config.agenteHerramientaConexiones()
@@ -670,6 +697,41 @@ struct AgenteView: View {
                 Toggle("Un clic en el icono de la barra calla a Beto mientras habla", isOn: $m.clicCalla)
                 Text("Órdenes directas, sin IA: «calla» corta la voz; «tacha la tarea X» o «marca como hecha X» la completa.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+
+            card("Correo de Microsoft (solo lectura)", "envelope.open") {
+                Toggle("Permitir que el asistente lea mi correo", isOn: $m.graphActivo)
+                Text("Lee la bandeja de entrada de una cuenta Microsoft 365 u Outlook.com con Microsoft Graph: remitente, asunto, fecha y el inicio del texto. Nunca envía, borra ni mueve correos. Lo leído viaja a la IA del asistente para resumirlo.")
+                    .font(.caption).foregroundStyle(.orange)
+                if m.graphActivo {
+                    field("Identificador de la aplicación (client ID)", text: $m.graphClientID,
+                          placeholder: "00000000-0000-0000-0000-000000000000")
+                    field("Directorio (tenant)", text: $m.graphTenant, placeholder: "common")
+                    Text("Registra una aplicación en Microsoft Entra (portal de Azure → Registros de aplicaciones): tipo cliente público, «Permitir flujos de cliente públicos» activado y permisos delegados Mail.Read y User.Read. Pega aquí su identificador. «common» admite cualquier cuenta; tu organización puede exigir su propio directorio o la aprobación de un administrador.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Circle().fill(m.graphConectado ? Color.green : Color.orange).frame(width: 7, height: 7)
+                        Text(m.graphConectado ? "Cuenta conectada" : "Sin cuenta conectada").font(.caption)
+                        Spacer()
+                        Button(m.graphConectado ? "Volver a conectar" : "Conectar cuenta") { m.conectarGraph() }
+                            .controlSize(.small)
+                            .disabled(m.graphClientID.trimmingCharacters(in: .whitespaces).isEmpty || m.graphCodigo != nil)
+                        if m.graphConectado || m.graphCodigo != nil {
+                            Button("Desconectar") { m.desconectarGraph() }.controlSize(.small)
+                        }
+                    }
+                    if let c = m.graphCodigo {
+                        HStack {
+                            Text("Código:").font(.caption)
+                            Text(c.codigoUsuario).font(.system(.title3, design: .monospaced)).textSelection(.enabled)
+                            Button("Copiar") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(c.codigoUsuario, forType: .string)
+                            }.controlSize(.small)
+                        }
+                    }
+                    if !m.graphEstado.isEmpty { Text(m.graphEstado).font(.caption) }
+                }
             }
 
             card("Cerebro y memoria", "brain.head.profile") {

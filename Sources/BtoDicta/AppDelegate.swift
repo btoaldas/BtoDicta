@@ -9388,10 +9388,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let contexto = Config.agenteMemoriaContextoIA() ? MemoriaAgente.contexto() : ""
         let prompt = AgenteTerminal.promptMixto(pedido: texto, contexto: contexto,
-                                                catalogo: CatalogoCapacidades.paraIA(caps))
+                                                catalogo: CatalogoCapacidades.paraIA(caps),
+                                                correo: MicrosoftGraph.disponible)
         CerebroTexto.pedir(prompt, ia: ia) { [weak self] r in
             guard let self, self.agenteVigente(tok) else { return }
             let bruto = r ?? ""
+            if MicrosoftGraph.disponible, let dias = AgenteTerminal.diasLeerCorreo(bruto) {
+                self.leerCorreoYResumir(texto, dias: dias, ia: ia, token: tok)
+                return
+            }
             if let cj = AgenteTerminal.capacidadMixta(bruto),
                let d = RouterGlobalIA.interpretar(cj, catalogo: caps, texto: texto),
                ["modo", "conexion"].contains(d.tipo) {
@@ -9462,6 +9467,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    /// Lee la bandeja (Graph), la IA resume según el pedido y Beto lo dice.
+    /// La memoria guarda solo cuántos correos se revisaron, no su texto.
+    private func leerCorreoYResumir(_ texto: String, dias: Int, ia: ChatIA?, token: Int) {
+        if !recorder.isRecording { panel.update("📬 Leyendo tu correo…") }
+        AgenteLog.registrar("correo_leer", ["dias": dias])
+        MicrosoftGraph.leerBandeja(dias: dias) { [weak self] r in
+            guard let self, self.agenteVigente(token) else { return }
+            switch r {
+            case .failure(let e):
+                self.entregarRespuestaAgente(e.mensaje, pedido: texto, motor: "Correo", token: token,
+                                             crudo: "", wav: Data(), history: nil)
+            case .success(let correos):
+                let memoria = "Revisé \(correos.count) correos de los últimos \(dias) día(s)."
+                guard !correos.isEmpty else {
+                    self.entregarRespuestaAgente("No tienes correos nuevos en la bandeja de entrada en ese plazo. ¿Algo más?",
+                                                 pedido: texto, motor: "Correo", token: token,
+                                                 crudo: "", wav: Data(), history: nil, memoria: memoria)
+                    return
+                }
+                if !self.recorder.isRecording { self.panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
+                let p = AgenteTerminal.promptResumenCorreo(pedido: texto, correos: MicrosoftGraph.paraIA(correos),
+                                                           total: correos.count)
+                CerebroTexto.pedir(p, ia: ia) { [weak self] resumen in
+                    guard let self, self.agenteVigente(token) else { return }
+                    let t = resumen?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    self.entregarRespuestaAgente(t.isEmpty ? "Leí \(correos.count) correos, pero no pude resumirlos." : t,
+                                                 pedido: texto, motor: "Correo", token: token,
+                                                 crudo: "", wav: Data(), history: nil, memoria: memoria)
+                }
+            }
+        }
+    }
+
     private func correrComandosTerminal(_ plan: PlanTerminal, indice: Int, salidas: [String],
                                         pedido: String, ia: ChatIA?, token: Int, crudo: String,
                                         wav: Data, history: HistoryWriter?) {
@@ -9514,10 +9552,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func entregarRespuestaAgente(_ respuesta: String, pedido: String, motor: String,
                                          token: Int, crudo: String, wav: Data,
-                                         history: HistoryWriter?) {
+                                         history: HistoryWriter?, memoria: String? = nil) {
         guard agenteVigente(token) else { return }
         Log.write("  3·Agente/\(motor): \(respuesta)")
-        MemoriaAgente.registrar(usuario: pedido, asistente: respuesta)
+        MemoriaAgente.registrar(usuario: pedido, asistente: memoria ?? respuesta)
         AgenteLog.registrar("respuesta", ["motor": motor, "pedido": pedido,
                                            "respuesta": respuesta])
         if Config.agenteRespuestaConVoz() {
