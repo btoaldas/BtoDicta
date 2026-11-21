@@ -367,6 +367,16 @@ struct Config {
     static func tareasResumenTardeMinutos() -> Int {
         min(1439, max(0, (json()["tareas_resumen_tarde_min"] as? Int) ?? 1200)) // 20:00
     }
+    static func tareasResumenMediodia() -> Bool { (json()["tareas_resumen_mediodia"] as? Bool) ?? false }
+    static func tareasResumenMediodiaMinutos() -> Int {
+        min(1439, max(0, (json()["tareas_resumen_mediodia_min"] as? Int) ?? 750)) // 12:30
+    }
+    /// Minutos tras el vencimiento en que se vuelve a avisar de una tarea sin tachar.
+    /// Después del último, solo aparece en los resúmenes. Lista vacía = un solo aviso.
+    static func tareasVencidasRepetirMinutos() -> [Int] {
+        let v = (json()["tareas_vencidas_repetir_min"] as? [Int]) ?? [15, 30, 60]
+        return Array(Set(v.filter { (1...1_440).contains($0) })).sorted().prefix(6).map { $0 }
+    }
     static func tareasResumenIncluirSinFecha() -> Bool {
         (json()["tareas_resumen_sin_fecha"] as? Bool) ?? true
     }
@@ -387,7 +397,7 @@ struct Config {
     }
     // Recordatorio PERIÓDICO de pendientes (cada N horas): resume solo lo que
     // falta, con notificación + voz. Reutiliza la triple salida existente.
-    static func tareasResumenPeriodico() -> Bool { (json()["tareas_resumen_periodico"] as? Bool) ?? true }
+    static func tareasResumenPeriodico() -> Bool { (json()["tareas_resumen_periodico"] as? Bool) ?? false }
     static func tareasResumenPeriodicoHoras() -> Int {
         min(24, max(1, (json()["tareas_resumen_periodico_horas"] as? Int) ?? 1))
     }

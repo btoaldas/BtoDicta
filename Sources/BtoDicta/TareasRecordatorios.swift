@@ -113,6 +113,7 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
         }
         let necesita = necesitaAvisos
             || Config.tareasResumenManana() || Config.tareasResumenTarde()
+            || Config.tareasResumenMediodia() || Config.tareasResumenPeriodico()
         guard necesita, let centro else { return }
         centro.getNotificationSettings { [weak self] ajustes in
             guard ajustes.authorizationStatus == .notDetermined else { return }
@@ -338,14 +339,55 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
         return resumenTexto(items: filtradas, ahora: ahora, incluirSinFecha: incluirSinFecha)
     }
 
-    static func vencidos(items: [Pendiente], ahora: Date,
-                         incluirNotas: Bool) -> [Pendiente] {
+    static func vencidos(items: [Pendiente], ahora: Date, incluirNotas: Bool,
+                         repetir: [Int] = []) -> [Pendiente] {
         items.filter { item in
-            guard !item.hecho, item.avisar, item.avisadoEn == nil,
-                  let e = item.fechaObjetivo,
-                  e <= ahora.timeIntervalSince1970 else { return false }
+            guard !item.hecho, item.avisar, let e = item.fechaObjetivo,
+                  tocaAviso(fecha: e, ultimo: item.avisadoEn,
+                            ahora: ahora.timeIntervalSince1970, repetir: repetir)
+            else { return false }
             return item.tipo == "tarea" || incluirNotas
         }.sorted { ($0.fechaObjetivo ?? 0) < ($1.fechaObjetivo ?? 0) }
+    }
+
+    /// Primer aviso al vencer; luego uno por cada minuto de `repetir` ya alcanzado
+    /// y aún no cubierto por el último aviso. Pasados 5 minutos del último plazo
+    /// no se repite más (una Mac que despierta tarde no recupera repeticiones viejas):
+    /// desde ahí la tarea solo sale en los resúmenes.
+    static func tocaAviso(fecha: Double, ultimo: Double?, ahora: Double, repetir: [Int]) -> Bool {
+        guard fecha <= ahora else { return false }
+        guard let ultimo else { return true }
+        guard let tope = repetir.max(), ahora <= fecha + Double(tope) * 60 + 300 else { return false }
+        return repetir.contains { m in
+            let t = fecha + Double(m) * 60
+            return t > ultimo && t <= ahora
+        }
+    }
+
+    private func publicarVencidos(_ items: [Pendiente], repetidos: Bool, ahora: Date,
+                                  callar: Bool = false) {
+        guard let p = items.first else { return }
+        let marca = "\(repetidos ? "r" : "n").\(Int(ahora.timeIntervalSince1970))"
+        if items.count == 1 {
+            let titulo = repetidos ? "Sigue pendiente"
+                : (p.tipo == "nota" ? "Nota programada" : "Tarea pendiente")
+            publicar(.init(titulo: titulo, cuerpo: Self.breve(p.texto),
+                           hablar: !callar && Config.tareasAvisosVoz(),
+                           id: "pendiente.\(p.id).\(marca)", sonido: !callar))
+        } else {
+            let muestra = items.prefix(3).map { Self.breve($0.texto) }.joined(separator: "; ")
+            publicar(.init(titulo: "\(items.count) pendientes \(repetidos ? "siguen sin hacer" : "vencidos")",
+                           cuerpo: muestra, hablar: !callar && Config.tareasAvisosVoz(),
+                           id: "pendientes.\(marca)", sonido: !callar))
+        }
+    }
+
+    private func enHorasQuietasAhora(_ ahora: Date) -> Bool {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: ahora)
+        return Config.tareasQuietasActivo()
+            && Self.enHorasQuietas(minutosAhora: (c.hour ?? 0) * 60 + (c.minute ?? 0),
+                                   desde: Config.tareasQuietasDesde(),
+                                   hasta: Config.tareasQuietasHasta())
     }
 
     func revisarAhora(ahora: Date = Date()) {
@@ -355,19 +397,17 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
         }
         let vencidos = Config.tareasAvisos()
             ? Self.vencidos(items: NotasStore.todos(), ahora: ahora,
-                            incluirNotas: Config.tareasAvisarNotas()) : []
+                            incluirNotas: Config.tareasAvisarNotas(),
+                            repetir: Config.tareasVencidasRepetirMinutos()) : []
 
-        let marcados = vencidos.compactMap { NotasStore.marcarAvisado($0.id, ahora: ahora) }
-        if marcados.count == 1, let p = marcados.first {
-            publicar(.init(titulo: p.tipo == "nota" ? "Nota programada" : "Tarea pendiente",
-                           cuerpo: Self.breve(p.texto), hablar: Config.tareasAvisosVoz(),
-                           id: "pendiente.\(p.id)"))
-        } else if !marcados.isEmpty {
-            let muestra = marcados.prefix(3).map { Self.breve($0.texto) }.joined(separator: "; ")
-            publicar(.init(titulo: "\(marcados.count) pendientes vencidos",
-                           cuerpo: muestra, hablar: Config.tareasAvisosVoz(),
-                           id: "pendientes.\(Int(ahora.timeIntervalSince1970))"))
+        let marcados = vencidos.compactMap { v in
+            NotasStore.marcarAvisado(v.id, previo: v.avisadoEn, fecha: v.fechaObjetivo, ahora: ahora)
+                .map { ($0, v.avisadoEn != nil) }
         }
+        publicarVencidos(marcados.filter { !$0.1 }.map { $0.0 }, repetidos: false, ahora: ahora)
+        // Las repeticiones respetan las horas quietas: de noche llegan sin sonido ni voz.
+        publicarVencidos(marcados.filter { $0.1 }.map { $0.0 }, repetidos: true, ahora: ahora,
+                         callar: enHorasQuietasAhora(ahora))
         revisarResumen(ahora: ahora)
         revisarResumenPeriodico(ahora: ahora)
     }
@@ -410,12 +450,7 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
         let sinFecha = Config.tareasResumenIncluirSinFecha()
         guard items.contains(where: { $0.tipo == "tarea" && !$0.hecho && (sinFecha || $0.fechaObjetivo != nil) })
         else { return }  // nada que recordar
-        let c = Calendar.current.dateComponents([.hour, .minute], from: ahora)
-        let minutos = (c.hour ?? 0) * 60 + (c.minute ?? 0)
-        let quietas = Config.tareasQuietasActivo()
-            && Self.enHorasQuietas(minutosAhora: minutos,
-                                   desde: Config.tareasQuietasDesde(),
-                                   hasta: Config.tareasQuietasHasta())
+        let quietas = enHorasQuietasAhora(ahora)
         let texto = Self.resumenTexto(items: items, ahora: ahora,
                                       incluirSinFecha: Config.tareasResumenIncluirSinFecha())
         publicar(.init(titulo: "Tareas pendientes", cuerpo: texto,
@@ -426,39 +461,45 @@ final class TareasRecordatorios: NSObject, UNUserNotificationCenterDelegate {
 
     private func revisarResumen(ahora: Date) {
         let clave = Self.claveDia(ahora)
-        let periodo = Self.periodoResumenPendiente(
-            ahora: ahora,
-            mananaActivo: Config.tareasResumenManana(),
-            tardeActivo: Config.tareasResumenTarde(),
-            minutoManana: Config.tareasResumenMananaMinutos(),
-            minutoTarde: Config.tareasResumenTardeMinutos(),
-            ultimoManana: Config.tareasResumenUltimo("manana"),
-            ultimoTarde: Config.tareasResumenUltimo("tarde"))
-        // Si la Mac se abre de noche, entrega solo el resumen más reciente y marca
-        // el de la mañana como cubierto: nunca dispara dos discursos seguidos.
-        if periodo == "tarde" {
-            Config.set("tareas_resumen_ultimo_tarde", to: clave)
-            if Config.tareasResumenManana() { Config.set("tareas_resumen_ultimo_manana", to: clave) }
-            publicarResumen(titulo: "Resumen de la tarde", ahora: ahora, periodo: "tarde")
-            return
-        }
-        if periodo == "manana" {
-            Config.set("tareas_resumen_ultimo_manana", to: clave)
-            publicarResumen(titulo: "Resumen del día", ahora: ahora, periodo: "manana")
-        }
+        var periodos: [(nombre: String, minuto: Int, hecho: Bool)] = []
+        if Config.tareasResumenManana() { periodos.append(("manana", Config.tareasResumenMananaMinutos(), false)) }
+        if Config.tareasResumenMediodia() { periodos.append(("mediodia", Config.tareasResumenMediodiaMinutos(), false)) }
+        if Config.tareasResumenTarde() { periodos.append(("tarde", Config.tareasResumenTardeMinutos(), false)) }
+        periodos = periodos.map { ($0.nombre, $0.minuto, Config.tareasResumenUltimo($0.nombre) == clave) }
+        let c = Calendar.current.dateComponents([.hour, .minute], from: ahora)
+        guard let (periodo, cubrir) = Self.elegirPeriodo(minutos: (c.hour ?? 0) * 60 + (c.minute ?? 0),
+                                                         periodos: periodos) else { return }
+        // Si la Mac se abre tarde, entrega solo el resumen más reciente y marca los
+        // anteriores ya pasados como cubiertos: nunca dispara dos discursos seguidos.
+        for p in cubrir { Config.set("tareas_resumen_ultimo_\(p)", to: clave) }
+        let titulos = ["manana": "Resumen del día", "mediodia": "Resumen del mediodía",
+                       "tarde": "Resumen de la tarde"]
+        publicarResumen(titulo: titulos[periodo] ?? "Resumen", ahora: ahora, periodo: periodo)
     }
 
     static func periodoResumenPendiente(ahora: Date,
                                         mananaActivo: Bool, tardeActivo: Bool,
                                         minutoManana: Int, minutoTarde: Int,
                                         ultimoManana: String,
-                                        ultimoTarde: String) -> String? {
+                                        ultimoTarde: String,
+                                        mediodiaActivo: Bool = false, minutoMediodia: Int = 750,
+                                        ultimoMediodia: String = "") -> String? {
         let c = Calendar.current.dateComponents([.hour, .minute], from: ahora)
-        let minutos = (c.hour ?? 0) * 60 + (c.minute ?? 0)
         let clave = claveDia(ahora)
-        if tardeActivo, minutos >= minutoTarde, ultimoTarde != clave { return "tarde" }
-        if mananaActivo, minutos >= minutoManana, ultimoManana != clave { return "manana" }
-        return nil
+        var periodos: [(nombre: String, minuto: Int, hecho: Bool)] = []
+        if mananaActivo { periodos.append(("manana", minutoManana, ultimoManana == clave)) }
+        if mediodiaActivo { periodos.append(("mediodia", minutoMediodia, ultimoMediodia == clave)) }
+        if tardeActivo { periodos.append(("tarde", minutoTarde, ultimoTarde == clave)) }
+        return elegirPeriodo(minutos: (c.hour ?? 0) * 60 + (c.minute ?? 0), periodos: periodos)?.0
+    }
+
+    /// El periodo pendiente más tardío ya alcanzado (por su hora, no por su nombre)
+    /// y los que quedan cubiertos con él: todos los ya alcanzados hasta esa hora.
+    static func elegirPeriodo(minutos: Int, periodos: [(nombre: String, minuto: Int, hecho: Bool)])
+        -> (String, [String])? {
+        let alcanzados = periodos.filter { $0.minuto <= minutos }
+        guard let e = alcanzados.filter({ !$0.hecho }).max(by: { $0.minuto < $1.minuto }) else { return nil }
+        return (e.nombre, alcanzados.filter { $0.minuto <= e.minuto }.map { $0.nombre })
     }
 
     private func publicarResumen(titulo: String, ahora: Date, periodo: String) {
@@ -608,7 +649,32 @@ enum TareasNotasQA {
                 con: "Tienes vencidas: 2 · hoy: 1. Revisa a las 8:00.")
         let primero = NotasStore.marcarAvisado(p.id, ahora: ahora)
         let segundo = NotasStore.marcarAvisado(p.id, ahora: ahora)
-        let unaVez = primero?.avisadoEn != nil && segundo == nil
+        let tercero = NotasStore.marcarAvisado(p.id, previo: primero?.avisadoEn,
+                                               fecha: fecha.timeIntervalSince1970,
+                                               ahora: ahora.addingTimeInterval(900))
+        let otraFecha = NotasStore.marcarAvisado(p.id, previo: tercero?.avisadoEn,
+                                                 fecha: fecha.timeIntervalSince1970 + 60, ahora: ahora)
+        // Vence a las 0: avisa en 0, 15, 30 y 60 minutos y nunca más.
+        let r = [15, 30, 60], f = 1_000_000.0
+        func toca(_ ultimo: Double?, _ min: Double) -> Bool {
+            TareasRecordatorios.tocaAviso(fecha: f, ultimo: ultimo, ahora: f + min * 60, repetir: r)
+        }
+        let cadencia = !toca(nil, -1) && toca(nil, 0) && !toca(f, 14) && toca(f, 15)
+            && !toca(f + 900, 29) && toca(f + 900, 30) && toca(f + 1_800, 60)
+            && !toca(f + 3_600, 61) && !toca(f + 3_600, 600)
+            && toca(f, 40) && !toca(f + 2_400, 59)          // despierta a los 40: uno, no dos
+            && !toca(f, 120)                                // despierta tarde: nada viejo
+            && !TareasRecordatorios.tocaAviso(fecha: f, ultimo: f, ahora: f + 900, repetir: [])
+            && TareasRecordatorios.periodoResumenPendiente(
+                ahora: cal.date(bySettingHour: 13, minute: 0, second: 0, of: ahora)!,
+                mananaActivo: true, tardeActivo: true, minutoManana: 510, minutoTarde: 1200,
+                ultimoManana: "", ultimoTarde: "", mediodiaActivo: true, minutoMediodia: 750,
+                ultimoMediodia: "") == "mediodia"
+            && TareasRecordatorios.elegirPeriodo(minutos: 1205, periodos: [
+                ("tarde", 1200, false), ("mediodia", 1230, false)])! == ("tarde", ["tarde"])
+            && TareasRecordatorios.elegirPeriodo(minutos: 1300, periodos: [
+                ("manana", 510, false), ("mediodia", 750, true), ("tarde", 1200, false)])!.1.count == 3
+        let unaVez = primero?.avisadoEn != nil && segundo == nil && tercero != nil && otraFecha == nil && cadencia
         let parseada = AppleAgenda.previsualizar("Llamar a Rafael mañana a las 8:00 p.m.",
                                                  ahora: ahora).fecha
         let fechaOK = parseada.map {

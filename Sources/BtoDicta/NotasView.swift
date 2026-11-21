@@ -26,6 +26,10 @@ struct NotasView: View {
     @State private var avisarNotas = Config.tareasAvisarNotas()
     @State private var resumenManana = Config.tareasResumenManana()
     @State private var resumenTarde = Config.tareasResumenTarde()
+    @State private var resumenMediodia = Config.tareasResumenMediodia()
+    @State private var horaMediodia = Self.hoy(minutos: Config.tareasResumenMediodiaMinutos())
+    @State private var repetirTexto = Config.tareasVencidasRepetirMinutos().map(String.init)
+        .joined(separator: ", ")
     @State private var incluirSinFecha = Config.tareasResumenIncluirSinFecha()
     @State private var antesCantidad = Self.antesInicial().cantidad
     @State private var antesUnidad = Self.antesInicial().unidad   // "horas" | "dias" | "todas"
@@ -82,6 +86,13 @@ struct NotasView: View {
         Config.set("tareas_avisar_notas", to: avisarNotas)
         Config.set("tareas_resumen_manana", to: resumenManana)
         Config.set("tareas_resumen_tarde", to: resumenTarde)
+        Config.set("tareas_resumen_mediodia", to: resumenMediodia)
+        Config.set("tareas_resumen_mediodia_min", to: Self.minutos(horaMediodia))
+        // Enteros con signo: «-15» se descarta en Config en vez de volverse 15.
+        Config.set("tareas_vencidas_repetir_min",
+                   to: repetirTexto.split(whereSeparator: { $0 == "," || $0 == " " }).compactMap { Int($0) })
+        let saneado = Config.tareasVencidasRepetirMinutos().map(String.init).joined(separator: ", ")
+        if saneado != repetirTexto { repetirTexto = saneado }
         Config.set("tareas_resumen_sin_fecha", to: incluirSinFecha)
         let cantidad = min(365, max(1, antesCantidad))
         if cantidad != antesCantidad { antesCantidad = cantidad }
@@ -152,6 +163,15 @@ struct NotasView: View {
                             .disabled(!Config.ttsActivo())
                         Toggle("También notas con fecha", isOn: $avisarNotas)
                     }.toggleStyle(.checkbox)
+                    HStack {
+                        Text("Si sigue sin tachar, volver a avisar a los").font(.caption)
+                        TextField("15, 30, 60", text: $repetirTexto).onSubmit(guardarConfiguracion)
+                            .onDisappear(perform: guardarConfiguracion)
+                            .frame(width: 90)
+                        Text("minutos").font(.caption)
+                    }
+                    Text("Después solo se nombra en los resúmenes. Vacío = un solo aviso.")
+                        .font(.caption2).foregroundStyle(.secondary)
                     Text("Notificaciones de macOS: \(permisoNotificaciones.texto). La voz usa el motor TTS elegido en Ajustes y nunca habla durante una grabación de pantalla.")
                         .font(.caption).foregroundStyle(.secondary)
                     Divider()
@@ -159,6 +179,11 @@ struct NotasView: View {
                         Toggle("Resumen de la mañana", isOn: $resumenManana)
                         DatePicker("", selection: $horaManana, displayedComponents: .hourAndMinute)
                             .labelsHidden().controlSize(.small).disabled(!resumenManana)
+                    }
+                    HStack {
+                        Toggle("Resumen del mediodía", isOn: $resumenMediodia)
+                        DatePicker("", selection: $horaMediodia, displayedComponents: .hourAndMinute)
+                            .labelsHidden().controlSize(.small).disabled(!resumenMediodia)
                     }
                     HStack {
                         Toggle("Resumen de la tarde", isOn: $resumenTarde)
@@ -250,6 +275,8 @@ struct NotasView: View {
                 .onChange(of: avisarNotas) { _, _ in guardarConfiguracion() }
                 .onChange(of: resumenManana) { _, _ in guardarConfiguracion() }
                 .onChange(of: resumenTarde) { _, _ in guardarConfiguracion() }
+                .onChange(of: resumenMediodia) { _, _ in guardarConfiguracion() }
+                .onChange(of: horaMediodia) { _, _ in guardarConfiguracion() }
                 .onChange(of: incluirSinFecha) { _, _ in guardarConfiguracion() }
                 .onChange(of: antesCantidad) { _, _ in guardarConfiguracion() }
                 .onChange(of: antesUnidad) { _, _ in guardarConfiguracion() }

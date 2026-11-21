@@ -159,11 +159,16 @@ enum NotasStore {
 
     /// Marca exactamente una vez y devuelve el ítem que ganó la carrera. El timer,
     /// el despertar de la Mac y un cambio de configuración pueden coincidir.
-    @discardableResult static func marcarAvisado(_ id: String, ahora: Date = Date()) -> Pendiente? {
+    /// Compara y marca: solo si `avisadoEn` sigue siendo `previo`, así dos procesos
+    /// no dan el mismo aviso. `avisadoEn` guarda la hora del último aviso.
+    /// Con `fecha`, exige además que la tarea no haya cambiado de fecha desde la lectura.
+    @discardableResult static func marcarAvisado(_ id: String, previo: Double? = nil, fecha: Double? = nil,
+                                                 ahora: Date = Date()) -> Pendiente? {
         var resultado: Pendiente?
         mutar { items in
             guard let i = items.firstIndex(where: {
-                $0.id == id && !$0.hecho && $0.avisar && $0.avisadoEn == nil
+                $0.id == id && !$0.hecho && $0.avisar && $0.avisadoEn == previo
+                    && (fecha == nil || $0.fechaObjetivo == fecha)
             }) else { return false }
             items[i].avisadoEn = ahora.timeIntervalSince1970
             resultado = items[i]
