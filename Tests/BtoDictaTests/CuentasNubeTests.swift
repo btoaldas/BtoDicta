@@ -183,3 +183,30 @@ final class ArchivarCorreosTests: XCTestCase {
         XCTAssertTrue(GoogleCuenta.alcances.contains("https://www.googleapis.com/auth/gmail.modify"))
     }
 }
+
+/// Buzón compartido o delegado de Microsoft (spec 019, fase 3).
+final class BuzonDelegadoTests: XCTestCase {
+    func testRutasVanAlBuzonDelegado() {
+        XCTAssertEqual(MicrosoftGraph.ruta("/me/messages/1/move", buzon: "sec@x.example"), "/users/sec@x.example/messages/1/move")
+        XCTAssertEqual(MicrosoftGraph.ruta("/me/mailFolders/inbox/messages", buzon: "sec@x.example"), "/users/sec@x.example/mailFolders/inbox/messages")
+        XCTAssertEqual(MicrosoftGraph.ruta("/me/calendarView", buzon: "sec@x.example"), "/users/sec@x.example/calendarView")
+        XCTAssertEqual(MicrosoftGraph.ruta("/me/people", buzon: "sec@x.example"), "/me/people")   // personas: del usuario
+        XCTAssertEqual(MicrosoftGraph.ruta("/me", buzon: "sec@x.example"), "/me")
+        XCTAssertEqual(MicrosoftGraph.ruta("/me/messages", buzon: nil), "/me/messages")
+        XCTAssertEqual(MicrosoftGraph.ruta("/me/messages", buzon: "a/../b@x"), "/users/a%2F..%2Fb@x/messages")
+    }
+
+    func testSoloElBuzonDelegadoPidePermisosShared() {
+        var c = CuentaNube(id: "m", proveedor: .microsoft, alias: "Secretaría", correo: "", clientID: "x", tenant: "",
+                           llavero: "l", predeterminada: false)
+        XCTAssertFalse(MicrosoftGraph.alcances(de: c).contains("Shared"))
+        c.buzon = "sec@x.example"
+        XCTAssertTrue(MicrosoftGraph.alcances(de: c).contains("Mail.ReadWrite.Shared"))
+    }
+
+    func testRegistroViejoSinBuzonSeLeeIgual() throws {
+        let j = #"[{"id":"m","proveedor":"microsoft","alias":"A","correo":"","clientID":"x","tenant":"","llavero":"l","predeterminada":true}]"#
+        let l = try JSONDecoder().decode([CuentaNube].self, from: Data(j.utf8))
+        XCTAssertNil(l[0].buzon); XCTAssertFalse(l[0].esBuzonDelegado)
+    }
+}

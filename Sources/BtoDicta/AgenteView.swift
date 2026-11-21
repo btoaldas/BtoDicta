@@ -211,14 +211,16 @@ final class AgenteSettingsModel: ObservableObject {
     @Published var nuevaClientID = ""
     @Published var nuevaTenant = "common"
     @Published var nuevaSecreto = ""
+    @Published var nuevaBuzon = ""
 
     func refrescarCuentas() { cuentas = CuentasNube.todas(); graphConectado = !CuentasNube.conectadas.isEmpty }
 
     func agregarCuenta() {
         let c = CuentasNube.agregar(proveedor: nuevaProveedor, alias: nuevaAlias, clientID: nuevaClientID,
-                                    tenant: nuevaProveedor == .microsoft ? nuevaTenant : "")
+                                    tenant: nuevaProveedor == .microsoft ? nuevaTenant : "",
+                                    buzon: nuevaProveedor == .microsoft ? nuevaBuzon : "")
         let secreto = nuevaSecreto
-        nuevaAlias = ""; nuevaSecreto = ""
+        nuevaAlias = ""; nuevaSecreto = ""; nuevaBuzon = ""
         refrescarCuentas()
         conectarCuenta(c, secreto: secreto)
     }
@@ -877,6 +879,10 @@ struct AgenteView: View {
                           placeholder: m.nuevaProveedor == .microsoft ? "00000000-0000-0000-0000-000000000000" : "….apps.googleusercontent.com")
                     if m.nuevaProveedor == .microsoft {
                         field("Directorio (tenant)", text: $m.nuevaTenant, placeholder: "common")
+                        field("Buzón compartido o delegado (opcional)", text: $m.nuevaBuzon,
+                              placeholder: "secretaria@tu-dominio — vacío = tu propio buzón")
+                        Text("Para un buzón que otra persona te delegó o uno compartido: entras con TU cuenta y el asistente trabaja en ese buzón. Se agrega como una cuenta más, con su nombre corto.")
+                            .font(.caption).foregroundStyle(.secondary)
                         Text("Microsoft Entra → Registros de aplicaciones: cliente público con «Permitir flujos de cliente públicos» y permisos delegados Mail.ReadWrite, Mail.Send, Calendars.ReadWrite, People.Read, User.Read y User.ReadBasic.All. «common» admite cualquier cuenta.")
                             .font(.caption).foregroundStyle(.secondary)
                     } else {

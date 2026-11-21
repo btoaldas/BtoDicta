@@ -41,7 +41,7 @@ extension MicrosoftGraph {
         guard disponible else { DispatchQueue.main.async { fin(-1, nil) }; return }
         conToken { token in
             guard let token else { DispatchQueue.main.async { fin(401, nil) }; return }
-            var c = URLComponents(string: "https://graph.microsoft.com/v1.0" + ruta)
+            var c = URLComponents(string: "https://graph.microsoft.com/v1.0" + Self.ruta(ruta, buzon: cuenta?.buzon))
             if !query.isEmpty { c?.queryItems = query }
             guard let url = c?.url else { DispatchQueue.main.async { fin(0, nil) }; return }
             var req = URLRequest(url: url)

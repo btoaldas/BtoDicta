@@ -20,7 +20,10 @@ struct CuentaNube: Codable, Equatable, Identifiable {
     var tenant: String
     var llavero: String
     var predeterminada: Bool
+    /// Buzón compartido o delegado de Microsoft (su correo); nil = el propio (spec 019).
+    var buzon: String?
 
+    var esBuzonDelegado: Bool { !(buzon ?? "").isEmpty }
     var etiqueta: String { correo.isEmpty ? alias : "\(alias) (\(correo))" }
 }
 
@@ -54,13 +57,16 @@ enum CuentasNube {
     }
 
     @discardableResult
-    static func agregar(proveedor: ProveedorNube, alias: String, clientID: String, tenant: String) -> CuentaNube {
+    static func agregar(proveedor: ProveedorNube, alias: String, clientID: String, tenant: String,
+                        buzon: String = "") -> CuentaNube {
         var lista = todas()
         let id = "\(proveedor.rawValue)-\(UUID().uuidString.prefix(8).lowercased())"
-        let c = CuentaNube(id: id, proveedor: proveedor, alias: alias.isEmpty ? proveedor.nombre : alias, correo: "",
+        var c = CuentaNube(id: id, proveedor: proveedor, alias: alias.isEmpty ? proveedor.nombre : alias, correo: "",
                            clientID: clientID.trimmingCharacters(in: .whitespaces),
                            tenant: tenant.trimmingCharacters(in: .whitespaces),
                            llavero: "cuenta-\(id)-refresh", predeterminada: lista.isEmpty)
+        let b = buzon.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if proveedor == .microsoft, !b.isEmpty { c.buzon = b; c.correo = b }
         lista.append(c); guardar(lista)
         return c
     }

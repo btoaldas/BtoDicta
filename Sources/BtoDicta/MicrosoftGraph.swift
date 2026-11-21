@@ -27,6 +27,19 @@ struct CodigoDispositivo: Equatable {
 
 enum MicrosoftGraph {
     static let alcances = "offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite People.Read User.ReadBasic.All"
+    /// Solo las cuentas de buzón delegado piden los permisos «Shared»: pedirlos al renovar
+    /// una cuenta que no los aprobó la rompería.
+    static let alcancesBuzon = alcances + " Mail.ReadWrite.Shared Mail.Send.Shared Calendars.ReadWrite.Shared"
+    static func alcances(de c: CuentaNube?) -> String { c?.esBuzonDelegado == true ? alcancesBuzon : alcances }
+
+    /// En un buzón delegado, el correo y la agenda van a /users/<buzón>; personas y perfil siguen en /me. Puro.
+    static func ruta(_ r: String, buzon: String?) -> String {
+        guard let b = buzon, !b.isEmpty,
+              r.hasPrefix("/me/messages") || r.hasPrefix("/me/mailFolders") || r.hasPrefix("/me/calendarView")
+                || r.hasPrefix("/me/events") else { return r }
+        let seguro = b.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))) ?? b
+        return "/users/\(seguro)" + r.dropFirst(3)
+    }
     private static let lock = NSLock()
     /// Caché de acceso por cuenta (clave: su entrada del Llavero). Solo en memoria.
     private static var accesos: [String: (token: String, vence: Date)] = [:]
@@ -76,7 +89,7 @@ enum MicrosoftGraph {
         guard let url = URL(string: "https://login.microsoftonline.com/\(tenant)/oauth2/v2.0/devicecode") else {
             fin("El directorio (tenant) no es válido."); return
         }
-        post(url, ["client_id": clientID, "scope": alcances]) { codigo, json in
+        post(url, ["client_id": clientID, "scope": alcances(de: cuenta)]) { codigo, json in
             guard codigo == 200, let json, let c = leerCodigoDispositivo(json) else {
                 DispatchQueue.main.async { fin(mensajeError(json, codigo: codigo)) }
                 return
@@ -149,7 +162,7 @@ enum MicrosoftGraph {
 
     /// Guarda en el registro el correo de la cuenta recién conectada (para nombrarla).
     private static func anotarCorreoDeLaCuenta() {
-        guard var c = cuenta else { return }
+        guard var c = cuenta, !c.esBuzonDelegado else { return }   // el buzón delegado ya se nombra por su correo
         llamar("GET", "/me", query: [URLQueryItem(name: "$select", value: "mail,userPrincipalName")]) { codigo, json in
             guard codigo == 200, let j = json as? [String: Any] else { return }
             let correo = (j["mail"] as? String) ?? (j["userPrincipalName"] as? String) ?? ""
@@ -177,7 +190,7 @@ enum MicrosoftGraph {
         if let a, a.vence > Date().addingTimeInterval(60) { listo(a.token); return }
         guard let refresco = SecretosKeychain.leer(cuenta: cuentaLlavero), let url = urlToken else { listo(nil); return }
         post(url, ["grant_type": "refresh_token", "client_id": clientID,
-                   "refresh_token": refresco, "scope": alcances]) { codigo, json in
+                   "refresh_token": refresco, "scope": alcances(de: cuenta)]) { codigo, json in
             guard codigo == 200, let json, guardarTokens(json) else { listo(nil); return }
             lock.lock(); let t = acceso?.token; lock.unlock()
             listo(t)
@@ -225,7 +238,7 @@ enum MicrosoftGraph {
         let inicio = Calendar.current.startOfDay(for: ahora.addingTimeInterval(-Double(d - 1) * 86_400))
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
-        var c = URLComponents(string: "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages")
+        var c = URLComponents(string: "https://graph.microsoft.com/v1.0" + ruta("/me/mailFolders/inbox/messages", buzon: cuenta?.buzon))
         c?.queryItems = [
             URLQueryItem(name: "$filter", value: "receivedDateTime ge \(f.string(from: inicio))"),
             URLQueryItem(name: "$orderby", value: "receivedDateTime desc"),
