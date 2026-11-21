@@ -147,3 +147,18 @@ final class SecretosKeychainExisteTests: XCTestCase {
         XCTAssertNil(SecretosKeychain.leer(cuenta: cuenta))
     }
 }
+
+/// «Los tres últimos correos»: se respeta la cantidad pedida.
+final class CantidadCorreosTests: XCTestCase {
+    func testCantidadPedida() {
+        XCTAssertEqual(AgenteTerminal.cantidadPedida("revisa en mi correo personal los tres últimos correos", numero: nil), 3)
+        XCTAssertEqual(AgenteTerminal.cantidadPedida("léeme los 5 últimos", numero: nil), 5)
+        XCTAssertEqual(AgenteTerminal.cantidadPedida("dime el último correo", numero: nil), 1)
+        XCTAssertNil(AgenteTerminal.cantidadPedida("revisa los últimos correos", numero: nil))
+        XCTAssertEqual(AgenteTerminal.cantidadPedida("dime el último correo", numero: 1), 1)
+        XCTAssertEqual(AgenteTerminal.cantidadPedida("cualquier cosa", numero: 4), 4)
+        XCTAssertNil(AgenteTerminal.cantidadPedida("revisa los correos de los últimos dos días", numero: nil))
+        XCTAssertNil(AgenteTerminal.cantidadPedida("revisa mis correos de hoy", numero: nil))
+        XCTAssertNil(AgenteTerminal.cantidadPedida("x", numero: 900))
+    }
+}

@@ -9784,7 +9784,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !recorder.isRecording { panel.update("📬 Microsoft…") }
         switch plan.herramienta {
         case "leer_correo":
-            leerCorreoYResumir(pedido, dias: AgenteTerminal.dias(plan.contenido), ia: ia, token: token)
+            // Con una cantidad («los tres últimos»): los N más recientes de la semana, no todo el día.
+            if let n = AgenteTerminal.cantidadPedida(pedido, numero: plan.numero) {
+                leerCorreoYResumir(pedido, dias: 7, cantidad: n, ia: ia, token: token)
+            } else {
+                leerCorreoYResumir(pedido, dias: AgenteTerminal.dias(plan.contenido), ia: ia, token: token)
+            }
         case "buscar_correo":
             self.opsCorreo.buscarCorreo(plan.contenido.isEmpty ? pedido : plan.contenido) { [weak self] r in
                 guard let self, self.agenteVigente(token) else { return }
@@ -9960,18 +9965,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Lee la bandeja (Graph), la IA resume según el pedido y Beto lo dice.
     /// La memoria guarda solo cuántos correos se revisaron, no su texto.
-    private func leerCorreoYResumir(_ texto: String, dias: Int, ia: ChatIA?, token: Int) {
+    private func leerCorreoYResumir(_ texto: String, dias: Int, cantidad: Int? = nil, ia: ChatIA?, token: Int) {
         if !recorder.isRecording { panel.update("📬 Leyendo tu correo…") }
-        AgenteLog.registrar("correo_leer", ["dias": dias])
+        AgenteLog.registrar("correo_leer", ["dias": dias, "cantidad": cantidad ?? 0])
         self.opsCorreo.leerBandeja(dias: dias) { [weak self] r in
             guard let self, self.agenteVigente(token) else { return }
             switch r {
             case .failure(let e):
                 self.entregarRespuestaAgente(e.mensaje, pedido: texto, motor: "Correo", token: token,
                                              crudo: "", wav: Data(), history: nil)
-            case .success(let correos):
+            case .success(let todos):
+                let correos = cantidad.map { Array(todos.sorted { $0.fecha > $1.fecha }.prefix($0)) } ?? todos
                 self.resumirCorreos(correos, pedido: texto, ia: ia, token: token,
-                                    memoria: "Revisé \(correos.count) correos de los últimos \(dias) día(s).")
+                                    memoria: cantidad != nil
+                                        ? "Revisé los \(correos.count) correos más recientes."
+                                        : "Revisé \(correos.count) correos de los últimos \(dias) día(s).")
             }
         }
     }

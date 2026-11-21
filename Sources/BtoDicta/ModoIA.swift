@@ -200,7 +200,7 @@ enum AgenteTerminal {
         f.dateFormat = "EEEE d 'de' MMMM 'de' yyyy, HH:mm"
         return """
 
-        - [herramienta:leer_correo] Leer correo recibido. "contenido" = días atrás: 1 = hoy, 2 = ayer y hoy (máx. 7).
+        - [herramienta:leer_correo] Leer correo recibido. "contenido" = días atrás: 1 = hoy, 2 = ayer y hoy (máx. 7). Si el usuario pide una cantidad («los tres últimos»), "numero" = esa cantidad.
         - [herramienta:buscar_correo] Buscar en todo el buzón. "contenido" = palabras clave; para un remitente usa from:correo o from:nombre. No pongas palabras de tiempo ("hoy", "esta semana"): para correos recientes usa leer_correo.
         - [herramienta:buscar_persona] Buscar a una persona (contactos frecuentes y directorio). "contenido" = nombre.
         - [herramienta:borrador_correo] Crear un borrador real en la cuenta (carpeta Borradores). "destinatario" = correo o nombre; "asunto"; "contenido" = cuerpo redactado. Para correo de una cuenta conectada usa ESTA herramienta y no la app de correo.
@@ -299,6 +299,26 @@ enum AgenteTerminal {
     }
 
     /// Días (1–7) a partir del contenido; por defecto 2.
+    /// Cuántos correos pidió el usuario («los tres últimos», «5 correos»), 1–50; nil si no dijo.
+    /// Primero el número que puso la IA; si no, se busca en el pedido.
+    static func cantidadPedida(_ pedido: String, numero: Int?) -> Int? {
+        if let n = numero, (1...50).contains(n) { return n }
+        let palabras = ["un": 1, "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6,
+                        "siete": 7, "ocho": 8, "nueve": 9, "diez": 10, "quince": 15, "veinte": 20]
+        let t = PerfilAgente.normalizar(pedido).split(separator: " ").map(String.init)
+        let clave: Set<String> = ["ultimo", "ultimos", "ultima", "ultimas", "correo", "correos", "mensaje", "mensajes", "mails"]
+        for (i, w) in t.enumerated() {
+            guard let n = Int(w) ?? palabras[w], (1...50).contains(n) else { continue }
+            // «los últimos dos días» habla de tiempo, no de cuántos correos.
+            if i + 1 < t.count, ["dia", "dias", "semana", "semanas", "hora", "horas"].contains(t[i + 1]) { continue }
+            let vecinos = t[max(0, i - 1)...min(t.count - 1, i + 2)]
+            if vecinos.contains(where: clave.contains) { return n }
+        }
+        // «el último correo», «el último mensaje»: uno.
+        for i in t.indices.dropLast() where ["el", "mi"].contains(t[i]) && t[i + 1] == "ultimo" { return 1 }
+        return nil
+    }
+
     static func dias(_ contenido: String, porDefecto: Int = 2) -> Int {
         min(7, max(1, Int(contenido.filter(\.isNumber).prefix(1)) ?? porDefecto))
     }
