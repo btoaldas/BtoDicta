@@ -165,6 +165,8 @@ enum Arnes {
         - Enviar: enviar_borrador (BtoDicta siempre pide confirmación en pantalla).
         - Archivar correos de la última lista: archivar_correo con sus números o «todos» (siempre con confirmación; no borra).
         - Marcar (leído, no leído, destacado): marcar_correo · mover a una carpeta: mover_correo · papelera: papelera_correo.
+        - Tarea o recordatorio desde un correo: correo_a_tarea («recuérdame responderle el viernes a las 9»).
+        - Resumen de la mañana (agenda, correos de todas las cuentas, recordatorios): [herramienta:resumen_manana].
         - Adjuntos de un correo a Descargas/BtoDicta: adjuntos_correo · adjuntar un archivo al borrador: adjuntar_archivo.
         - Agenda: ver_agenda; crear: crear_evento (sin invitados).
         - Responder y reenviar funcionan en Microsoft y en Gmail (siempre como borrador).

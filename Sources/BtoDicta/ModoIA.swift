@@ -148,7 +148,7 @@ enum AgenteTerminal {
         let lineaCorreo = (correo ? AgenteTerminal.catalogoGraph(ahora: Date()) : "")
             + "\n- [herramienta:tareas_resumen] Decir las tareas y pendientes de BtoDicta. \"contenido\" = hoy, semana o pendientes."
             + "\n- [herramienta:recordar] Guardar un dato duradero del usuario cuando diga «recuerda que…» o «anota que…». \"contenido\" = el dato, en una frase."
-            + "\n- [herramienta:crear_documento] Crear un Word con formato (memo, oficio, informe, carta o documento) y abrirlo. \"tipo_documento\"; \"asunto\"; \"destinatario\" = para quién (opcional); \"contenido\" = el cuerpo ya redactado. La numeración la deja en blanco BtoDicta."
+            + "\n- [herramienta:crear_documento] Crear un Word con formato (memo, oficio, informe, carta o documento) y abrirlo. \"tipo_documento\"; \"asunto\"; \"destinatario\" = para quién (opcional); \"contenido\" = el cuerpo ya redactado. La numeración la deja en blanco BtoDicta. «Hazme un oficio / memo / carta / informe» va SIEMPRE aquí, nunca al modo pulir."
             + "\n- [herramienta:crear_hoja] Crear una hoja de Excel desde una tabla y abrirla. \"asunto\" = título; \"filas\" = [[\"Encabezado\",\"…\"],[\"dato\",\"…\"]]."
             + "\n- [herramienta:buscar_historial] Buscar en los dictados anteriores de BtoDicta. \"contenido\" = palabras clave."
             + "\n- [herramienta:resumen_bitacora] Resumen de la bitácora (lo que hizo el usuario en el equipo). \"contenido\" = hoy o ayer."
@@ -159,6 +159,7 @@ enum AgenteTerminal {
             + "\n- [herramienta:resumir_pagina] Leer una página web y responder sobre ella. \"contenido\" = la dirección."
             + "\n- [herramienta:abrir_sesion_ia] Abrir Claude, Claude Code, Codex, ChatGPT o Gemini. \"contenido\" = cuál; \"lugar\" = nombre del proyecto (opcional) para abrir Claude Code o Codex en su carpeta."
             + "\n- [herramienta:reproducir_youtube] Poner algo en YouTube y que empiece a sonar (abre el primer video). Úsala SIEMPRE que el usuario nombre YouTube, en vez del modo música. \"contenido\" = qué buscar; \"lugar\" = navegador si lo nombra (Edge, Chrome…)."
+            + "\n- [herramienta:resumen_manana] Resumen del día completo: agenda, correos de todas las cuentas y recordatorios («dame el resumen de la mañana», «¿qué tengo hoy?», «ponme al día»)."
             + "\n- [herramienta:delegar_agente] Encargar a Claude Code (o Codex si lo nombra) una tarea que BtoDicta no hace por sí mismo, sobre todo lo que describe una habilidad externa (proformas, facturas, informes con formato oficial, despliegues…). \"contenido\" = el encargo completo en español: qué hacer, con qué habilidad y TODOS los datos dados; \"lugar\" = proyecto (opcional). BtoDicta pide confirmación."
             + "\n- [herramienta:firmar_documento] Preparar la firma de un PDF: lo abre en la app oficial de firma; BtoDicta NUNCA firma. \"contenido\" = ruta o parte del nombre; vacío = el PDF más reciente."
             + "\n- [herramienta:crear_habilidad] Guardar una habilidad propia del usuario («crea una habilidad: cuando pida X, haz Y»). \"asunto\" = nombre corto; \"palabras\" = palabras clave separadas por comas; \"contenido\" = las instrucciones."
@@ -218,6 +219,7 @@ enum AgenteTerminal {
         - [herramienta:marcar_correo] Marcar correos de la última lista. "contenido" = números o «todos»; "asunto" = leído, no leído, destacado o sin destacar.
         - [herramienta:mover_correo] Mover correos de la última lista a una carpeta (o etiqueta de Gmail). "contenido" = números o «todos»; "lugar" = nombre de la carpeta. BtoDicta pide confirmación.
         - [herramienta:papelera_correo] Mandar a la papelera correos de la última lista (se recuperan; nunca borrado definitivo). "contenido" = números o «todos». BtoDicta pide confirmación.
+        - [herramienta:correo_a_tarea] Crear una tarea (con aviso si da fecha) a partir de un correo («recuérdame responderle el viernes», «hazme una tarea con ese correo»). "numero" = el correo (1 = el más reciente); "contenido" = qué hay que hacer; "inicio" = "AAAA-MM-DDTHH:MM" si pide aviso.
         - [herramienta:adjuntos_correo] Bajar los adjuntos de un correo de la última lista a Descargas/BtoDicta. "numero" = su número.
         - [herramienta:adjuntar_archivo] Adjuntar un archivo al último borrador. "contenido" = ruta o nombre del archivo; vacío = el más reciente de Descargas. BtoDicta pide confirmación.
         - [herramienta:enviar_borrador] Enviar el último borrador. BtoDicta pedirá confirmación al usuario.
@@ -246,20 +248,22 @@ enum AgenteTerminal {
 
     static let herramientasGraph: Set<String> = ["leer_correo", "buscar_correo", "buscar_persona", "borrador_correo",
                                                  "modificar_borrador", "responder_correo", "reenviar_correo", "enviar_borrador", "archivar_correo",
-                                                 "marcar_correo", "mover_correo", "papelera_correo", "adjuntos_correo", "adjuntar_archivo",
+                                                 "marcar_correo", "mover_correo", "papelera_correo", "adjuntos_correo", "adjuntar_archivo", "correo_a_tarea",
                                                  "ver_agenda", "crear_evento", "tareas_resumen", "recordar",
                                                  "crear_documento", "crear_hoja", "buscar_historial",
                                                  "resumen_bitacora", "transcribir_archivo",
                                                  "ver_pantalla", "editar_seleccion", "crear_habilidad",
                                                  "leer_documento", "resumir_pagina", "abrir_sesion_ia", "firmar_documento",
-                                                 "reproducir_youtube", "delegar_agente"]
+                                                 "reproducir_youtube", "delegar_agente", "resumen_manana"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,
               let data = String(texto[a...b]).data(using: .utf8),
               let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let c = j["capacidad"] as? [String: Any] else { return nil }
-        let clave = ((c["clave"] as? String) ?? "").replacingOccurrences(of: "herramienta:", with: "")
+        var clave = ((c["clave"] as? String) ?? "").replacingOccurrences(of: "herramienta:", with: "")
+        // A veces la IA pone la herramienta en "tipo" y deja "clave" vacía.
+        if clave.isEmpty { clave = ((c["tipo"] as? String) ?? "").replacingOccurrences(of: "herramienta:", with: "") }
         guard herramientasGraph.contains(clave) else { return nil }
         func s(_ k: String) -> String? {
             if let n = c[k] as? Int { return String(n) }
@@ -333,6 +337,14 @@ enum AgenteTerminal {
         // «el último correo», «el último mensaje»: uno.
         for i in t.indices.dropLast() where ["el", "mi"].contains(t[i]) && t[i + 1] == "ultimo" { return 1 }
         return nil
+    }
+
+    /// Texto de la tarea que nace de un correo: lo pedido, o «Responder a X: asunto» (puro).
+    static func textoTareaDeCorreo(_ pedido: String, de: String, asunto: String) -> String {
+        let quien = de.components(separatedBy: "<").first?.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"")) ?? de
+        let base = pedido.trimmingCharacters(in: .whitespacesAndNewlines)
+        let p = base.isEmpty || base.allSatisfy(\.isNumber) ? "Responder a \(quien)" : base
+        return "\(p) — correo de \(quien.isEmpty ? de : quien): «\(asunto.prefix(80))»"
     }
 
     /// Qué correos de la última lista archivar (índices desde 0). «todos», «los tres», «1, 3», o `numero`.
@@ -761,10 +773,13 @@ enum ReglasModoTodo {
     static let precisas: Set<String> = ["volumen", "clima", "captura_pantalla", "grabar_pantalla",
                                         "captura_compartir", "recordatorios", "rutina"]
 
-    static func admite(_ plan: ModoPreguntaPlan, graph: Bool) -> Bool {
+    static func admite(_ plan: ModoPreguntaPlan, graph: Bool, texto: String = "") -> Bool {
         let acciones = plan.cadena.acciones.map { $0.modo.accion }
         guard !acciones.isEmpty, plan.cadena.transforms.isEmpty else { return false }
         if graph, acciones.contains("calendario") { return false }
+        // «Recuérdame responder ese correo»: lo decide la IA con el correo (correo_a_tarea).
+        let n = PerfilAgente.normalizar(texto)
+        if graph, acciones.contains("recordatorios"), n.contains("correo") || n.contains("mail") || n.contains("responderle") { return false }
         return acciones.allSatisfy { precisas.contains($0) }
     }
 }
@@ -779,7 +794,7 @@ enum AgenteEvaluacion {
     static func porReglas(_ texto: String, graph: Bool) -> String? {
         if AgenteOrdenes.esCallar(texto) { return "regla:callar" }
         if AgenteOrdenes.tareaACompletar(texto) != nil { return "regla:tachar" }
-        guard let plan = AgenteNucleo.planificar(texto), ReglasModoTodo.admite(plan, graph: graph) else { return nil }
+        guard let plan = AgenteNucleo.planificar(texto), ReglasModoTodo.admite(plan, graph: graph, texto: texto) else { return nil }
         return "regla:" + plan.cadena.acciones.map { $0.modo.accion }.joined(separator: "+")
     }
 

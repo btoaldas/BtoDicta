@@ -154,6 +154,20 @@ final class AgenteSettingsModel: ObservableObject {
     @Published var iaConfirmacion: String { didSet { Config.set("agente_ia_confirmacion", to: iaConfirmacion) } }
     @Published var terminalTimeout: Double { didSet { Config.set("agente_terminal_timeout", to: terminalTimeout) } }
     @Published var clicCalla: Bool { didSet { Config.set("agente_clic_calla", to: clicCalla) } }
+    @Published var resumenActivo = Config.resumenMananaActivo() {
+        didSet { Config.set("agente_resumen_manana_activo", to: resumenActivo) }
+    }
+    @Published var resumenHora = Config.resumenMananaHora() {
+        didSet {
+            let p = resumenHora.split(separator: ":").compactMap { Int($0) }
+            if p.count == 2, (0...23).contains(p[0]), (0...59).contains(p[1]) {
+                Config.set("agente_resumen_manana_hora", to: String(format: "%02d:%02d", p[0], p[1]))
+            }
+        }
+    }
+    @Published var confirmarVoz = Config.agenteConfirmarVoz() {
+        didSet { Config.set("agente_confirmar_voz", to: confirmarVoz) }
+    }
     @Published var externoActivo = Config.arnesExternoActivo() {
         didSet { Config.set("arnes_externo_activo", to: externoActivo); refrescarExternas() }
     }
@@ -827,6 +841,15 @@ struct AgenteView: View {
                     }
                     .onAppear { m.refrescarExternas() }
                 }
+                HStack {
+                    Toggle("Resumen de la mañana a las", isOn: $m.resumenActivo)
+                    TextField("08:00", text: $m.resumenHora).textFieldStyle(.roundedBorder).frame(width: 60)
+                }
+                Text("Agenda, correos de todas tus cuentas y recordatorios, contado por Beto una vez al día (si el Mac dormía, hasta mediodía). También: «dame el resumen de la mañana».")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Confirmar también de viva voz («sí» o «no»)", isOn: $m.confirmarVoz)
+                Text("Beto pregunta en voz alta y escucha tu respuesta con el reconocimiento local de Apple; el cuadro sigue ahí. Cualquier «no» cancela.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Un clic en el icono de la barra calla a Beto mientras habla", isOn: $m.clicCalla)
                 Text("Órdenes directas, sin IA: «calla» corta la voz; «tacha la tarea X» o «marca como hecha X» la completa.")
                     .font(.caption).foregroundStyle(.secondary)

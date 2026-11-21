@@ -32,5 +32,6 @@ otra spec con `Modifica: NNN`.
 | 017 | Arnés del asistente: gobernanza, habilidades, memoria y evaluación | Borrador | P | funcionalidad | 2026-11-21 | pendiente (fases) | 014, 016 | Diseño |
 | 018 | Varias cuentas de Microsoft y Google | En implementación | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 015, 016 | Implementación |
 | 019 | Acciones de oficina y habilidades externas | En implementación | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 017, 018 | Implementación |
+| 020 | Pulido del asistente de oficina | Hecha | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 017, 019 | Implementación |
 
 <!-- sdd:indice:fin -->

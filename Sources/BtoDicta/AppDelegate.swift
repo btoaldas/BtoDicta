@@ -5118,6 +5118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         iniciarVigilanciaActivacionVoz()
+        vigilarResumenManana()
         inicioCompleto = true
         let urlsAlArrancar = urlsPendientes
         urlsPendientes.removeAll()
@@ -6398,10 +6399,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Agente sin cortarlo: el modo se congela al cerrar.
     private func activarModoIAPorGesto(desdeConversacion: Bool = false) {
         guard !hayConfirmacion, !CapturaMac.grabacionContinuaEnCurso else { return }
-        if desdeConversacion {
-            // Señal clara de «te escucho»: sin ella parecía que se había cerrado.
-            playSound("Tink")
-        }
         let agente = ModosStore.modo("agente")
         guard agente.id == "agente" else { return }
         modoPendienteVoz = agente
@@ -6442,10 +6439,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 return
             }
             self.activarModoIAPorGesto(desdeConversacion: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-                guard let self, self.recorder.isRecording else { return }
-                self.panel.update("🎙️ Te escucho…")
+            self.avisarCuandoEscuche()
+        }
+    }
+
+    /// El «tin» de «te escucho» suena solo cuando el micrófono YA graba: si sonara antes,
+    /// lo primero que dice el usuario se perdería mientras arranca la grabación.
+    private func avisarCuandoEscuche(intentos: Int = 60) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self, self.conversacionIA else { return }
+            guard self.recorder.isRecording, self.recorder.buffersRecibidos > 0 else {
+                if intentos > 0 { self.avisarCuandoEscuche(intentos: intentos - 1) }
+                return
             }
+            playSound("Tink")
+            self.panel.update("🎙️ Te escucho…")
         }
     }
 
@@ -8849,7 +8857,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // decide la IA (con Microsoft, el calendario va por Graph).
             if Config.agenteNucleoActivo(), (contextoAgente || normal.base == "agente"),
                Config.agenteIADecision() == "mixto",
-               !ReglasModoTodo.admite(pregunta, graph: CuentasNube.hayDisponible) {
+               !ReglasModoTodo.admite(pregunta, graph: CuentasNube.hayDisponible, texto: textoNormal ?? crudo) {
                 responderAgente(textoNormal ?? crudo, modo: ModosStore.modo("agente"), crudo: crudo,
                                 wav: wav, history: history, modoNormal: normal, contextoAgente: true)
                 return
@@ -8954,7 +8962,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let pregunta = ModoPlanificador.pregunta(para: cadena, fuente: .natural,
                                                   confianza: confianza)
         if Config.agenteIADecision() == "mixto",
-           !ReglasModoTodo.admite(pregunta, graph: CuentasNube.hayDisponible) {
+           !ReglasModoTodo.admite(pregunta, graph: CuentasNube.hayDisponible, texto: textoNormal) {
             responderAgente(textoNormal, modo: ModosStore.modo("agente"), crudo: crudo, wav: wav,
                             history: history, modoNormal: modoNormal, contextoAgente: true)
             return true
@@ -9102,7 +9110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         if Config.agenteNucleoActivo(), let plan = AgenteNucleo.planificar(texto),
-           Config.agenteIADecision() != "mixto" || ReglasModoTodo.admite(plan, graph: CuentasNube.hayDisponible) {
+           Config.agenteIADecision() != "mixto" || ReglasModoTodo.admite(plan, graph: CuentasNube.hayDisponible, texto: texto) {
             AgenteLog.registrar("plan", ["descripcion": plan.descripcion,
                 "nivel": PoliticaAgente.nivel.rawValue,
                 "riesgo": PoliticaAgente.riesgo(de: plan.cadena).rawValue,
@@ -9377,7 +9385,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Pregunta modal «¿Autorizar?». La app se pone delante para que se vea.
     private func autorizarDecisionIA(_ titulo: String, detalle: String) -> Bool {
         NSApp.activate(ignoringOtherApps: true)
-        return ConfirmacionSegura.pedir(titulo, detalle: detalle, boton: "Aceptar")
+        return ConfirmacionVoz.pedir(titulo, detalle: detalle, pregunta: titulo, boton: "Aceptar")
     }
 
     /// Corta la voz propia y avisa a quien tenga un aviso sonando.
@@ -9578,7 +9586,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let locales: Set<String> = ["crear_documento", "crear_hoja", "buscar_historial",
                                     "resumen_bitacora", "transcribir_archivo", "ver_pantalla",
                                     "editar_seleccion", "crear_habilidad", "leer_documento", "resumir_pagina",
-                                    "abrir_sesion_ia", "firmar_documento", "reproducir_youtube", "delegar_agente"]
+                                    "abrir_sesion_ia", "firmar_documento", "reproducir_youtube", "delegar_agente",
+                                    "resumen_manana"]
         guard locales.contains(plan.herramienta) else { return false }
         let decir: (String, String?) -> Void = { [weak self] t, memoria in
             guard let self else { return }
@@ -9700,6 +9709,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             OficinaAgente.abrirSesion(s, en: carpeta)
             decir("Listo, abrí \(s.nombre)" + (carpeta.map { " en \($0.lastPathComponent)" } ?? "") + ".",
                   "Abrí \(s.nombre)\(carpeta.map { " en \($0.lastPathComponent)" } ?? "").")
+        case "resumen_manana":
+            contarResumenManana(ia: ia, decir: decir)
         case "delegar_agente":
             // Para HACER lo que describe una habilidad externa: se le pasa a Claude Code o Codex en la terminal.
             // El usuario lo confirma aquí y aprueba cada paso allá (sin saltarse permisos).
@@ -9773,6 +9784,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         default: return false
         }
         return true
+    }
+
+    /// Resumen de la mañana: Mac + correo y agenda de todas las cuentas, contado por la IA.
+    private func contarResumenManana(ia: ChatIA?, decir: @escaping (String, String?) -> Void) {
+        if !recorder.isRecording { panel.update("☀️ Preparando tu resumen…") }
+        ResumenManana.reunir { d in
+            CerebroTexto.pedir(ResumenManana.prompt(d, persona: Config.agentePersonaVoz()), ia: ia) { r in
+                let t = r?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let n = d.cuentas.map(\.correos.count).reduce(0, +)
+                decir(t.isEmpty ? "No pude preparar el resumen." : t,
+                      "Di el resumen de la mañana (\(d.cuentas.count) cuenta(s), \(n) correos).")
+            }
+        }
+    }
+
+    /// Revisa cada minuto si toca dar el resumen de la mañana solo.
+    private func vigilarResumenManana() {
+        let t = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self, Config.resumenMananaActivo(), !self.recorder.isRecording, !self.agenteActivo,
+                  !self.hayConfirmacion,
+                  ResumenManana.toca(ahora: Date(), hora: Config.resumenMananaHora(),
+                                     ultimo: Config.resumenMananaUltimo()) else { return }
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+            Config.set("agente_resumen_manana_ultimo", to: f.string(from: Date()))
+            Log.write("resumen de la mañana: a la hora programada")
+            let pedido = "Resumen de la mañana"
+            let tok = self.nuevoAgente()
+            let ia = self.iaDelAgente(ModosStore.modo("agente"))
+            self.contarResumenManana(ia: ia) { [weak self] texto, memoria in
+                self?.entregarRespuestaAgente(texto, pedido: pedido, motor: "BtoDicta", token: tok,
+                                              crudo: "", wav: Data(), history: nil, memoria: memoria)
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
     }
 
     /// La IA responde al pedido sobre un texto leído (documento o página). Lo leído es dato no confiable.
@@ -9890,7 +9935,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // «Archiva el último que llegó» sin haber leído antes: se lee la bandeja (lo más nuevo primero)
         // y se sigue. Cada acción sobre el buzón mantiene su confirmación.
         let sobreLaLista: Set<String> = ["archivar_correo", "marcar_correo", "mover_correo", "papelera_correo",
-                                          "adjuntos_correo", "responder_correo", "reenviar_correo"]
+                                          "adjuntos_correo", "responder_correo", "reenviar_correo", "correo_a_tarea"]
         if sobreLaLista.contains(plan.herramienta), graphUltimosCorreos.isEmpty {
             opsCorreo.leerBandeja(dias: 7) { [weak self] r in
                 guard let self, self.agenteVigente(token) else { return }
@@ -10047,6 +10092,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     seguir(c.id, c.nombre)
                 }
             }
+        case "correo_a_tarea":
+            let n = plan.numero ?? Int(plan.contenido.prefix(3).filter(\.isNumber)) ?? 1
+            guard n >= 1, n <= graphUltimosCorreos.count else { decir("¿De cuál correo hago la tarea? Dime su número.", nil); return }
+            let c = graphUltimosCorreos[n - 1]
+            let texto = AgenteTerminal.textoTareaDeCorreo(plan.contenido, de: c.de, asunto: c.asunto)
+            let p = NotasStore.agregar(tipo: "tarea", texto: texto, fechaObjetivo: plan.inicio)
+            let cuando = p.fechaObjetivo.map { Date(timeIntervalSince1970: $0) }.map { f -> String in
+                let d = DateFormatter(); d.locale = Locale(identifier: "es"); d.dateFormat = "EEEE d 'a las' HH:mm"
+                return " y te aviso el \(d.string(from: f))"
+            } ?? ""
+            decir("Listo, anoté la tarea «\(texto.prefix(80))»\(cuando). ¿Algo más?", "Creé una tarea desde un correo\(cuando.isEmpty ? "" : " con aviso").")
         case "adjuntos_correo":
             let n = plan.numero ?? Int(plan.contenido.filter(\.isNumber)) ?? (graphUltimosCorreos.count == 1 ? 1 : 0)
             guard n >= 1, n <= graphUltimosCorreos.count, !graphUltimosCorreos[n - 1].id.isEmpty else {

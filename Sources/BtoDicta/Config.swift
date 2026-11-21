@@ -1682,6 +1682,12 @@ struct Config {
 
     // MARK: Correo de Microsoft por Graph (spec 015)
     /// Leer correo con Microsoft Graph. Apagado de fábrica: el texto va a la IA.
+    /// Resumen de la mañana a una hora fija (spec 020): apagado de fábrica.
+    static func resumenMananaActivo() -> Bool { (json()["agente_resumen_manana_activo"] as? Bool) ?? false }
+    static func resumenMananaHora() -> String { (json()["agente_resumen_manana_hora"] as? String) ?? "08:00" }
+    static func resumenMananaUltimo() -> String { (json()["agente_resumen_manana_ultimo"] as? String) ?? "" }
+    /// Confirmar por voz «sí» o «no» además del cuadro (spec 020). Encendido por defecto.
+    static func agenteConfirmarVoz() -> Bool { (json()["agente_confirmar_voz"] as? Bool) ?? true }
     /// Habilidades externas (spec 019): apagado de fábrica.
     static func arnesExternoActivo() -> Bool { (json()["arnes_externo_activo"] as? Bool) ?? false }
     /// Carpetas con SKILL.md; vacío = las predeterminadas en la carpeta del usuario.
