@@ -153,7 +153,7 @@ enum AgenteTerminal {
         {"respuesta":"<frase breve en español para decir en voz alta>","capacidad":{"tipo":"<tipo>","clave":"<clave>","contenido":"<dato para esa capacidad>","destinatario":"<correo o nombre, si aplica>","asunto":"<asunto, si aplica>"},"comandos":[{"cmd":"<comando zsh>","sudo":false,"proposito":"<para qué>"}]}
         CÓMO DECIDIR, en este orden:
         1. Si una capacidad del CATÁLOGO hace lo pedido (redactar o abrir un borrador de correo, buscar en la web, crear o tachar una tarea, música, abrir una app…), pon "capacidad" con un tipo y una clave que existan EXACTAMENTE en el catálogo y deja "comandos" vacío. "contenido" es SOLO el dato, en palabras naturales, como lo dictaría el usuario; nunca describas la tarea ("Crear un correo…", "Verificar…").
-           · Correo o borrador (Outlook, Mail, Gmail…): "contenido" = el cuerpo del mensaje ya redactado; "destinatario" y "asunto" en sus campos.
+           · Correo o borrador (Outlook, Mail, Gmail…): "contenido" = el cuerpo del mensaje ya redactado; "destinatario" y "asunto" en sus campos. Si el usuario dicta el asunto o el destinatario, cópialos LITERALMENTE, sin acortarlos ni cambiarlos.
            · Recordatorio o evento: "contenido" = el título y cuándo, en palabras ("Comprobar la IA de BtoDicta en 15 minutos", "Reunión con Ana mañana a las 9").
            · Búsqueda: "contenido" = solo lo que se busca.
         2. Si no hay capacidad pero se puede hacer en la Mac con la terminal, deja "capacidad" en null y propone como mucho 5 comandos. No pongas "sudo" dentro de "cmd": marca "sudo": true.
