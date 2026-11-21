@@ -114,6 +114,73 @@ extension MicrosoftGraph {
         }
     }
 
+    static func marcar(_ id: String, _ m: MarcaCorreo, fin: @escaping Fin<Void>) {
+        let cuerpo: [String: Any]
+        switch m {
+        case .leido: cuerpo = ["isRead": true]
+        case .noLeido: cuerpo = ["isRead": false]
+        case .destacado: cuerpo = ["flag": ["flagStatus": "flagged"]]
+        case .sinDestacar: cuerpo = ["flag": ["flagStatus": "notFlagged"]]
+        }
+        llamar("PATCH", "/me/messages/\(id)", cuerpo: cuerpo) { c, _ in c == 200 ? fin(.success(())) : fin(.failure(error(c))) }
+    }
+
+    /// Carpetas del buzón (primer nivel y sus subcarpetas directas).
+    static func carpetas(fin: @escaping Fin<[(id: String, nombre: String)]>) {
+        llamar("GET", "/me/mailFolders", query: [URLQueryItem(name: "$top", value: "100"),
+                                                 URLQueryItem(name: "$expand", value: "childFolders($select=id,displayName)"),
+                                                 URLQueryItem(name: "$select", value: "id,displayName")]) { c, json in
+            guard c == 200 else { fin(.failure(error(c))); return }
+            fin(.success(leerCarpetas(json)))
+        }
+    }
+
+    static func leerCarpetas(_ json: Any?) -> [(id: String, nombre: String)] {
+        let v = ((json as? [String: Any])?["value"] as? [[String: Any]]) ?? []
+        return v.flatMap { f -> [(id: String, nombre: String)] in
+            guard let id = f["id"] as? String, let n = f["displayName"] as? String else { return [] }
+            let hijas = ((f["childFolders"] as? [[String: Any]]) ?? []).compactMap { h -> (id: String, nombre: String)? in
+                guard let i = h["id"] as? String, let hn = h["displayName"] as? String else { return nil }
+                return (i, hn)
+            }
+            return [(id, n)] + hijas
+        }
+    }
+
+    /// Mueve a una carpeta (id o nombre conocido: «archive», «deleteditems»).
+    static func mover(_ id: String, a carpeta: String, fin: @escaping Fin<Void>) {
+        llamar("POST", "/me/messages/\(id)/move", cuerpo: ["destinationId": carpeta]) { c, _ in
+            c == 201 ? fin(.success(())) : fin(.failure(error(c)))
+        }
+    }
+
+    /// A Elementos eliminados (se recupera desde ahí). Nunca borra definitivo.
+    static func papelera(_ id: String, fin: @escaping Fin<Void>) { mover(id, a: "deleteditems", fin: fin) }
+
+    static func adjuntos(_ id: String, fin: @escaping Fin<[AdjuntoCorreo]>) {
+        llamar("GET", "/me/messages/\(id)/attachments") { c, json in
+            guard c == 200 else { fin(.failure(error(c))); return }
+            fin(.success(leerAdjuntos(json)))
+        }
+    }
+
+    static func leerAdjuntos(_ json: Any?) -> [AdjuntoCorreo] {
+        let v = ((json as? [String: Any])?["value"] as? [[String: Any]]) ?? []
+        return v.compactMap { a in
+            guard (a["@odata.type"] as? String) == "#microsoft.graph.fileAttachment",
+                  let n = a["name"] as? String, let b = a["contentBytes"] as? String,
+                  let d = Data(base64Encoded: b) else { return nil }
+            return AdjuntoCorreo(nombre: n, datos: d)
+        }
+    }
+
+    static func adjuntar(_ borrador: String, _ a: AdjuntoCorreo, fin: @escaping Fin<Void>) {
+        llamar("POST", "/me/messages/\(borrador)/attachments", cuerpo: [
+            "@odata.type": "#microsoft.graph.fileAttachment", "name": a.nombre,
+            "contentBytes": a.datos.base64EncodedString(),
+        ]) { c, _ in c == 201 ? fin(.success(())) : fin(.failure(error(c))) }
+    }
+
     /// Mueve el correo a la carpeta Archivo (se deshace moviéndolo de vuelta).
     static func archivar(_ idMensaje: String, fin: @escaping Fin<Void>) {
         llamar("POST", "/me/messages/\(idMensaje)/move", cuerpo: ["destinationId": "archive"]) { codigo, _ in

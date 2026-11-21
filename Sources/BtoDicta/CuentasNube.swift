@@ -149,6 +149,27 @@ struct OperacionesCorreo {
     func crearReenvio(_ id: String, para: String, comentario: String, fin: @escaping Fin<BorradorGraph>) {
         if google != nil { noGmail(fin) } else { usarMicrosoft(); MicrosoftGraph.crearReenvio(id, para: para, comentario: comentario, fin: fin) }
     }
+    func marcar(_ id: String, _ m: MarcaCorreo, fin: @escaping Fin<Void>) {
+        if let g = google { GoogleCuenta.marcar(g, id, m, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.marcar(id, m, fin: fin) }
+    }
+    func carpetas(fin: @escaping Fin<[(id: String, nombre: String)]>) {
+        if let g = google { GoogleCuenta.carpetas(g, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.carpetas(fin: fin) }
+    }
+    func mover(_ id: String, a carpeta: String, fin: @escaping Fin<Void>) {
+        if let g = google { GoogleCuenta.mover(g, id, a: carpeta, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.mover(id, a: carpeta, fin: fin) }
+    }
+    func papelera(_ id: String, fin: @escaping Fin<Void>) {
+        if let g = google { GoogleCuenta.papelera(g, id, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.papelera(id, fin: fin) }
+    }
+    func adjuntos(_ id: String, fin: @escaping Fin<[AdjuntoCorreo]>) {
+        if let g = google { GoogleCuenta.adjuntos(g, id, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.adjuntos(id, fin: fin) }
+    }
+    /// `todos` = todos los adjuntos del borrador, incluido el nuevo (Gmail reescribe el borrador entero).
+    func adjuntar(_ b: BorradorGraph, nuevo: AdjuntoCorreo, todos: [AdjuntoCorreo], fin: @escaping Fin<Void>) {
+        if let g = google { GoogleCuenta.reescribirBorrador(g, b, adjuntos: todos, fin: fin) }
+        else { usarMicrosoft(); MicrosoftGraph.adjuntar(b.id, nuevo, fin: fin) }
+    }
+    var esGoogle: Bool { google != nil }
     func archivar(_ id: String, fin: @escaping Fin<Void>) {
         if let g = google { GoogleCuenta.archivar(g, id, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.archivar(id, fin: fin) }
     }

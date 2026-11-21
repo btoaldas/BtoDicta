@@ -208,6 +208,11 @@ enum AgenteTerminal {
         - [herramienta:responder_correo] Preparar como borrador la respuesta a un correo de la última lista leída. "numero" = su número en la lista; "contenido" = texto de la respuesta.
         - [herramienta:reenviar_correo] Preparar como borrador el reenvío de un correo de la última lista. "numero"; "destinatario" = correo o nombre; "contenido" = comentario opcional.
         - [herramienta:archivar_correo] Archivar correos de la última lista leída (salen de la bandeja de entrada; no se borran). "contenido" = sus números separados por comas, o «todos». BtoDicta pide confirmación.
+        - [herramienta:marcar_correo] Marcar correos de la última lista. "contenido" = números o «todos»; "asunto" = leído, no leído, destacado o sin destacar.
+        - [herramienta:mover_correo] Mover correos de la última lista a una carpeta (o etiqueta de Gmail). "contenido" = números o «todos»; "lugar" = nombre de la carpeta. BtoDicta pide confirmación.
+        - [herramienta:papelera_correo] Mandar a la papelera correos de la última lista (se recuperan; nunca borrado definitivo). "contenido" = números o «todos». BtoDicta pide confirmación.
+        - [herramienta:adjuntos_correo] Bajar los adjuntos de un correo de la última lista a Descargas/BtoDicta. "numero" = su número.
+        - [herramienta:adjuntar_archivo] Adjuntar un archivo al último borrador. "contenido" = ruta o nombre del archivo; vacío = el más reciente de Descargas. BtoDicta pide confirmación.
         - [herramienta:enviar_borrador] Enviar el último borrador. BtoDicta pedirá confirmación al usuario.
         - [herramienta:ver_agenda] Ver eventos del calendario. "contenido" = días desde hoy (1–7).
         - [herramienta:crear_evento] Crear un evento propio, sin invitados. "contenido" = título; "inicio" y "fin" = "AAAA-MM-DDTHH:MM" en hora local; "lugar" opcional.
@@ -234,6 +239,7 @@ enum AgenteTerminal {
 
     static let herramientasGraph: Set<String> = ["leer_correo", "buscar_correo", "buscar_persona", "borrador_correo",
                                                  "modificar_borrador", "responder_correo", "reenviar_correo", "enviar_borrador", "archivar_correo",
+                                                 "marcar_correo", "mover_correo", "papelera_correo", "adjuntos_correo", "adjuntar_archivo",
                                                  "ver_agenda", "crear_evento", "tareas_resumen", "recordar",
                                                  "crear_documento", "crear_hoja", "buscar_historial",
                                                  "resumen_bitacora", "transcribir_archivo",

@@ -296,6 +296,119 @@ enum GoogleCuenta {
         return ""
     }
 
+    private static func modificar(_ cuenta: CuentaNube, _ id: String, agregar: [String] = [], quitar: [String] = [],
+                                  fin: @escaping Fin<Void>) {
+        llamar(cuenta, "POST", gmail + "/messages/\(id)/modify",
+               cuerpo: ["addLabelIds": agregar, "removeLabelIds": quitar]) { c, _ in
+            switch c {
+            case 200: fin(.success(()))
+            case 403: fin(.failure(.respuesta("falta un permiso; vuelve a conectar la cuenta en Ajustes")))
+            default: fin(.failure(MicrosoftGraph.error(c)))
+            }
+        }
+    }
+
+    static func marcar(_ cuenta: CuentaNube, _ id: String, _ m: MarcaCorreo, fin: @escaping Fin<Void>) {
+        switch m {
+        case .leido: modificar(cuenta, id, quitar: ["UNREAD"], fin: fin)
+        case .noLeido: modificar(cuenta, id, agregar: ["UNREAD"], fin: fin)
+        case .destacado: modificar(cuenta, id, agregar: ["STARRED"], fin: fin)
+        case .sinDestacar: modificar(cuenta, id, quitar: ["STARRED"], fin: fin)
+        }
+    }
+
+    /// Etiquetas del usuario (en Gmail «mover a una carpeta» es poner su etiqueta y salir de Recibidos).
+    static func carpetas(_ cuenta: CuentaNube, fin: @escaping Fin<[(id: String, nombre: String)]>) {
+        llamar(cuenta, "GET", gmail + "/labels") { c, json in
+            guard c == 200 else { fin(.failure(MicrosoftGraph.error(c))); return }
+            let l = ((json as? [String: Any])?["labels"] as? [[String: Any]]) ?? []
+            fin(.success(l.compactMap { e in
+                guard (e["type"] as? String) == "user", let i = e["id"] as? String, let n = e["name"] as? String else { return nil }
+                return (i, n)
+            }))
+        }
+    }
+
+    static func mover(_ cuenta: CuentaNube, _ id: String, a etiqueta: String, fin: @escaping Fin<Void>) {
+        modificar(cuenta, id, agregar: [etiqueta], quitar: ["INBOX"], fin: fin)
+    }
+
+    /// A la papelera de Gmail (se recupera 30 días). Nunca borra definitivo.
+    static func papelera(_ cuenta: CuentaNube, _ id: String, fin: @escaping Fin<Void>) {
+        llamar(cuenta, "POST", gmail + "/messages/\(id)/trash") { c, _ in
+            c == 200 ? fin(.success(())) : fin(.failure(c == 403 ? .respuesta("falta un permiso; vuelve a conectar la cuenta en Ajustes")
+                                                                  : MicrosoftGraph.error(c)))
+        }
+    }
+
+    /// Partes con archivo de un mensaje (puro): nombre e id del adjunto, o los datos si vienen en línea.
+    static func partesAdjuntas(_ payload: [String: Any]) -> [(nombre: String, id: String?, datos: String?)] {
+        var res: [(nombre: String, id: String?, datos: String?)] = []
+        if let n = payload["filename"] as? String, !n.isEmpty {
+            let b = payload["body"] as? [String: Any]
+            res.append((n, b?["attachmentId"] as? String, b?["data"] as? String))
+        }
+        for p in (payload["parts"] as? [[String: Any]]) ?? [] { res += partesAdjuntas(p) }
+        return res
+    }
+
+    static func base64url(_ s: String) -> Data? {
+        var b = s.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while b.count % 4 != 0 { b += "=" }
+        return Data(base64Encoded: b)
+    }
+
+    static func adjuntos(_ cuenta: CuentaNube, _ id: String, fin: @escaping Fin<[AdjuntoCorreo]>) {
+        llamar(cuenta, "GET", gmail + "/messages/\(id)", query: [URLQueryItem(name: "format", value: "full")]) { c, json in
+            guard c == 200, let p = (json as? [String: Any])?["payload"] as? [String: Any] else {
+                fin(.failure(MicrosoftGraph.error(c))); return
+            }
+            var partes = partesAdjuntas(p)[...]
+            var res: [AdjuntoCorreo] = []
+            func siguiente() {
+                guard let a = partes.popFirst() else { fin(.success(res)); return }
+                if let d = a.datos.flatMap(base64url) { res.append(AdjuntoCorreo(nombre: a.nombre, datos: d)); siguiente(); return }
+                guard let aid = a.id else { siguiente(); return }
+                llamar(cuenta, "GET", gmail + "/messages/\(id)/attachments/\(aid)") { c2, j2 in
+                    if c2 == 200, let d = ((j2 as? [String: Any])?["data"] as? String).flatMap(base64url) {
+                        res.append(AdjuntoCorreo(nombre: a.nombre, datos: d))
+                    }
+                    siguiente()
+                }
+            }
+            siguiente()
+        }
+    }
+
+    /// Mensaje con adjuntos (multipart/mixed) en base64url. Puro.
+    static func mime(para: [String], asunto: String, cuerpo: String, adjuntos: [AdjuntoCorreo], limite: String = UUID().uuidString) -> String {
+        guard !adjuntos.isEmpty else { return mime(para: para, asunto: asunto, cuerpo: cuerpo) }
+        let destinos = para.map { $0.components(separatedBy: .newlines).joined() }
+        func cab(_ s: String) -> String { "=?UTF-8?B?\(Data(s.utf8).base64EncodedString())?=" }
+        var t = "To: \(destinos.joined(separator: ", "))\r\nSubject: \(cab(asunto))\r\nMIME-Version: 1.0\r\n"
+            + "Content-Type: multipart/mixed; boundary=\"\(limite)\"\r\n\r\n"
+            + "--\(limite)\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+            + Data(cuerpo.utf8).base64EncodedString(options: .lineLength76Characters) + "\r\n"
+        for a in adjuntos {
+            let n = CorreoAcciones.nombreSeguro(a.nombre)
+            t += "--\(limite)\r\nContent-Type: application/octet-stream; name=\"\(cab(n))\"\r\n"
+                + "Content-Disposition: attachment; filename=\"\(cab(n))\"\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+                + a.datos.base64EncodedString(options: .lineLength76Characters) + "\r\n"
+        }
+        t += "--\(limite)--\r\n"
+        return Data(t.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    /// Gmail no agrega partes a un borrador: se reescribe con el cuerpo y todos los adjuntos.
+    static func reescribirBorrador(_ cuenta: CuentaNube, _ b: BorradorGraph, adjuntos: [AdjuntoCorreo], fin: @escaping Fin<Void>) {
+        llamar(cuenta, "PUT", gmail + "/drafts/\(b.id)",
+               cuerpo: ["id": b.id, "message": ["raw": mime(para: b.para, asunto: b.asunto, cuerpo: b.cuerpo, adjuntos: adjuntos)]]) { c, _ in
+            c == 200 ? fin(.success(())) : fin(.failure(MicrosoftGraph.error(c)))
+        }
+    }
+
     /// Archivar en Gmail = quitar la etiqueta de la bandeja de entrada (se deshace con «Mover a Recibidos»).
     /// Una cuenta conectada antes de este permiso responde 403: hay que reconectarla.
     static func archivar(_ cuenta: CuentaNube, _ id: String, fin: @escaping Fin<Void>) {

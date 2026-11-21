@@ -154,7 +154,7 @@ enum Arnes {
         """))
         f.append(("microsoft.md", """
         ---
-        palabras: correo, correos, bandeja, borrador, responder, reenviar, enviar, agenda, calendario, reunión, evento, persona, contacto, outlook, microsoft, gmail, google, personal, cuenta
+        palabras: correo, correos, bandeja, borrador, responder, reenviar, enviar, archiva, marca, leido, destacado, mueve, carpeta, papelera, elimina, adjunto, adjuntos, adjunta, agenda, calendario, reunión, evento, persona, contacto, outlook, microsoft, gmail, google, personal, cuenta
         ---
         # Cuentas de correo conectadas (Microsoft y Google)
         - Con una cuenta conectada, el correo, la agenda y los contactos se leen con las herramientas, NUNCA abriendo
@@ -164,6 +164,8 @@ enum Arnes {
           un correo de la última lista: responder_correo / reenviar_correo (por su número).
         - Enviar: enviar_borrador (BtoDicta siempre pide confirmación en pantalla).
         - Archivar correos de la última lista: archivar_correo con sus números o «todos» (siempre con confirmación; no borra).
+        - Marcar (leído, no leído, destacado): marcar_correo · mover a una carpeta: mover_correo · papelera: papelera_correo.
+        - Adjuntos de un correo a Descargas/BtoDicta: adjuntos_correo · adjuntar un archivo al borrador: adjuntar_archivo.
         - Agenda: ver_agenda; crear: crear_evento (sin invitados).
         - Responder y reenviar solo en cuentas Microsoft; en Gmail, un borrador nuevo.
         - Si no hay ninguna cuenta conectada, abrir el correo web es lo único posible.

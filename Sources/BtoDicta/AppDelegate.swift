@@ -233,7 +233,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var conversacionIA = false
     /// Última lista de correos leída y último borrador (spec 016).
     private var graphUltimosCorreos: [CorreoLeido] = []
-    private var graphUltimoBorrador: BorradorGraph?
+    private var graphUltimoBorrador: BorradorGraph? {
+        didSet { if oldValue?.id != graphUltimoBorrador?.id { graphAdjuntosBorrador = [] } }
+    }
+    /// Adjuntos puestos por el asistente en el último borrador (spec 019).
+    private var graphAdjuntosBorrador: [AdjuntoCorreo] = []
     /// Cuenta (Microsoft o Google) con la que trabaja este turno del asistente (spec 018).
     private var cuentaCorreo: CuentaNube?
     private var opsCorreo: OperacionesCorreo { OperacionesCorreo(cuenta: cuentaCorreo ?? CuentasNube.elegir(nil)) }
@@ -9835,6 +9839,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 case .failure(let e): fallo(e)
                 case .success(let nuevo):
                     self.graphUltimoBorrador = nuevo
+                    // Gmail reescribe el borrador entero: se vuelven a poner los adjuntos.
+                    if self.opsCorreo.esGoogle, let ultimo = self.graphAdjuntosBorrador.last {
+                        self.opsCorreo.adjuntar(nuevo, nuevo: ultimo, todos: self.graphAdjuntosBorrador) { _ in }
+                    }
                     decir("Listo, cambié el mismo borrador. ¿Está bien así o lo envío?",
                           AgenteTerminal.resumenAccion(nombre: "el borrador (modificado)", destinatario: nuevo.para.first,
                                                        asunto: nuevo.asunto, contenido: plan.contenido))
@@ -9875,6 +9883,98 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     }
                 }
             }
+        case "marcar_correo":
+            guard let marca = MarcaCorreo.desde(plan.asunto ?? plan.contenido) ?? MarcaCorreo.desde(pedido) else {
+                decir("¿Cómo los marco: leídos, no leídos o destacados?", nil); return
+            }
+            let idx = AgenteTerminal.indicesArchivar(plan.contenido, numero: plan.numero, total: graphUltimosCorreos.count)
+            guard !idx.isEmpty else { decir("¿Cuáles marco? Dime sus números o «todos».", nil); return }
+            aplicarEnOrden(idx.map { graphUltimosCorreos[$0] }, hechos: 0, token: token,
+                           accion: { [weak self] c, fin in self?.opsCorreo.marcar(c.id, marca, fin: fin) },
+                           listo: { n in decir("Listo, marqué \(n == 1 ? "el correo" : "\(n) correos") \(marca.hablado). ¿Algo más?",
+                                               "Marqué \(n) correo(s) \(marca.hablado).") },
+                           decir: decir, fallo: fallo)
+        case "mover_correo", "papelera_correo":
+            let aPapelera = plan.herramienta == "papelera_correo"
+            let idx = AgenteTerminal.indicesArchivar(plan.contenido, numero: plan.numero, total: graphUltimosCorreos.count)
+            guard !idx.isEmpty else { decir("¿Cuáles? Dime sus números o «todos».", nil); return }
+            let elegidos = idx.map { graphUltimosCorreos[$0] }
+            let lista = zip(idx, elegidos).map { "\($0 + 1). \($1.de) — \($1.asunto)" }.joined(separator: "\n")
+            let seguir: (String, String) -> Void = { [weak self] destino, nombre in
+                guard let self else { return }
+                // Mover o mandar a la papelera cambia el buzón: se confirma SIEMPRE.
+                let titulo = aPapelera ? "¿Mandar a la papelera \(elegidos.count) correo(s)?" : "¿Mover \(elegidos.count) correo(s) a «\(nombre)»?"
+                guard self.autorizarDecisionIA(titulo, detalle: lista + (aPapelera ? "\n\nSe pueden recuperar desde la papelera; no se borran definitivamente." : "")) else {
+                    decir("Vale, no los muevo.", nil); return
+                }
+                self.aplicarEnOrden(elegidos, hechos: 0, token: token,
+                                    accion: { [weak self] c, fin in
+                                        if aPapelera { self?.opsCorreo.papelera(c.id, fin: fin) }
+                                        else { self?.opsCorreo.mover(c.id, a: destino, fin: fin) } },
+                                    listo: { n in decir(aPapelera ? "Listo, mandé \(n) a la papelera. ¿Algo más?" : "Listo, moví \(n) a «\(nombre)». ¿Algo más?",
+                                                        aPapelera ? "Mandé \(n) correo(s) a la papelera." : "Moví \(n) correo(s) a «\(nombre)».") },
+                                    decir: decir, fallo: fallo)
+            }
+            if aPapelera { seguir("", "papelera"); return }
+            let pedida = plan.lugar ?? plan.destinatario ?? ""
+            self.opsCorreo.carpetas { [weak self] r in
+                guard let self, self.agenteVigente(token) else { return }
+                switch r {
+                case .failure(let e): fallo(e)
+                case .success(let cs):
+                    guard let c = CorreoAcciones.elegirCarpeta(pedida, entre: cs) else {
+                        decir("No encontré la carpeta «\(pedida)». Tienes: " + cs.prefix(12).map(\.nombre).joined(separator: ", ") + ".", nil)
+                        return
+                    }
+                    seguir(c.id, c.nombre)
+                }
+            }
+        case "adjuntos_correo":
+            let n = plan.numero ?? Int(plan.contenido.filter(\.isNumber)) ?? (graphUltimosCorreos.count == 1 ? 1 : 0)
+            guard n >= 1, n <= graphUltimosCorreos.count, !graphUltimosCorreos[n - 1].id.isEmpty else {
+                decir("¿De cuál correo bajo los adjuntos? Dime su número en la lista.", nil); return
+            }
+            self.opsCorreo.adjuntos(graphUltimosCorreos[n - 1].id) { [weak self] r in
+                guard let self, self.agenteVigente(token) else { return }
+                switch r {
+                case .failure(let e): fallo(e)
+                case .success(let a) where a.isEmpty: decir("Ese correo no trae archivos adjuntos.", nil)
+                case .success(let a):
+                    let guardados = a.compactMap { try? CorreoAcciones.guardar($0) }
+                    // Nunca se abren solos: se muestran en el Finder.
+                    if !guardados.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(guardados) }
+                    decir("Bajé \(guardados.count) adjunto(s) a Descargas, carpeta BtoDicta: "
+                          + guardados.map(\.lastPathComponent).joined(separator: ", ") + ". ¿Algo más?",
+                          "Bajé \(guardados.count) adjunto(s) a Descargas/BtoDicta.")
+                }
+            }
+        case "adjuntar_archivo":
+            guard let b = graphUltimoBorrador else { decir("Primero preparo el borrador; luego le adjunto el archivo.", nil); return }
+            guard let u = CorreoAcciones.archivoParaAdjuntar(plan.contenido) else {
+                decir("No encontré ese archivo. Dime su nombre o déjalo en Descargas.", nil); return
+            }
+            guard !CorreoAcciones.archivoSensible(u) else {
+                decir("Ese archivo es sensible (una clave o un certificado); no lo adjunto.", nil); return
+            }
+            guard let d = try? Data(contentsOf: u), d.count <= CorreoAcciones.maximoAdjunto else {
+                decir("No pude leer el archivo o pasa de 3 MB.", nil); return
+            }
+            // Adjuntar sube el archivo a la nube: se confirma SIEMPRE, con su ruta.
+            guard autorizarDecisionIA("¿Adjuntar este archivo al borrador?",
+                                      detalle: "\(u.path)\n\(ByteCountFormatter.string(fromByteCount: Int64(d.count), countStyle: .file))\nBorrador: \(b.asunto)") else {
+                decir("Vale, no lo adjunto.", nil); return
+            }
+            let nuevo = AdjuntoCorreo(nombre: u.lastPathComponent, datos: d)
+            let todos = graphAdjuntosBorrador + [nuevo]
+            self.opsCorreo.adjuntar(b, nuevo: nuevo, todos: todos) { [weak self] r in
+                guard let self, self.agenteVigente(token) else { return }
+                switch r {
+                case .failure(let e): fallo(e)
+                case .success:
+                    self.graphAdjuntosBorrador = todos
+                    decir("Listo, adjunté «\(u.lastPathComponent)» al borrador. ¿Lo envío?", "Adjunté \(u.lastPathComponent) al borrador.")
+                }
+            }
         case "archivar_correo":
             let idx = AgenteTerminal.indicesArchivar(plan.contenido, numero: plan.numero, total: graphUltimosCorreos.count)
                 .filter { !graphUltimosCorreos[$0].id.isEmpty }
@@ -9899,7 +9999,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.opsCorreo.detalleParaEnviar(b.id) { [weak self] detalle in
                 guard let self, self.agenteVigente(token) else { return }
                 guard let detalle else { decir("No pude leer el borrador antes de enviarlo. No envié nada.", nil); return }
-                guard self.autorizarDecisionIA("¿Enviar este correo?", detalle: detalle) else {
+                let adj = self.graphAdjuntosBorrador.map(\.nombre)
+                let detalleFinal = adj.isEmpty ? detalle : detalle + "\n\nAdjuntos: " + adj.joined(separator: ", ")
+                guard self.autorizarDecisionIA("¿Enviar este correo?", detalle: detalleFinal) else {
                     decir("No lo envié. Sigue en Borradores.", nil); return
                 }
                 self.enviarConfirmado(b, token: token, decir: decir, fallo: fallo)
@@ -9982,6 +10084,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Lee la bandeja (Graph), la IA resume según el pedido y Beto lo dice.
     /// La memoria guarda solo cuántos correos se revisaron, no su texto.
+    /// Aplica una acción a varios correos, uno tras otro; si uno falla, dice cuántos se hicieron.
+    private func aplicarEnOrden(_ correos: [CorreoLeido], hechos: Int, token: Int,
+                                accion: @escaping (CorreoLeido, @escaping (Result<Void, MicrosoftGraph.ErrorGraph>) -> Void) -> Void,
+                                listo: @escaping (Int) -> Void,
+                                decir: @escaping (String, String?) -> Void,
+                                fallo: @escaping (MicrosoftGraph.ErrorGraph) -> Void) {
+        guard let primero = correos.first else { listo(hechos); return }
+        accion(primero) { [weak self] r in
+            guard let self, self.agenteVigente(token) else { return }
+            switch r {
+            case .success:
+                self.aplicarEnOrden(Array(correos.dropFirst()), hechos: hechos + 1, token: token,
+                                    accion: accion, listo: listo, decir: decir, fallo: fallo)
+            case .failure(let e) where hechos > 0: decir("Hice \(hechos) y luego falló: \(e.mensaje)", nil)
+            case .failure(let e): fallo(e)
+            }
+        }
+    }
+
     /// Archiva uno tras otro; si uno falla, se detiene y dice cuántos quedaron archivados.
     private func archivarEnOrden(_ correos: [CorreoLeido], hechos: Int, token: Int,
                                  decir: @escaping (String, String?) -> Void,
