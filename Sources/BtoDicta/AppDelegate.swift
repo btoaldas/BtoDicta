@@ -9481,7 +9481,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let fallo: (MicrosoftGraph.ErrorGraph) -> Void = { e in decir(e.mensaje, nil) }
         // «Aprobación» pregunta antes de escribir algo elegido por la IA.
-        let escribe = ["borrador_correo", "modificar_borrador", "responder_correo", "crear_evento"].contains(plan.herramienta)
+        let escribe = ["borrador_correo", "modificar_borrador", "responder_correo", "reenviar_correo",
+                       "crear_evento"].contains(plan.herramienta)
         if escribe, Config.agenteIAConfirmacion() == "aprobacion",
            !autorizarDecisionIA("La IA quiere: \(plan.herramienta.replacingOccurrences(of: "_", with: " "))",
                                 detalle: [plan.destinatario, plan.asunto, plan.contenido].compactMap { $0 }.joined(separator: "\n")) {
@@ -9555,6 +9556,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     decir("Preparé la respuesta a \(original.de) como borrador. ¿La envío o la cambio?",
                           AgenteTerminal.resumenAccion(nombre: "una respuesta en borrador", destinatario: b.para.first,
                                                        asunto: b.asunto, contenido: plan.contenido))
+                }
+            }
+        case "reenviar_correo":
+            guard let n = plan.numero, n >= 1, n <= graphUltimosCorreos.count, !graphUltimosCorreos[n - 1].id.isEmpty else {
+                decir("¿Cuál correo reenvío? Primero pídeme que revise o busque tus correos.", nil); return
+            }
+            let original = graphUltimosCorreos[n - 1]
+            resolverDestinatario(plan.destinatario, token: token, decir: decir) { [weak self] correo in
+                guard let self else { return }
+                MicrosoftGraph.crearReenvio(original.id, para: correo, comentario: plan.contenido) { r in
+                    guard self.agenteVigente(token) else { return }
+                    switch r {
+                    case .failure(let e): fallo(e)
+                    case .success(let b):
+                        self.graphUltimoBorrador = b
+                        decir("Preparé el reenvío para \(correo) como borrador. ¿Lo envío?",
+                              AgenteTerminal.resumenAccion(nombre: "un reenvío en borrador", destinatario: correo,
+                                                           asunto: b.asunto, contenido: plan.contenido))
+                    }
                 }
             }
         case "enviar_borrador":

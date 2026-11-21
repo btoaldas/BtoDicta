@@ -112,6 +112,16 @@ extension MicrosoftGraph {
         }
     }
 
+    static func crearReenvio(_ idMensaje: String, para: String, comentario: String, fin: @escaping Fin<BorradorGraph>) {
+        llamar("POST", "/me/messages/\(idMensaje)/createForward", cuerpo: [
+            "comment": comentario,
+            "toRecipients": [["emailAddress": ["address": para]]],
+        ]) { codigo, json in
+            guard codigo == 201, let b = leerBorrador(json) else { fin(.failure(error(codigo))); return }
+            fin(.success(b))
+        }
+    }
+
     /// Lo que se va a enviar de verdad, leído del buzón justo antes: todos los
     /// destinatarios y el texto completo (acotado). nil si no se pudo leer.
     static func detalleParaEnviar(_ id: String, fin: @escaping (String?) -> Void) {

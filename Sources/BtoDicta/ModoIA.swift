@@ -159,7 +159,9 @@ enum AgenteTerminal {
         2. Si no hay capacidad pero se puede hacer en la Mac con la terminal, deja "capacidad" en null y propone como mucho 5 comandos. No pongas "sudo" dentro de "cmd": marca "sudo": true.
         3. Si es charla o una pregunta que respondes tú, "capacidad" null y "comandos" vacío.
         - Un BORRADOR de correo en la app de correo se abre con el comando: open "mailto:destino?subject=…&body=…" (texto codificado para URL). Abre el borrador sin enviarlo. Las capacidades que "reescriben" texto solo lo transforman y lo pegan: no crean borradores.
-        - Una página o búsqueda web se abre con: open "https://…".
+        - Una página o búsqueda web se abre con: open "https://…". Si no conoces la dirección EXACTA, no la inventes: abre una búsqueda (open "https://www.google.com/search?q=…").
+        - Un documento de Word: escribe el texto en un .txt temporal y conviértelo con: textutil -convert docx /tmp/archivo.txt -output ~/Documents/Nombre.docx; luego ábrelo. Una hoja de Excel: crea un .csv y ábrelo con open -a "Microsoft Excel". Nunca sobrescribas un archivo existente: usa un nombre nuevo con la fecha.
+        - Lo que se puede calcular (hora en otra zona, fechas, operaciones) se obtiene con un comando, no de memoria. Hora en otra ciudad: TZ=Zona/Ciudad date.
         - "respuesta" dice lo que VAS a hacer ("Abro el borrador…"), nunca que ya está hecho; BtoDicta lo ejecuta y confirma.
         - Si falta un dato imprescindible, pregúntalo en "respuesta" sin capacidad ni comandos.
         - Si el usuario confirma algo que propusiste ("sí", "dale", "bueno", "hazlo"), EJECÚTALO ahora con "capacidad" o "comandos", usando los datos del CONTEXTO. Nunca digas que haces algo sin incluir la capacidad o los comandos que lo hacen.
@@ -183,11 +185,12 @@ enum AgenteTerminal {
         return """
 
         - [herramienta:leer_correo] Leer correo recibido. "contenido" = días atrás: 1 = hoy, 2 = ayer y hoy (máx. 7).
-        - [herramienta:buscar_correo] Buscar en todo el buzón. "contenido" = palabras o nombre del remitente.
+        - [herramienta:buscar_correo] Buscar en todo el buzón. "contenido" = palabras clave; para un remitente usa from:correo o from:nombre. No pongas palabras de tiempo ("hoy", "esta semana"): para correos recientes usa leer_correo.
         - [herramienta:buscar_persona] Buscar a una persona (contactos frecuentes y directorio). "contenido" = nombre.
         - [herramienta:borrador_correo] Crear un borrador real en la cuenta Microsoft (carpeta Borradores). "destinatario" = correo o nombre; "asunto"; "contenido" = cuerpo redactado. Para correo de la cuenta Microsoft usa ESTA herramienta y no la app de correo.
         - [herramienta:modificar_borrador] Cambiar el último borrador creado. "asunto" y/o "contenido" con la versión completa nueva.
         - [herramienta:responder_correo] Preparar como borrador la respuesta a un correo de la última lista leída. "numero" = su número en la lista; "contenido" = texto de la respuesta.
+        - [herramienta:reenviar_correo] Preparar como borrador el reenvío de un correo de la última lista. "numero"; "destinatario" = correo o nombre; "contenido" = comentario opcional.
         - [herramienta:enviar_borrador] Enviar el último borrador. BtoDicta pedirá confirmación al usuario.
         - [herramienta:ver_agenda] Ver eventos del calendario. "contenido" = días desde hoy (1–7).
         - [herramienta:crear_evento] Crear un evento propio, sin invitados. "contenido" = título; "inicio" y "fin" = "AAAA-MM-DDTHH:MM" en hora local; "lugar" opcional.
@@ -208,7 +211,7 @@ enum AgenteTerminal {
     }
 
     static let herramientasGraph: Set<String> = ["leer_correo", "buscar_correo", "buscar_persona", "borrador_correo",
-                                                 "modificar_borrador", "responder_correo", "enviar_borrador",
+                                                 "modificar_borrador", "responder_correo", "reenviar_correo", "enviar_borrador",
                                                  "ver_agenda", "crear_evento"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
