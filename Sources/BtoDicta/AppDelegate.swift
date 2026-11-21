@@ -9578,7 +9578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let locales: Set<String> = ["crear_documento", "crear_hoja", "buscar_historial",
                                     "resumen_bitacora", "transcribir_archivo", "ver_pantalla",
                                     "editar_seleccion", "crear_habilidad", "leer_documento", "resumir_pagina",
-                                    "abrir_sesion_ia", "firmar_documento", "reproducir_youtube"]
+                                    "abrir_sesion_ia", "firmar_documento", "reproducir_youtube", "delegar_agente"]
         guard locales.contains(plan.herramienta) else { return false }
         let decir: (String, String?) -> Void = { [weak self] t, memoria in
             guard let self else { return }
@@ -9700,6 +9700,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             OficinaAgente.abrirSesion(s, en: carpeta)
             decir("Listo, abrí \(s.nombre)" + (carpeta.map { " en \($0.lastPathComponent)" } ?? "") + ".",
                   "Abrí \(s.nombre)\(carpeta.map { " en \($0.lastPathComponent)" } ?? "").")
+        case "delegar_agente":
+            // Para HACER lo que describe una habilidad externa: se le pasa a Claude Code o Codex en la terminal.
+            // El usuario lo confirma aquí y aprueba cada paso allá (sin saltarse permisos).
+            let encargo = plan.contenido.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !encargo.isEmpty else { decir("¿Qué le encargo exactamente?", nil); break }
+            let s: OficinaAgente.SesionIA = OficinaAgente.SesionIA.desde((plan.asunto ?? "") + " " + pedido) == .codex ? .codex : .claudeCode
+            let carpeta = (plan.lugar ?? "").isEmpty ? nil : OficinaAgente.carpetaProyecto(plan.lugar ?? "")
+            guard autorizarDecisionIA("¿Encargárselo a \(s.nombre)?",
+                                      detalle: encargo + "\n\nCarpeta: " + (carpeta ?? FileManager.default.homeDirectoryForCurrentUser).path
+                                        + "\nSe abre en la Terminal; ahí apruebas cada paso.") else {
+                decir("Vale, no lo encargo.", nil); break
+            }
+            OficinaAgente.abrirSesion(s, en: carpeta, encargo: encargo)
+            decir("Listo, se lo pasé a \(s.nombre) en la Terminal. Ahí lo ves trabajar y apruebas cada paso.",
+                  "Encargué a \(s.nombre): \(encargo.prefix(120))")
         case "reproducir_youtube":
             let q = plan.contenido.isEmpty ? pedido : plan.contenido
             OficinaAgente.reproducirYouTube(q, navegador: OficinaAgente.navegador((plan.lugar ?? "") + " " + pedido)) { video in

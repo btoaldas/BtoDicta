@@ -44,6 +44,7 @@ final class HabilidadesExternasTests: XCTestCase {
         XCTAssertEqual(HabilidadesExternas.seleccionar("fírmame este documento pdf", de: l).map(\.nombre), ["firmar-pdf"])
         XCTAssertEqual(HabilidadesExternas.seleccionar("transcribe este audio", de: l).first?.nombre, "transcribir")
         XCTAssertTrue(HabilidadesExternas.seleccionar("¿qué hora es?", de: l).isEmpty)
+        XCTAssertEqual(HabilidadesExternas.seleccionar("transcribe este audio y fírmame el pdf", de: l).count, 2)   // empate: las dos
     }
 }
 
@@ -65,7 +66,8 @@ final class HabilidadesExternasRealesTests: XCTestCase {
         print("EXT total \(todas.count)")
         for p in ["¿Cómo emito una factura de EZTIC?", "Explícame cómo hago un overlay para OBS con dos cámaras",
                   "¿Cómo registro mis actividades en el sistema de evaluación?", "Ayúdame a preparar una proforma para el SERCOP",
-                  "¿Cómo despliego campus?", "revisa mi correo"] {
+                  "¿Cómo despliego campus?", "revisa mi correo", "Recuerda que mi jefe directo se llama Pedro Gómez",
+                  "¿Qué dicté la semana pasada sobre el switch del laboratorio?"] {
             print("EXT «\(p)» → " + HabilidadesExternas.seleccionar(p, de: todas).map(\.nombre).joined(separator: ", "))
         }
     }

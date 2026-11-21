@@ -159,6 +159,7 @@ enum AgenteTerminal {
             + "\n- [herramienta:resumir_pagina] Leer una página web y responder sobre ella. \"contenido\" = la dirección."
             + "\n- [herramienta:abrir_sesion_ia] Abrir Claude, Claude Code, Codex, ChatGPT o Gemini. \"contenido\" = cuál; \"lugar\" = nombre del proyecto (opcional) para abrir Claude Code o Codex en su carpeta."
             + "\n- [herramienta:reproducir_youtube] Poner algo en YouTube y que empiece a sonar (abre el primer video). Úsala SIEMPRE que el usuario nombre YouTube, en vez del modo música. \"contenido\" = qué buscar; \"lugar\" = navegador si lo nombra (Edge, Chrome…)."
+            + "\n- [herramienta:delegar_agente] Encargar a Claude Code (o Codex si lo nombra) una tarea que BtoDicta no hace por sí mismo, sobre todo lo que describe una habilidad externa (proformas, facturas, informes con formato oficial, despliegues…). \"contenido\" = el encargo completo en español: qué hacer, con qué habilidad y TODOS los datos dados; \"lugar\" = proyecto (opcional). BtoDicta pide confirmación."
             + "\n- [herramienta:firmar_documento] Preparar la firma de un PDF: lo abre en la app oficial de firma; BtoDicta NUNCA firma. \"contenido\" = ruta o parte del nombre; vacío = el PDF más reciente."
             + "\n- [herramienta:crear_habilidad] Guardar una habilidad propia del usuario («crea una habilidad: cuando pida X, haz Y»). \"asunto\" = nombre corto; \"palabras\" = palabras clave separadas por comas; \"contenido\" = las instrucciones."
         return """
@@ -251,7 +252,7 @@ enum AgenteTerminal {
                                                  "resumen_bitacora", "transcribir_archivo",
                                                  "ver_pantalla", "editar_seleccion", "crear_habilidad",
                                                  "leer_documento", "resumir_pagina", "abrir_sesion_ia", "firmar_documento",
-                                                 "reproducir_youtube"]
+                                                 "reproducir_youtube", "delegar_agente"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,

@@ -13,6 +13,7 @@ final class EvaluacionAsistenteTests: XCTestCase {
         ("Archiva esos tres correos que me leíste", "graph:archivar_correo"),
         ("Resúmeme el Excel de gastos que bajé", "graph:leer_documento"),
         ("Abre YouTube en Edge y pon una canción alegre", "graph:reproducir_youtube"),
+        ("Prepárame la proforma para el SERCOP de la empresa Mitad del Mundo, mantenimiento de Quipux por mil dólares", "graph:delegar_agente"),
         ("Archiva el último correo que me llegó a mi correo personal", "graph:archivar_correo"),
         ("Abre Claude Code en el proyecto BtoDicta", "graph:abrir_sesion_ia|comando"),
         ("Quiero firmar el PDF que me llegó, ábremelo para firmarlo", "graph:firmar_documento"),

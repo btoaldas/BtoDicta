@@ -188,7 +188,7 @@ enum Arnes {
         """))
         f.append(("bitacora-historial.md", """
         ---
-        palabras: bitácora, historial, dictado, dictados, transcribir, transcripción, grabación, grabar, audio
+        palabras: bitácora, historial, dictado, dictados, dicté, dije, transcribir, transcripción, grabación, grabar, audio
         ---
         # Bitácora, historial y transcripción
         - «¿Qué dicté sobre…?», «busca en mis dictados…»: [herramienta:buscar_historial] con las palabras clave.

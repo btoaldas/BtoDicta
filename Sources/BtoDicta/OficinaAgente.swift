@@ -305,16 +305,25 @@ enum OficinaAgente {
         }
     }
 
-    /// Abre la sesión. Las de terminal (Claude Code, Codex) se abren en la carpeta del proyecto.
+    /// Texto entre comillas simples para zsh (puro).
+    static func entreComillas(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+
+    /// Línea que abre Claude Code o Codex en la carpeta, con un encargo opcional (puro).
+    static func ordenTerminal(_ s: SesionIA, carpeta: URL, encargo: String?) -> String {
+        let bin = s == .codex ? "codex" : "claude"
+        let e = encargo.map { $0.replacingOccurrences(of: "\u{0}", with: "").trimmingCharacters(in: .whitespacesAndNewlines) }
+        return "cd \(entreComillas(carpeta.path)) && \(bin)" + ((e ?? "").isEmpty ? "" : " " + entreComillas(e!))
+    }
+
+    /// Abre la sesión. Las de terminal (Claude Code, Codex) se abren en la carpeta del proyecto, con el encargo si lo hay.
     @discardableResult
-    static func abrirSesion(_ s: SesionIA, en carpeta: URL?) -> Bool {
+    static func abrirSesion(_ s: SesionIA, en carpeta: URL?, encargo: String? = nil) -> Bool {
         switch s {
         case .claudeCode, .codex:
             let dir = carpeta ?? FileManager.default.homeDirectoryForCurrentUser
             let orden = s == .claudeCode ? "claude" : "codex"
             let guion = FileManager.default.temporaryDirectory.appendingPathComponent("btodicta-\(orden)-\(UUID().uuidString.prefix(6)).command")
-            let ruta = dir.path.replacingOccurrences(of: "'", with: "'\\''")
-            let texto = "#!/bin/zsh -l\ncd '\(ruta)' && \(orden)\n"
+            let texto = "#!/bin/zsh -l\n" + ordenTerminal(s, carpeta: dir, encargo: encargo) + "\n"
             guard (try? texto.write(to: guion, atomically: true, encoding: .utf8)) != nil else { return false }
             try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: guion.path)
             return NSWorkspace.shared.open(guion)

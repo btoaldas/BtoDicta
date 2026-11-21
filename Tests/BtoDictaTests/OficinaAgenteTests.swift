@@ -138,3 +138,18 @@ final class YouTubeTests: XCTestCase {
         wait(for: [e], timeout: 15)
     }
 }
+
+/// Delegar a Claude Code o Codex con el encargo bien citado.
+final class DelegarAgenteTests: XCTestCase {
+    func testOrdenTerminalCitaElEncargo() {
+        let c = URL(fileURLWithPath: "/Users/x/Developer/Mi Proyecto")
+        XCTAssertEqual(OficinaAgente.ordenTerminal(.claudeCode, carpeta: c, encargo: nil), "cd '/Users/x/Developer/Mi Proyecto' && claude")
+        XCTAssertEqual(OficinaAgente.ordenTerminal(.codex, carpeta: c, encargo: "haz la proforma de O'Brien; rm -rf ~"),
+                       "cd '/Users/x/Developer/Mi Proyecto' && codex 'haz la proforma de O'\\''Brien; rm -rf ~'")
+    }
+
+    func testPlanDelegar() {
+        XCTAssertEqual(AgenteTerminal.planGraph(#"{"capacidad":{"tipo":"herramienta","clave":"delegar_agente","contenido":"x"}}"#)?.herramienta,
+                       "delegar_agente")
+    }
+}
