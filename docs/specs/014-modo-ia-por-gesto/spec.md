@@ -204,3 +204,20 @@ No toca `TareasRecordatorios.swift` ni `NotasView.swift`.
   lectura automática. «Omitir permisos» se mantiene por decisión de Alberto.
 - Límite conocido: un comando con clave de administrador corre como root; Esc no
   puede matarlo desde la app.
+
+## 10. Cambio tras la prueba real (2026-11-20)
+
+Alberto probó el gesto: funcionaba, pero el asistente solo conversaba. Causas
+vistas en `logs/agente.jsonl`: el router devolvía siempre confianza 0 (el ejemplo
+del prompt decía `0.0` y el modelo lo copiaba), así que el freno de 0,45
+descartaba incluso decisiones correctas; además el router usaba la cascada de
+pulido (Groq) y no la IA del asistente.
+
+- Nuevo modo de decisión **«Todo: acción, terminal o respuesta»** (`mixto`): una
+  sola consulta al cerebro elegido devuelve una capacidad del catálogo, comandos
+  o solo la respuesta. Genérico: funciona con IA por API, Codex, Hermes o ZCode;
+  si falta la CLI elegida, cae a la IA configurada.
+- El router usa la IA del asistente si está configurada.
+- Borrador de correo canónico: `open "mailto:…"` (no envía).
+- Prueba real contra ZCode (`BTODICTA_ZCODE_REAL=1`): borrador por comando,
+  búsqueda web por capacidad. Suite 133, 0 fallos. Commit `2d5db69`.
