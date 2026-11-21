@@ -154,15 +154,18 @@ enum Arnes {
         """))
         f.append(("microsoft.md", """
         ---
-        palabras: correo, correos, bandeja, borrador, responder, reenviar, enviar, agenda, calendario, reunión, evento, persona, contacto, outlook, microsoft
+        palabras: correo, correos, bandeja, borrador, responder, reenviar, enviar, agenda, calendario, reunión, evento, persona, contacto, outlook, microsoft, gmail, google, personal, cuenta
         ---
-        # Cuenta Microsoft (si está conectada)
+        # Cuentas de correo conectadas (Microsoft y Google)
+        - Con una cuenta conectada, el correo, la agenda y los contactos se leen con las herramientas, NUNCA abriendo
+          Outlook, Gmail ni el navegador. Si el pedido nombra una cuenta («mi correo personal», «el Gmail»), va en "cuenta".
         - Leer la bandeja: leer_correo · buscar: buscar_correo (from:remitente) · persona: buscar_persona.
         - Borradores reales: borrador_correo; cambiar el mismo: modificar_borrador; responder / reenviar
           un correo de la última lista: responder_correo / reenviar_correo (por su número).
         - Enviar: enviar_borrador (BtoDicta siempre pide confirmación en pantalla).
         - Agenda: ver_agenda; crear: crear_evento (sin invitados).
-        - Gmail no se puede leer: solo abrir Gmail web o un borrador por URL.
+        - Responder y reenviar solo en cuentas Microsoft; en Gmail, un borrador nuevo.
+        - Si no hay ninguna cuenta conectada, abrir el correo web es lo único posible.
         """))
         f.append(("mac.md", """
         ---
