@@ -218,9 +218,12 @@ enum AgenteTerminal {
                 // Solo tras una tubería: leyendo un archivo sacaría su contenido.
                 guard i > 0 else { return false }
                 var sueltos = 0
+                var anterior = ""
                 for a in partes.dropFirst() {
                     if a.hasPrefix("-") { if !f.opciones.contains(a) { return false } }
-                    else if Int(a) == nil { sueltos += 1 }
+                    // Un número solo vale como valor de -n; si no, sería un archivo.
+                    else if !(anterior == "-n" && Int(a) != nil) { sueltos += 1 }
+                    anterior = a
                 }
                 if sueltos > f.sueltos { return false }
                 continue
