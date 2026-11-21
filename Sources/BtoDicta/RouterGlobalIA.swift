@@ -116,6 +116,17 @@ enum RouterGlobalIA {
         intentar(1)
     }
 
+    /// Del cuerpo de un error, solo «código: mensaje» (máx. 160); nada más del texto.
+    static func resumenError(_ data: Data?) -> String {
+        guard let data, let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return "(cuerpo de \(data?.count ?? 0) bytes)"
+        }
+        let e = (j["error"] as? [String: Any]) ?? j
+        let codigo = (e["code"] as? String) ?? (e["code"] as? Int).map(String.init) ?? (e["type"] as? String) ?? ""
+        let mensaje = (e["message"] as? String) ?? ""
+        return String("\(codigo): \(mensaje)".prefix(160))
+    }
+
     static func llamarIA(_ ia: ChatIA, prompt: String, textLen: Int,
                                  _ completion: @escaping (String?) -> Void) {
         if ia.esCuentaCodex {
@@ -143,7 +154,7 @@ enum RouterGlobalIA {
                 // Solo el mensaje de error del servidor; una respuesta 2xx puede traer texto del usuario.
                 let cuerpo = (200..<300).contains(code)
                     ? "(respuesta de \(data?.count ?? 0) bytes sin contenido legible)"
-                    : (data.map { String(decoding: $0.prefix(200), as: UTF8.self) } ?? "")
+                    : Self.resumenError(data)
                 Log.write("IA \(ia.etiqueta): sin respuesta — HTTP \(code) \(error?.localizedDescription ?? "") \(cuerpo)")
             }
             completion(out)

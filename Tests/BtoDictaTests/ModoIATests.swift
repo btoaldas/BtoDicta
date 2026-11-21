@@ -80,6 +80,12 @@ final class ModoIATests: XCTestCase {
         XCTAssertEqual(zai.conModelo("").modeloEfectivo, zai.modeloEfectivo)
     }
 
+    func testResumenErrorSoloCodigoYMensaje() {
+        let d = #"{"error":{"code":"1309","message":"plan vencido","detalle":"texto del pedido"}}"#.data(using: .utf8)
+        XCTAssertEqual(RouterGlobalIA.resumenError(d), "1309: plan vencido")
+        XCTAssertEqual(RouterGlobalIA.resumenError("<html>x</html>".data(using: .utf8)), "(cuerpo de 14 bytes)")
+    }
+
     func testInterpretarPlanTerminal() {
         let r = """
         Claro: {"respuesta":"Reviso el disco","comandos":[{"cmd":"df -h","sudo":false,"proposito":"espacio"},{"cmd":"sudo purge","proposito":"memoria"}]}

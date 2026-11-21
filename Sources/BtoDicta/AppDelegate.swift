@@ -9374,7 +9374,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let tok = nuevoAgente()
         let ia = iaDelAgente(modo)
         if !recorder.isRecording { panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
-        let caps = CatalogoCapacidades.todas()
+        // Solo lo que este modo ejecuta (modos y conexiones), y nunca el propio
+        // Agente: elegirlo volvería a consultar a la IA con el mismo pedido.
+        let caps = CatalogoCapacidades.todas().filter {
+            ["modo", "conexion"].contains($0.tipo) && $0.clave != "agente"
+                && ModosStore.modo($0.clave).base != "agente"
+        }
         let contexto = Config.agenteMemoriaContextoIA() ? MemoriaAgente.contexto() : ""
         let prompt = AgenteTerminal.promptMixto(pedido: texto, contexto: contexto,
                                                 catalogo: CatalogoCapacidades.paraIA(caps))

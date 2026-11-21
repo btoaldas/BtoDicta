@@ -79,6 +79,7 @@ struct ChatIA {
             return propio.isEmpty || n == "automatico" ? Config.codexCuentaModelo() : propio
         }
         if local {
+            if modeloFijo { return modelo }
             let detectado = Self.modeloSeguroParaPulido(Self.modelosLocales[id], respaldo: modelo)
             return Self.modeloSeguroParaPulido(Config.pulidoModelo(id), respaldo: detectado)
         }
