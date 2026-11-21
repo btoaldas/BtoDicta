@@ -56,7 +56,7 @@ final class EvaluacionAsistenteTests: XCTestCase {
             if obtenido == nil {
                 let e = expectation(description: pedido)
                 // Lo que en la app ya habría pasado en turnos anteriores.
-                let contexto = "MEMORIA CORTA DE ESTA CONVERSACIÓN:\nUsuario: revisa mis correos de hoy\nBeto: Revisé 5 correos de los últimos 1 día(s).\nUsuario: hazme un borrador para persona@ejemplo.com\nBeto: Preparé un borrador en Microsoft para persona@ejemplo.com, asunto «Prueba»."
+                let contexto = "MEMORIA CORTA DE ESTA CONVERSACIÓN:\nUsuario: revisa mis correos de hoy\nBeto: Revisé 5 correos de los últimos 1 día(s).\nUsuario: hazme un borrador para colega@ejemplo.org sobre el informe\nBeto: Preparé un borrador en Microsoft para colega@ejemplo.org, asunto «Informe semanal»."
                 let p = AgenteTerminal.promptMixto(pedido: pedido, contexto: contexto,
                                                    catalogo: CatalogoCapacidades.paraIA(caps), correo: graph)
                 RouterGlobalIA.llamarIA(ia, prompt: p, textLen: p.count, plazo: 40) { r in

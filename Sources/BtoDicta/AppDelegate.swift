@@ -6421,7 +6421,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Conversación hablada: tras la respuesta, otro turno del Agente.
     private func continuarConversacionIA(intentos: Int = 60) {
         guard conversacionIA, Config.agenteGestoConversacion() else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+        // La primera comprobación espera un poco: la voz de la nube tarda en empezar
+        // y, si se mira antes, parece que ya terminó.
+        DispatchQueue.main.asyncAfter(deadline: .now() + (intentos == 60 ? 1.2 : 0.35)) { [weak self] in
             guard let self, self.conversacionIA, !self.recorder.isRecording,
                   !self.hayConfirmacion else { return }
             // Si Beto aún habla o el agente sigue trabajando, espera: abrir el
@@ -8834,6 +8836,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         case .preguntarPlan(let pregunta):
             let normal = modoNormal ?? ModosStore.activo()
+            // En el modo «Todo», solo lo preciso va por reglas fijas; lo demás lo
+            // decide la IA (con Microsoft, el calendario va por Graph).
+            if Config.agenteNucleoActivo(), (contextoAgente || normal.base == "agente"),
+               Config.agenteIADecision() == "mixto",
+               !ReglasModoTodo.admite(pregunta, graph: MicrosoftGraph.disponible) {
+                responderAgente(textoNormal ?? crudo, modo: ModosStore.modo("agente"), crudo: crudo,
+                                wav: wav, history: history, modoNormal: normal, contextoAgente: true)
+                return
+            }
             // Dentro del Agente, el nivel de autonomía decide si una herramienta
             // segura se ejecuta sola. Fuera del Agente, el comportamiento anterior
             // se conserva: toda intención natural se confirma.
@@ -8933,6 +8944,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
               !cadena.etapas.isEmpty else { return false }
         let pregunta = ModoPlanificador.pregunta(para: cadena, fuente: .natural,
                                                   confianza: confianza)
+        if Config.agenteIADecision() == "mixto",
+           !ReglasModoTodo.admite(pregunta, graph: MicrosoftGraph.disponible) {
+            responderAgente(textoNormal, modo: ModosStore.modo("agente"), crudo: crudo, wav: wav,
+                            history: history, modoNormal: modoNormal, contextoAgente: true)
+            return true
+        }
         if PoliticaAgente.autoEjecutar(cadena) {
             AgenteLog.registrar("plan_autonomo", ["nivel": PoliticaAgente.nivel.rawValue,
                 "riesgo": PoliticaAgente.riesgo(de: cadena).rawValue,
@@ -10415,6 +10432,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 // memoria vuelve a la IA en cada turno.
                 MemoriaAgente.registrar(usuario: "(resultado de \(Acciones.nombre(id)))",
                                         asistente: r.ok ? "Hecho." : "Falló.")
+            }
+            if contextoAgente, alResultado == nil {
+                // Acción por reglas fijas dentro del asistente: también se sigue conversando.
+                continuarConversacionIA()
             }
             if let alResultado {
                 alResultado(r)   // quien lo pidió habla del resultado
