@@ -53,12 +53,16 @@ enum SeguimientoCorreo {
     /// (un nombre visible se puede falsificar), o si no, el nombre completo (puro).
     static func esDeLaPersona(_ de: String, persona: String) -> Bool {
         let p = persona.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if p.contains("@") {
-            let direccion = de.range(of: "<[^>]+>", options: .regularExpression)
-                .map { String(de[$0].dropFirst().dropLast()) } ?? de
-            return direccion.trimmingCharacters(in: .whitespaces).lowercased() == p
-        }
-        return PerfilAgente.normalizar(de).contains(PerfilAgente.normalizar(p))
+        let t = de.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Un remitente con más de un «<» trae una dirección escondida en el nombre: no cuenta.
+        guard t.filter({ $0 == "<" }).count <= 1 else { return false }
+        let conAngulos = t.range(of: "<([^<>]+)>$", options: .regularExpression)
+        let direccion = conAngulos.map { String(t[$0].dropFirst().dropLast()) } ?? (t.contains("@") ? t : "")
+        if p.contains("@") { return direccion.trimmingCharacters(in: .whitespaces).lowercased() == p }
+        // Por nombre: el nombre visible completo y exacto (menos seguro: se puede falsificar).
+        let nombre = conAngulos.map { String(t[..<$0.lowerBound]) } ?? (t.contains("@") ? "" : t)
+        let limpio = nombre.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\"'")))
+        return !limpio.isEmpty && PerfilAgente.normalizar(limpio) == PerfilAgente.normalizar(p)
     }
 
     static func evaluar(_ s: Seguimiento, correos: [CorreoLeido], ahora: Date = Date()) -> Resultado {

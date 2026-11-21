@@ -59,6 +59,10 @@ final class BloqueBTests: XCTestCase {
         XCTAssertFalse(SeguimientoCorreo.esDeLaPersona("paul@x.example <spam@malo.example>", persona: "paul@x.example"))
         XCTAssertTrue(SeguimientoCorreo.esDeLaPersona("Paul Leones <p@x.example>", persona: "Paul Leones"))
         XCTAssertFalse(SeguimientoCorreo.esDeLaPersona("Ana <a@x.example>", persona: "Paul"))
+        XCTAssertFalse(SeguimientoCorreo.esDeLaPersona("Malo <paul@x.example> <spam@malo.example>", persona: "paul@x.example"))
+        XCTAssertFalse(SeguimientoCorreo.esDeLaPersona("Paul Leones Falso <spam@malo.example>", persona: "Paul Leones"))
+        XCTAssertTrue(SeguimientoCorreo.esDeLaPersona("\"Paul Leones\" <p@x.example>", persona: "paul leones"))
+        XCTAssertTrue(SeguimientoCorreo.esDeLaPersona("paul@x.example", persona: "paul@x.example"))
     }
 
     func testPlanesBloqueB() {

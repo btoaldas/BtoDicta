@@ -10225,9 +10225,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let registrar: (String) -> Void = { [weak self] persona in
                 let s = SeguimientoCorreo.agregar(persona: persona, cuenta: self?.cuentaCorreo?.id, hasta: plan.inicio)
                 let f = DateFormatter(); f.locale = Locale(identifier: "es"); f.dateFormat = "EEEE d 'a las' HH:mm"
-                decir(s.conPlazo
-                      ? "Listo, si \(nombre) no te responde hasta el \(f.string(from: s.hasta)), te aviso. ¿Algo más?"
-                      : "Listo, te aviso en cuanto te escriba \(nombre). ¿Algo más?",
+                let nota = persona.contains("@") ? "" : " No encontré su correo exacto: vigilo por su nombre, que es menos seguro; si me dices su dirección, mejor."
+                decir((s.conPlazo
+                      ? "Listo, si \(nombre) no te responde hasta el \(f.string(from: s.hasta)), te aviso."
+                      : "Listo, te aviso en cuanto te escriba \(nombre).") + nota + " ¿Algo más?",
                       "Vigilo el correo de \(nombre)\(s.conPlazo ? " hasta el \(f.string(from: s.hasta))" : "").")
             }
             // Un nombre se resuelve a su dirección exacta: el nombre visible de un correo se puede falsificar.
