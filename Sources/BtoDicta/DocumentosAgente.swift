@@ -93,8 +93,13 @@ enum DocumentosAgente {
     /// CSV con BOM (Excel lo abre con tildes bien); los campos con coma o comillas van entre comillas.
     static func csv(_ filas: [[String]]) -> String {
         "\u{FEFF}" + filas.map { fila in
-            fila.map { c in
-                c.contains(",") || c.contains("\"") || c.contains("\n")
+            fila.map { original in
+                // Una celda que empieza con = + - @ sería una fórmula para Excel: va como texto.
+                // Los números puros («-5», «10.5») se dejan como números.
+                let peligroso = original.first.map { "=+-@\t\r".contains($0) } ?? false
+                let c = peligroso && Double(original) == nil ? "'" + original : original
+                return
+                c.contains(",") || c.contains("\"") || c.contains("\n") || c != original
                     ? "\"" + c.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : c
             }.joined(separator: ",")
         }.joined(separator: "\n") + "\n"

@@ -30,6 +30,9 @@ final class DocumentosAgenteTests: XCTestCase {
     func testCSV() {
         let c = DocumentosAgente.csv([["Concepto", "Monto"], ["Almuerzo, cena", "8"]])
         XCTAssertTrue(c.hasPrefix("\u{FEFF}Concepto,Monto\n")); XCTAssertTrue(c.contains("\"Almuerzo, cena\",8"))
+        let f = DocumentosAgente.csv([["=HYPERLINK(\"x\")", "-5", "@SUMA(A1)", "+1+1"]])
+        XCTAssertTrue(f.contains("\"'=HYPERLINK(\"\"x\"\")\"")); XCTAssertTrue(f.contains(",-5,"))
+        XCTAssertTrue(f.contains("\"'@SUMA(A1)\"")); XCTAssertTrue(f.contains("\"'+1+1\""))
     }
 
     func testBuscarHistorial() throws {
