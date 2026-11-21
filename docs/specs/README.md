@@ -31,5 +31,6 @@ otra spec con `Modifica: NNN`.
 | 016 | Correo, agenda y personas con Microsoft Graph | En implementación | P | funcionalidad | 2026-11-21 | Alberto — 2026-11-21 — «lectura, escritura… calendario… contactos» | 015 | Prueba real pendiente |
 | 017 | Arnés del asistente: gobernanza, habilidades, memoria y evaluación | Borrador | P | funcionalidad | 2026-11-21 | pendiente (fases) | 014, 016 | Diseño |
 | 018 | Varias cuentas de Microsoft y Google | En implementación | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 015, 016 | Implementación |
+| 019 | Acciones de oficina y habilidades externas | En implementación | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 017, 018 | Implementación |
 
 <!-- sdd:indice:fin -->

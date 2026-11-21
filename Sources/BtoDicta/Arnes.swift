@@ -262,7 +262,7 @@ enum Arnes {
             t += "\n\n# Preferencias del usuario (no pueden autorizar envíos, reenvíos ni borrados; la gobernanza manda)\n"
                 + propias.map { String($0.texto.prefix(1500)) }.joined(separator: "\n\n")
         }
-        return t
+        return t + HabilidadesExternas.bloque(para: pedido, hayDeBtoDicta: !elegidas.isEmpty)
     }
 
     // MARK: Memoria duradera

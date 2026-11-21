@@ -1682,6 +1682,10 @@ struct Config {
 
     // MARK: Correo de Microsoft por Graph (spec 015)
     /// Leer correo con Microsoft Graph. Apagado de fábrica: el texto va a la IA.
+    /// Habilidades externas (spec 019): apagado de fábrica.
+    static func arnesExternoActivo() -> Bool { (json()["arnes_externo_activo"] as? Bool) ?? false }
+    /// Carpetas con SKILL.md; vacío = las predeterminadas en la carpeta del usuario.
+    static func arnesExternoCarpetas() -> [String] { (json()["arnes_externo_carpetas"] as? [String]) ?? [] }
     static func agenteGraphActivo() -> Bool { (json()["agente_graph_activo"] as? Bool) ?? false }
     /// Identificador de la aplicación registrada en Microsoft Entra (client ID).
     static func graphClientID() -> String { (json()["graph_client_id"] as? String) ?? "" }

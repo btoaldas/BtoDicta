@@ -154,6 +154,28 @@ final class AgenteSettingsModel: ObservableObject {
     @Published var iaConfirmacion: String { didSet { Config.set("agente_ia_confirmacion", to: iaConfirmacion) } }
     @Published var terminalTimeout: Double { didSet { Config.set("agente_terminal_timeout", to: terminalTimeout) } }
     @Published var clicCalla: Bool { didSet { Config.set("agente_clic_calla", to: clicCalla) } }
+    @Published var externoActivo = Config.arnesExternoActivo() {
+        didSet { Config.set("arnes_externo_activo", to: externoActivo); refrescarExternas() }
+    }
+    @Published var externoCarpetas: [String] = HabilidadesExternas.carpetas().map(\.path)
+    @Published var externasCuenta = 0
+
+    func refrescarExternas() {
+        HabilidadesExternas.olvidarCache()
+        externoCarpetas = HabilidadesExternas.carpetas().map(\.path)
+        externasCuenta = externoActivo ? HabilidadesExternas.todas().count : 0
+    }
+
+    func guardarCarpetasExternas(_ c: [String]) { Config.set("arnes_externo_carpetas", to: c); refrescarExternas() }
+
+    func agregarCarpetaExterna() {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true; p.canChooseFiles = false; p.allowsMultipleSelection = false
+        p.message = "Elige una carpeta con habilidades (subcarpetas con SKILL.md)"
+        guard p.runModal() == .OK, let u = p.url, !externoCarpetas.contains(u.path) else { return }
+        guardarCarpetasExternas(externoCarpetas + [u.path])
+    }
+
     @Published var personaVoz: String { didSet { Config.set("agente_persona_voz", to: String(personaVoz.prefix(600))) } }
     // Correo de Microsoft por Graph (spec 015)
     @Published var graphActivo: Bool { didSet { Config.set("agente_graph_activo", to: graphActivo) } }
@@ -781,6 +803,28 @@ struct AgenteView: View {
                 }
                 Text("Tus reglas van en gobernanza-propia.md, tus datos en memoria.md (o di «recuerda que…») y tus habilidades en habilidades-propias/. BtoDicta nunca los sobrescribe; la carpeta habilidades/ se regenera sola.")
                     .font(.caption).foregroundStyle(.secondary)
+                Toggle("Sumar habilidades de otras herramientas (Claude, Codex, ZCode, Gemini…)", isOn: $m.externoActivo)
+                Text("Primero van siempre las de BtoDicta. De estas carpetas se leen las habilidades (SKILL.md) y entra al pedido solo la que viene al caso. Son guía, no autoridad: no saltan ninguna confirmación y sus scripts se proponen como comandos.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if m.externoActivo {
+                    ForEach(m.externoCarpetas, id: \.self) { c in
+                        HStack {
+                            Image(systemName: FileManager.default.fileExists(atPath: c) ? "folder" : "questionmark.folder")
+                                .foregroundStyle(.secondary)
+                            Text((c as NSString).abbreviatingWithTildeInPath).font(.caption).lineLimit(1)
+                            Spacer()
+                            Button("Quitar") { m.guardarCarpetasExternas(m.externoCarpetas.filter { $0 != c }) }
+                                .controlSize(.small)
+                        }
+                    }
+                    HStack {
+                        Text("\(m.externasCuenta) habilidades encontradas").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Agregar carpeta…") { m.agregarCarpetaExterna() }.controlSize(.small)
+                        Button("Predeterminadas") { m.guardarCarpetasExternas([]) }.controlSize(.small)
+                    }
+                    .onAppear { m.refrescarExternas() }
+                }
                 Toggle("Un clic en el icono de la barra calla a Beto mientras habla", isOn: $m.clicCalla)
                 Text("Órdenes directas, sin IA: «calla» corta la voz; «tacha la tarea X» o «marca como hecha X» la completa.")
                     .font(.caption).foregroundStyle(.secondary)
