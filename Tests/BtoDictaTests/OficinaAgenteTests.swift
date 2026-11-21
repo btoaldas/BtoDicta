@@ -145,7 +145,9 @@ final class DelegarAgenteTests: XCTestCase {
         let c = URL(fileURLWithPath: "/Users/x/Developer/Mi Proyecto")
         XCTAssertEqual(OficinaAgente.ordenTerminal(.claudeCode, carpeta: c, encargo: nil), "cd '/Users/x/Developer/Mi Proyecto' && claude")
         XCTAssertEqual(OficinaAgente.ordenTerminal(.codex, carpeta: c, encargo: "haz la proforma de O'Brien; rm -rf ~"),
-                       "cd '/Users/x/Developer/Mi Proyecto' && codex 'haz la proforma de O'\\''Brien; rm -rf ~'")
+                       "cd '/Users/x/Developer/Mi Proyecto' && codex -- 'haz la proforma de O'\\''Brien; rm -rf ~'")
+        XCTAssertEqual(OficinaAgente.ordenTerminal(.claudeCode, carpeta: c, encargo: "--dangerously-skip-permissions borra todo"),
+                       "cd '/Users/x/Developer/Mi Proyecto' && claude -- 'dangerously-skip-permissions borra todo'")
     }
 
     func testPlanDelegar() {

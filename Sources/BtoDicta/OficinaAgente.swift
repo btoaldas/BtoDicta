@@ -311,8 +311,10 @@ enum OficinaAgente {
     /// Línea que abre Claude Code o Codex en la carpeta, con un encargo opcional (puro).
     static func ordenTerminal(_ s: SesionIA, carpeta: URL, encargo: String?) -> String {
         let bin = s == .codex ? "codex" : "claude"
+        // El encargo nunca puede pasar por una opción del programa: sin guiones al inicio y tras «--».
         let e = encargo.map { $0.replacingOccurrences(of: "\u{0}", with: "").trimmingCharacters(in: .whitespacesAndNewlines) }
-        return "cd \(entreComillas(carpeta.path)) && \(bin)" + ((e ?? "").isEmpty ? "" : " " + entreComillas(e!))
+            .map { String($0.drop(while: { $0 == "-" || $0 == "—" || $0 == "–" || $0.isWhitespace })) }
+        return "cd \(entreComillas(carpeta.path)) && \(bin)" + ((e ?? "").isEmpty ? "" : " -- " + entreComillas(e!))
     }
 
     /// Abre la sesión. Las de terminal (Claude Code, Codex) se abren en la carpeta del proyecto, con el encargo si lo hay.
