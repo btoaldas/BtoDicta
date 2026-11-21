@@ -116,9 +116,9 @@ final class ModoIATests: XCTestCase {
 
     func testCierreHablado() {
         XCTAssertEqual(AgenteTerminal.cierreHablado("Abrí el borrador en Mail", ok: true),
-                       "Abrí el borrador en Mail. ¿Está bien así o cambio algo?")
+                       "Abrí el borrador en Mail. ¿Algo más?")
         XCTAssertEqual(AgenteTerminal.cierreHablado("", ok: false),
-                       "No pude hacerlo. ¿Quieres que lo intente de otra forma?")
+                       "No pude hacerlo. ¿Lo intento de otra forma?")
     }
 
     func testInterpretarPlanTerminal() {
