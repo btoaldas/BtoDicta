@@ -9654,8 +9654,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "editar_seleccion":
             editarSeleccion(instruccion: plan.contenido.isEmpty ? pedido : plan.contenido, ia: ia, decir: decir)
         case "crear_habilidad":
-            if Config.agenteIAConfirmacion() == "aprobacion",
-               !autorizarDecisionIA("¿Guardar esta habilidad?", detalle: plan.contenido) {
+            // Una habilidad es una instrucción permanente: se confirma siempre.
+            guard !Arnes.habilidadPeligrosa(plan.contenido) else {
+                decir("Esa habilidad intenta saltarse una confirmación o borrar algo; no la guardo.", nil); return true
+            }
+            guard autorizarDecisionIA("¿Guardar esta habilidad?",
+                                      detalle: "Nombre: \(plan.asunto ?? "")\nPalabras: \(plan.palabras ?? "")\n\n\(plan.contenido)") else {
                 decir("Vale, no la guardo.", nil); return true
             }
             if let u = Arnes.crearHabilidad(nombre: plan.asunto ?? "Habilidad", palabras: plan.palabras ?? "",
