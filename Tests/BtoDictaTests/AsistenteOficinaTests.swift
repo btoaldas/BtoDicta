@@ -73,3 +73,12 @@ extension AsistenteOficinaTests {
         XCTAssertNil(AgenteTerminal.planGraph(#"{"capacidad":{"tipo":"modo","clave":""}}"#))
     }
 }
+
+extension AsistenteOficinaTests {
+    func testHerramientaEnTipoConOtroDatoEnClave() {
+        let a = AgenteTerminal.planGraph(#"{"capacidad":{"tipo":"archivar_correo","clave":"[herramienta:archivar_correo]","contenido":"1"}}"#)
+        XCTAssertEqual(a?.herramienta, "archivar_correo"); XCTAssertEqual(a?.contenido, "1")
+        let b = AgenteTerminal.planGraph(#"{"capacidad":{"tipo":"buscar_correo","clave":"from:ana@x.example"}}"#)
+        XCTAssertEqual(b?.herramienta, "buscar_correo"); XCTAssertEqual(b?.contenido, "from:ana@x.example")
+    }
+}

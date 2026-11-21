@@ -9589,7 +9589,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                     "resumen_bitacora", "transcribir_archivo", "ver_pantalla",
                                     "editar_seleccion", "crear_habilidad", "leer_documento", "resumir_pagina",
                                     "abrir_sesion_ia", "firmar_documento", "reproducir_youtube", "delegar_agente",
-                                    "resumen_manana"]
+                                    "resumen_manana", "obsidian_anotar", "obsidian_buscar"]
         guard locales.contains(plan.herramienta) else { return false }
         let decir: (String, String?) -> Void = { [weak self] t, memoria in
             guard let self else { return }
@@ -9713,6 +9713,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                   "Abrí \(s.nombre)\(carpeta.map { " en \($0.lastPathComponent)" } ?? "").")
         case "resumen_manana":
             contarResumenManana(ia: ia, decir: decir)
+        case "obsidian_anotar":
+            guard let b = ObsidianAgente.boveda() else { decir("No encontré tu bóveda de Obsidian. Indícala en Ajustes, Asistente.", nil); break }
+            do {
+                let u = try ObsidianAgente.anotar(plan.contenido.isEmpty ? pedido : plan.contenido, en: b)
+                decir("Listo, lo anoté en Obsidian, en tus notas de voz de hoy. ¿Algo más?", "Anoté en Obsidian (\(u.lastPathComponent)).")
+            } catch { decir("No pude escribir en tu bóveda de Obsidian.", nil) }
+        case "obsidian_buscar":
+            guard let b = ObsidianAgente.boveda() else { decir("No encontré tu bóveda de Obsidian. Indícala en Ajustes, Asistente.", nil); break }
+            let q = plan.contenido.isEmpty ? pedido : plan.contenido
+            if !recorder.isRecording { panel.update("🔎 Buscando en Obsidian…") }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let h = ObsidianAgente.buscar(q, en: b)
+                DispatchQueue.main.async {
+                    guard !h.isEmpty else { decir("No encontré nada sobre eso en tu Obsidian.", nil); return }
+                    let texto = h.map { "## \($0.titulo)\n\($0.extracto)" }.joined(separator: "\n\n")
+                    self.responderSobreTexto(texto, origen: "tus notas de Obsidian (\(h.map(\.titulo).joined(separator: ", ")))",
+                                             pedido: pedido, ia: ia, decir: decir,
+                                             memoria: "Busqué en Obsidian: \(h.count) nota(s).")
+                }
+            }
         case "delegar_agente":
             // Para HACER lo que describe una habilidad externa: se le pasa a Claude Code o Codex en la terminal.
             // El usuario lo confirma aquí y aprueba cada paso allá (sin saltarse permisos).

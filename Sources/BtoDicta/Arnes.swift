@@ -154,7 +154,7 @@ enum Arnes {
         """))
         f.append(("microsoft.md", """
         ---
-        palabras: correo, correos, bandeja, borrador, responder, reenviar, enviar, archiva, marca, leido, destacado, mueve, carpeta, papelera, elimina, adjunto, adjuntos, adjunta, agenda, calendario, reunión, evento, persona, contacto, outlook, microsoft, gmail, google, personal, cuenta
+        palabras: obsidian, anota, nota, whatsapp, quipux, memo, actividades, correo, correos, bandeja, borrador, responder, reenviar, enviar, archiva, marca, leido, destacado, mueve, carpeta, papelera, elimina, adjunto, adjuntos, adjunta, agenda, calendario, reunión, evento, persona, contacto, outlook, microsoft, gmail, google, personal, cuenta
         ---
         # Cuentas de correo conectadas (Microsoft y Google)
         - Con una cuenta conectada, el correo, la agenda y los contactos se leen con las herramientas, NUNCA abriendo
@@ -165,6 +165,9 @@ enum Arnes {
         - Enviar: enviar_borrador (BtoDicta siempre pide confirmación en pantalla).
         - Archivar correos de la última lista: archivar_correo con sus números o «todos» (siempre con confirmación; no borra).
         - Marcar (leído, no leído, destacado): marcar_correo · mover a una carpeta: mover_correo · papelera: papelera_correo.
+        - Obsidian: anotar [herramienta:obsidian_anotar]; buscar en las notas [herramienta:obsidian_buscar].
+        - WhatsApp: el modo WhatsApp deja el mensaje escrito en la app; lo envía el usuario.
+        - Sistemas internos (Quipux, registro de actividades, servidores): [herramienta:delegar_agente] con el encargo completo.
         - Tarea o recordatorio desde un correo: correo_a_tarea («recuérdame responderle el viernes a las 9»).
         - Resumen de la mañana (agenda, correos de todas las cuentas, recordatorios): [herramienta:resumen_manana].
         - Adjuntos de un correo a Descargas/BtoDicta: adjuntos_correo · adjuntar un archivo al borrador: adjuntar_archivo.

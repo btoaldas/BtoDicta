@@ -154,6 +154,9 @@ final class AgenteSettingsModel: ObservableObject {
     @Published var iaConfirmacion: String { didSet { Config.set("agente_ia_confirmacion", to: iaConfirmacion) } }
     @Published var terminalTimeout: Double { didSet { Config.set("agente_terminal_timeout", to: terminalTimeout) } }
     @Published var clicCalla: Bool { didSet { Config.set("agente_clic_calla", to: clicCalla) } }
+    @Published var obsidianBoveda = Config.obsidianBoveda() {
+        didSet { Config.set("obsidian_boveda", to: obsidianBoveda.trimmingCharacters(in: .whitespaces)) }
+    }
     @Published var resumenActivo = Config.resumenMananaActivo() {
         didSet { Config.set("agente_resumen_manana_activo", to: resumenActivo) }
     }
@@ -846,6 +849,10 @@ struct AgenteView: View {
                     TextField("08:00", text: $m.resumenHora).textFieldStyle(.roundedBorder).frame(width: 60)
                 }
                 Text("Agenda, correos de todas tus cuentas y recordatorios, contado por Beto una vez al día (si el Mac dormía, hasta mediodía). También: «dame el resumen de la mañana».")
+                    .font(.caption).foregroundStyle(.secondary)
+                field("Bóveda de Obsidian", text: $m.obsidianBoveda,
+                      placeholder: ObsidianAgente.boveda().map { ($0.path as NSString).abbreviatingWithTildeInPath } ?? "vacío = la que Obsidian tiene abierta")
+                Text("«Anota en Obsidian…» escribe solo en BtoDicta/Notas de voz/ (nunca en tus notas). «¿Qué decidimos sobre…?» busca en tus notas; las de credenciales y las líneas con claves nunca van a la IA.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Confirmar también de viva voz («sí» o «no»)", isOn: $m.confirmarVoz)
                 Text("Beto pregunta en voz alta y escucha con el reconocimiento local de Apple; el cuadro sigue ahí. Lo leve (archivar, mover, leer una página) acepta «sí»; enviar, papelera, adjuntar, delegar, firmar y comandos solo aceptan «confirmo». Cualquier «no» cancela.")

@@ -159,8 +159,10 @@ enum AgenteTerminal {
             + "\n- [herramienta:resumir_pagina] Leer una página web y responder sobre ella. \"contenido\" = la dirección."
             + "\n- [herramienta:abrir_sesion_ia] Abrir Claude, Claude Code, Codex, ChatGPT o Gemini. \"contenido\" = cuál; \"lugar\" = nombre del proyecto (opcional) para abrir Claude Code o Codex en su carpeta."
             + "\n- [herramienta:reproducir_youtube] Poner algo en YouTube y que empiece a sonar (abre el primer video). Úsala SIEMPRE que el usuario nombre YouTube, en vez del modo música. \"contenido\" = qué buscar; \"lugar\" = navegador si lo nombra (Edge, Chrome…)."
+            + "\n- [herramienta:obsidian_anotar] Anotar algo en Obsidian («anota en Obsidian que…»). \"contenido\" = el texto a anotar."
+            + "\n- [herramienta:obsidian_buscar] Buscar en las notas de Obsidian del usuario y responder («¿qué decidimos sobre X?», «busca en Obsidian…»). \"contenido\" = palabras clave."
             + "\n- [herramienta:resumen_manana] Resumen del día completo: agenda, correos de todas las cuentas y recordatorios («dame el resumen de la mañana», «¿qué tengo hoy?», «ponme al día»)."
-            + "\n- [herramienta:delegar_agente] Encargar a Claude Code (o Codex si lo nombra) una tarea que BtoDicta no hace por sí mismo, sobre todo lo que describe una habilidad externa (proformas, facturas, informes con formato oficial, despliegues…). \"contenido\" = el encargo completo en español: qué hacer, con qué habilidad y TODOS los datos dados; \"lugar\" = proyecto (opcional). BtoDicta pide confirmación."
+            + "\n- [herramienta:delegar_agente] Encargar a Claude Code (o Codex si lo nombra) una tarea que BtoDicta no hace por sí mismo, sobre todo lo que describe una habilidad externa (proformas, facturas, informes con formato oficial, despliegues…) y los sistemas internos de la oficina (gestión documental como Quipux, registro de actividades, servidores). \"contenido\" = el encargo completo en español: qué hacer, con qué habilidad y TODOS los datos dados; \"lugar\" = proyecto (opcional). BtoDicta pide confirmación."
             + "\n- [herramienta:firmar_documento] Preparar la firma de un PDF: lo abre en la app oficial de firma; BtoDicta NUNCA firma. \"contenido\" = ruta o parte del nombre; vacío = el PDF más reciente."
             + "\n- [herramienta:crear_habilidad] Guardar una habilidad propia del usuario («crea una habilidad: cuando pida X, haz Y»). \"asunto\" = nombre corto; \"palabras\" = palabras clave separadas por comas; \"contenido\" = las instrucciones."
         return """
@@ -254,16 +256,26 @@ enum AgenteTerminal {
                                                  "resumen_bitacora", "transcribir_archivo",
                                                  "ver_pantalla", "editar_seleccion", "crear_habilidad",
                                                  "leer_documento", "resumir_pagina", "abrir_sesion_ia", "firmar_documento",
-                                                 "reproducir_youtube", "delegar_agente", "resumen_manana"]
+                                                 "reproducir_youtube", "delegar_agente", "resumen_manana",
+                                                 "obsidian_anotar", "obsidian_buscar"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,
               let data = String(texto[a...b]).data(using: .utf8),
               let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let c = j["capacidad"] as? [String: Any] else { return nil }
-        var clave = ((c["clave"] as? String) ?? "").replacingOccurrences(of: "herramienta:", with: "")
-        // A veces la IA pone la herramienta en "tipo" y deja "clave" vacía.
-        if clave.isEmpty { clave = ((c["tipo"] as? String) ?? "").replacingOccurrences(of: "herramienta:", with: "") }
+        func limpia(_ s: String?) -> String {
+            (s ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "[] ")).replacingOccurrences(of: "herramienta:", with: "")
+        }
+        var clave = limpia(c["clave"] as? String)
+        var contenidoDeClave: String?
+        // A veces la IA pone la herramienta en "tipo" y en "clave" deja vacío u otro dato
+        // («from:ana@…», «oficio»): ese dato no se pierde si falta el contenido.
+        let tipo = limpia(c["tipo"] as? String)
+        if !herramientasGraph.contains(clave), herramientasGraph.contains(tipo) {
+            if !clave.isEmpty { contenidoDeClave = (c["clave"] as? String) }
+            clave = tipo
+        }
         guard herramientasGraph.contains(clave) else { return nil }
         func s(_ k: String) -> String? {
             if let n = c[k] as? Int { return String(n) }
@@ -282,7 +294,7 @@ enum AgenteTerminal {
             return nil
         }
         let filas = (c["filas"] as? [[Any]])?.map { $0.map { "\($0)" } }
-        return PlanGraph(herramienta: clave, contenido: s("contenido") ?? "", destinatario: s("destinatario"),
+        return PlanGraph(herramienta: clave, contenido: s("contenido") ?? contenidoDeClave ?? "", destinatario: s("destinatario"),
                          asunto: s("asunto"), numero: s("numero").flatMap { Int($0) },
                          inicio: fecha("inicio"), fin: fecha("fin"), lugar: s("lugar"),
                          tipoDocumento: s("tipo_documento"), filas: filas, palabras: s("palabras"), cuenta: s("cuenta"))
