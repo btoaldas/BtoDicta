@@ -114,6 +114,13 @@ final class ModoIATests: XCTestCase {
         XCTAssertNil(plazo("pensar en dos cosas"))
     }
 
+    func testCierreHablado() {
+        XCTAssertEqual(AgenteTerminal.cierreHablado("Abrí el borrador en Mail", ok: true),
+                       "Abrí el borrador en Mail. ¿Está bien así o cambio algo?")
+        XCTAssertEqual(AgenteTerminal.cierreHablado("", ok: false),
+                       "No pude hacerlo. ¿Quieres que lo intente de otra forma?")
+    }
+
     func testInterpretarPlanTerminal() {
         let r = """
         Claro: {"respuesta":"Reviso el disco","comandos":[{"cmd":"df -h","sudo":false,"proposito":"espacio"},{"cmd":"sudo purge","proposito":"memoria"}]}

@@ -184,6 +184,14 @@ enum AgenteTerminal {
         return String(data: d, encoding: .utf8)
     }
 
+    /// Lo que Beto dice tras una acción: el resultado real y una pregunta para seguir.
+    static func cierreHablado(_ mensaje: String, ok: Bool) -> String {
+        let m = mensaje.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = m.isEmpty ? (ok ? "Listo, ya lo hice." : "No pude hacerlo.") : m
+        let punto = base.hasSuffix(".") || base.hasSuffix("!") || base.hasSuffix("?") ? base : base + "."
+        return punto + (ok ? " ¿Está bien así o cambio algo?" : " ¿Quieres que lo intente de otra forma?")
+    }
+
     /// Destinatario y asunto opcionales de la capacidad elegida en un plan mixto.
     static func camposMixtos(_ texto: String) -> (destinatario: String?, asunto: String?) {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,

@@ -9409,19 +9409,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         return
                     }
                     let campos = AgenteTerminal.camposMixtos(bruto)
-                    MemoriaAgente.registrar(usuario: texto, asistente: acuse.isEmpty ? "Ejecuto \(d.nombre)." : acuse)
-                    self.responderBreveAgente(acuse, evento: "mixto_acuse")
+                    // Primero la acción, en silencio; después Beto cuenta el resultado
+                    // real y pregunta. Escuchar de nuevo llega al terminar de hablar.
+                    var contado = false
+                    let contar: (String) -> Void = { [weak self] t in
+                        guard let self, !contado else { return }
+                        contado = true
+                        self.entregarRespuestaAgente(t, pedido: texto, motor: "Mixto", token: self.nuevoAgente(),
+                                                     crudo: "", wav: Data(), history: nil)
+                    }
                     self.ejecutarAccion(d.contenido, modo: m, destinatario: campos.destinatario,
                                         asunto: campos.asunto, wav: wav, history: history,
-                                        completion: { [weak self] in self?.continuarConversacionIA() },
-                                        contextoAgente: true)
+                                        completion: { contar("Listo, ya lo hice. ¿Necesitas algo más?") },
+                                        contextoAgente: true,
+                                        alResultado: { r in
+                                            contar(AgenteTerminal.cierreHablado(r.mensaje, ok: r.ok))
+                                        })
                     return
                 }
                 if self.ejecutarDecisionRouter(d, pedido: texto, crudo: crudo, wav: wav,
                                                history: history, modoNormal: modoNormal) {
-                    MemoriaAgente.registrar(usuario: texto, asistente: acuse.isEmpty ? "Ejecuto \(d.nombre)." : acuse)
-                    self.responderBreveAgente(acuse, evento: "mixto_acuse")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.continuarConversacionIA() }
+                    let t = acuse.isEmpty ? "Listo. ¿Necesitas algo más?" : acuse + " ¿Necesitas algo más?"
+                    self.entregarRespuestaAgente(t, pedido: texto, motor: "Mixto", token: self.nuevoAgente(),
+                                                 crudo: "", wav: Data(), history: nil)
                     return
                 }
                 // No ejecutable: sigue con comandos o respuesta.
@@ -10057,7 +10067,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                 nombreArchivo: String? = nil,
                                 wav: Data, history: HistoryWriter?,
                                 completion: (() -> Void)? = nil,
-                                contextoAgente: Bool = false) {
+                                contextoAgente: Bool = false,
+                                alResultado: ((ResultadoHerramientaApple) -> Void)? = nil) {
         let t = texto.trimmingCharacters(in: .whitespacesAndNewlines)
         let id = modo.accion.isEmpty ? "correo" : modo.accion
         if id == "musica" {
@@ -10108,7 +10119,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 MemoriaAgente.registrar(usuario: "(resultado de \(Acciones.nombre(id)))",
                                         asistente: r.ok ? "Hecho." : "Falló.")
             }
-            if contextoAgente, !r.ok, id != "grabar_pantalla" {
+            if let alResultado {
+                alResultado(r)   // quien lo pidió habla del resultado
+            } else if contextoAgente, !r.ok, id != "grabar_pantalla" {
                 responderBreveAgente(r.mensaje, evento: "fallo_herramienta")
             } else if contextoAgente, r.ok, id == "clima" {
                 responderBreveAgente(r.mensaje, evento: "resultado_clima")
