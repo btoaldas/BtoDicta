@@ -127,7 +127,7 @@ enum RouterGlobalIA {
         return String("\(codigo): \(mensaje)".prefix(160))
     }
 
-    static func llamarIA(_ ia: ChatIA, prompt: String, textLen: Int,
+    static func llamarIA(_ ia: ChatIA, prompt: String, textLen: Int, plazo: Double = 15,
                                  _ completion: @escaping (String?) -> Void) {
         if ia.esCuentaCodex {
             AgenteCodex.transformar(prompt, modelo: ia.modeloEfectivo,
@@ -142,7 +142,7 @@ enum RouterGlobalIA {
         // El prompt del router lleva TODO el catálogo (decenas de capacidades):
         // necesita más aire que el árbitro de modos (cuyo tope es 8 s). Sin esto
         // se cortaba y el pedido caía al cerebro sin ejecutar (ej. "hazme una tarea").
-        req.timeoutInterval = 15
+        req.timeoutInterval = plazo
         URLSession.shared.dataTask(with: req) { data, resp, error in
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             let out: String? = {

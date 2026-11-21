@@ -1687,4 +1687,12 @@ struct Config {
     static func graphClientID() -> String { (json()["graph_client_id"] as? String) ?? "" }
     /// Directorio: «common» (cualquier cuenta), «organizations», «consumers» o un tenant.
     static func graphTenant() -> String { (json()["graph_tenant"] as? String) ?? "common" }
+
+    /// Cómo HABLA Beto (spec 017, fase 1). Distinto del tono de los documentos.
+    static func agentePersonaVoz() -> String {
+        let v = ((json()["agente_persona_voz"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return v.isEmpty
+            ? "Como un colega cercano y alegre: frases cortas y naturales, el resultado directo («Listo, ya está», «Son las 8:36 en Madrid», «Dos más dos, cuatro»). Sin jerga técnica, sin hablar de comandos ni de cómo lo hiciste."
+            : String(v.prefix(600))
+    }
 }

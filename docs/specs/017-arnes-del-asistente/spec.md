@@ -1,6 +1,6 @@
 # Spec 017 — Arnés del asistente: gobernanza, habilidades, memoria y evaluación
 
-- Estado: Borrador (diseño; pendiente la decisión de fases)
+- Estado: En implementación (fase 1 hecha; fases 2–4 pendientes)
 - Tipo: funcionalidad
 - Nivel: P (heredado del ROADMAP; lo fija sw-ciclo)
 - Fecha: 2026-11-21
@@ -81,6 +81,20 @@ código determinista de BtoDicta.
    portables se exponen como fichas.
 
 ## 7. Tareas y evidencia
+
+Fase 1 aprobada por Alberto el 2026-11-21 («Sí, fase 1»).
+
+- [x] Señal «Tink» y «Te escucho» al volver a escuchar; cierre hablado corto («¿Algo más?»).
+- [x] Anti-duplicados: la misma acción en menos de 90 s se consulta antes de repetirla.
+- [x] Promesa sin acción: un reintento exigiendo la herramienta.
+- [x] En el modo «Todo», las reglas fijas solo para lo preciso (volumen, clima, capturas, recordatorios, rutinas); el resto lo decide la IA con el catálogo. Con Microsoft, el calendario va solo por Graph.
+- [x] Persona hablada editable (`agente_persona_voz`), distinta del tono de los documentos; regla de no inventar numeración; una sola acción por turno.
+- [x] Plazo del cerebro 40 s (antes 15: «silencia la computadora» caducó); «silencia la computadora/el equipo/la Mac» por regla fija.
+- [x] Herramienta `tareas_resumen` (tareas de BtoDicta).
+- [x] Evaluación automática `EvaluacionAsistenteTests` (25 casos genéricos, reglas + IA, sin ejecutar).
+
+Medición con glm-5.3 y la configuración de Alberto: **68 %** al cerrar los arreglos de conversación; **96 %**, 96 % y **100 %** tras limitar las reglas fijas y agregar la herramienta de tareas (el caso variable es «abre la calculadora», cubierto en la app por el reintento).
+
 
 Se detallan al aprobar las fases. Línea base: 30 % estimado por Alberto en la
 prueba real; la evaluación automática dará la cifra medida.

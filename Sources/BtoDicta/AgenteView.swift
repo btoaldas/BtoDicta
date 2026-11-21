@@ -154,6 +154,7 @@ final class AgenteSettingsModel: ObservableObject {
     @Published var iaConfirmacion: String { didSet { Config.set("agente_ia_confirmacion", to: iaConfirmacion) } }
     @Published var terminalTimeout: Double { didSet { Config.set("agente_terminal_timeout", to: terminalTimeout) } }
     @Published var clicCalla: Bool { didSet { Config.set("agente_clic_calla", to: clicCalla) } }
+    @Published var personaVoz: String { didSet { Config.set("agente_persona_voz", to: String(personaVoz.prefix(600))) } }
     // Correo de Microsoft por Graph (spec 015)
     @Published var graphActivo: Bool { didSet { Config.set("agente_graph_activo", to: graphActivo) } }
     @Published var graphClientID: String { didSet { Config.set("graph_client_id", to: graphClientID.trimmingCharacters(in: .whitespaces)) } }
@@ -276,6 +277,7 @@ final class AgenteSettingsModel: ObservableObject {
         gestoVentana = Config.agenteGestoVentana(); gestoConversacion = Config.agenteGestoConversacion()
         iaDecision = Config.agenteIADecision(); iaConfirmacion = Config.agenteIAConfirmacion()
         terminalTimeout = Config.agenteTerminalTimeout(); clicCalla = Config.agenteClicCalla()
+        personaVoz = (Config.json0("agente_persona_voz") as? String) ?? ""
         graphActivo = Config.agenteGraphActivo(); graphClientID = Config.graphClientID()
         graphTenant = Config.graphTenant()
         volumenPaso = Double(Config.agenteVolumenPaso())
@@ -694,6 +696,10 @@ struct AgenteView: View {
                     Text("Con sudo, macOS pide tu clave en su propio diálogo; BtoDicta no la ve ni la guarda.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                field("Cómo te habla Beto", text: $m.personaVoz,
+                      placeholder: "Vacío = colega cercano y alegre, frases cortas y el resultado directo")
+                Text("Es solo su forma de hablarte. Los documentos que redacta conservan su propio tono (formal, oficio…).")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Un clic en el icono de la barra calla a Beto mientras habla", isOn: $m.clicCalla)
                 Text("Órdenes directas, sin IA: «calla» corta la voz; «tacha la tarea X» o «marca como hecha X» la completa.")
                     .font(.caption).foregroundStyle(.secondary)

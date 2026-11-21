@@ -234,6 +234,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Última lista de correos leída y último borrador (spec 016).
     private var graphUltimosCorreos: [CorreoLeido] = []
     private var graphUltimoBorrador: BorradorGraph?
+    /// Última acción del modo «Todo» y la repetición ya consultada (anti-duplicados).
+    private var ultimaAccionIA: (firma: String, cuando: Date)?
+    private var repeticionPendiente: String?
     /// El manejador del monitor de fn, para que su arnés lo alimente con eventos
     /// sintéticos sin tocar el teclado del sistema (spec 012, T07).
     fileprivate var manejadorFlags: ((NSEvent) -> Void)?
@@ -6384,8 +6387,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Abre un turno del Agente. Con un dictado ya grabando, lo reorienta al
     /// Agente sin cortarlo: el modo se congela al cerrar.
-    private func activarModoIAPorGesto() {
+    private func activarModoIAPorGesto(desdeConversacion: Bool = false) {
         guard !hayConfirmacion, !CapturaMac.grabacionContinuaEnCurso else { return }
+        if desdeConversacion {
+            // Señal clara de «te escucho»: sin ella parecía que se había cerrado.
+            playSound("Tink")
+        }
         let agente = ModosStore.modo("agente")
         guard agente.id == "agente" else { return }
         modoPendienteVoz = agente
@@ -6423,7 +6430,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if intentos > 0 { self.continuarConversacionIA(intentos: intentos - 1) }
                 return
             }
-            self.activarModoIAPorGesto()
+            self.activarModoIAPorGesto(desdeConversacion: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let self, self.recorder.isRecording else { return }
+                self.panel.update("🎙️ Te escucho…")
+            }
         }
     }
 
@@ -9064,7 +9075,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             return
         }
-        if Config.agenteNucleoActivo(), let plan = AgenteNucleo.planificar(texto) {
+        if Config.agenteNucleoActivo(), let plan = AgenteNucleo.planificar(texto),
+           Config.agenteIADecision() != "mixto" || ReglasModoTodo.admite(plan, graph: MicrosoftGraph.disponible) {
             AgenteLog.registrar("plan", ["descripcion": plan.descripcion,
                 "nivel": PoliticaAgente.nivel.rawValue,
                 "riesgo": PoliticaAgente.riesgo(de: plan.cadena).rawValue,
@@ -9379,7 +9391,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Una sola consulta al cerebro del Agente: capacidad del catálogo, comandos
     /// o respuesta. La capacidad pasa por el mismo despacho (y confirmación) del router.
     private func responderAgenteMixto(_ texto: String, modo: Modo, crudo: String,
-                                      wav: Data, history: HistoryWriter?, modoNormal: Modo?) {
+                                      wav: Data, history: HistoryWriter?, modoNormal: Modo?,
+                                      reintento: Bool = false) {
         let tok = nuevoAgente()
         let ia = iaDelAgente(modo)
         if !recorder.isRecording { panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
@@ -9396,6 +9409,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         CerebroTexto.pedir(prompt, ia: ia) { [weak self] r in
             guard let self, self.agenteVigente(tok) else { return }
             let bruto = r ?? ""
+            // Anunció una acción sin traerla: un reintento exigiéndola.
+            if !reintento, let p = AgenteTerminal.interpretar(bruto), p.comandos.isEmpty,
+               AgenteTerminal.capacidadMixta(bruto) == nil, AgenteTerminal.planGraph(bruto) == nil,
+               AgenteTerminal.prometeSinHacer(p.respuesta) {
+                AgenteLog.registrar("mixto_promesa_sin_accion", ["respuesta": p.respuesta])
+                self.responderAgenteMixto(texto + "\n(Tu respuesta anterior anunció una acción sin incluirla. Incluye ahora la capacidad o los comandos que la hacen, o di con honestidad que no puedes.)",
+                                          modo: modo, crudo: crudo, wav: wav, history: history,
+                                          modoNormal: modoNormal, reintento: true)
+                return
+            }
+            // Lo mismo otra vez en poco tiempo: se pregunta antes de repetirlo.
+            if let firma = AgenteTerminal.firmaAccion(bruto) {
+                if let u = self.ultimaAccionIA, u.firma == firma, Date().timeIntervalSince(u.cuando) < 90,
+                   self.repeticionPendiente != firma {
+                    self.repeticionPendiente = firma
+                    self.entregarRespuestaAgente("Eso ya lo hice hace un momento. ¿Quieres que lo haga otra vez?",
+                                                 pedido: texto, motor: "Mixto", token: tok,
+                                                 crudo: crudo, wav: wav, history: history)
+                    return
+                }
+                self.repeticionPendiente = nil
+                self.ultimaAccionIA = (firma, Date())
+            }
+            if let plan = AgenteTerminal.planGraph(bruto), plan.herramienta == "tareas_resumen" {
+                let c = PerfilAgente.normalizar(plan.contenido)
+                let alcance: AlcanceResumen = c.contains("hoy") ? .hoy : (c.contains("semana") ? .semana : .pendientes)
+                self.finAgente()
+                self.manejarComandoTarea(.resumen(alcance), crudo: crudo, wav: wav, history: history) { [weak self] in
+                    self?.continuarConversacionIA()
+                }
+                return
+            }
             if MicrosoftGraph.disponible, let plan = AgenteTerminal.planGraph(bruto) {
                 AgenteLog.registrar("graph_herramienta", ["herramienta": plan.herramienta])
                 self.ejecutarGraph(plan, pedido: texto, ia: ia, token: tok)

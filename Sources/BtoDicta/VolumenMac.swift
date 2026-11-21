@@ -159,7 +159,8 @@ struct SolicitudVolumenMac: Equatable {
 
         if ["mute", "silencio", "silencia", "silenciar", "mutea", "mutear"].contains(normal)
             || contiene(#"^(?:pon|ponme|ponlo|deja|dejalo)\s+(?:(?:el\s+)?(?:volumen|sonido|audio)\s+)?(?:en\s+)?(?:mute|silencio|mudo)\b"#, en: normal)
-            || contiene(#"^(?:silencia|silenciar|mutea|mutear|apaga)\s+(?:el\s+)?(?:sonido|audio|volumen)\b"#, en: normal) {
+            || contiene(#"^(?:silencia|silenciar|mutea|mutear|apaga)\s+(?:el\s+)?(?:sonido|audio|volumen)\b"#, en: normal)
+            || contiene(#"^(?:silencia|silenciar|mutea|mutear)\s+(?:la\s+|el\s+)?(?:computadora|compu|equipo|mac|ordenador|laptop|portatil)\b"#, en: normal) {
             return SolicitudVolumenMac(.silenciar)
         }
 
