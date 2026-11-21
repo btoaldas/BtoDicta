@@ -232,16 +232,77 @@ enum GoogleCuenta {
     }
 
     /// Mensaje RFC 822 en base64url (puro): asunto en UTF-8 y cuerpo en base64.
-    static func mime(para: [String], asunto: String, cuerpo: String) -> String {
+    static func mime(para: [String], asunto: String, cuerpo: String, extras: [(String, String)] = []) -> String {
         let a = "=?UTF-8?B?\(Data(asunto.utf8).base64EncodedString())?="
-        // Sin saltos de línea en destinatarios: evita inyectar cabeceras (CC/CCO ocultos).
-        let destinos = para.map { $0.components(separatedBy: .newlines).joined() }
-        let texto = "To: \(destinos.joined(separator: ", "))\r\nSubject: \(a)\r\nMIME-Version: 1.0\r\n"
+        // Sin saltos de línea en destinatarios ni cabeceras: evita inyectar cabeceras (CC/CCO ocultos).
+        let limpio: (String) -> String = { $0.components(separatedBy: .newlines).joined() }
+        let destinos = para.map(limpio)
+        let cabeceras = extras.map { "\(limpio($0.0)): \(limpio($0.1))\r\n" }.joined()
+        let texto = "To: \(destinos.joined(separator: ", "))\r\nSubject: \(a)\r\n" + cabeceras + "MIME-Version: 1.0\r\n"
             + "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n"
             + Data(cuerpo.utf8).base64EncodedString(options: .lineLength76Characters)
         return Data(texto.utf8).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+    }
+
+    /// Datos para responder o reenviar: cabeceras, hilo y texto del original.
+    struct Original { let de: String; let responderA: String; let asunto: String; let idMensaje: String
+                      let referencias: String; let hilo: String; let texto: String; let fecha: String }
+
+    static func leerOriginal(_ json: Any?) -> Original? {
+        guard let j = json as? [String: Any], let p = j["payload"] as? [String: Any] else { return nil }
+        let cab = (p["headers"] as? [[String: Any]]) ?? []
+        func h(_ n: String) -> String { (cab.first { ($0["name"] as? String)?.lowercased() == n }?["value"] as? String) ?? "" }
+        return Original(de: h("from"), responderA: h("reply-to"), asunto: h("subject"), idMensaje: h("message-id"),
+                        referencias: h("references"), hilo: (j["threadId"] as? String) ?? "",
+                        texto: textoDe(p), fecha: h("date"))
+    }
+
+    /// «Re: …» sin duplicar el prefijo. Puro.
+    static func asuntoCon(_ prefijo: String, _ asunto: String) -> String {
+        asunto.lowercased().hasPrefix(prefijo.lowercased()) ? asunto : "\(prefijo) \(asunto)"
+    }
+
+    private static func original(_ cuenta: CuentaNube, _ id: String, fin: @escaping (Original?) -> Void) {
+        llamar(cuenta, "GET", gmail + "/messages/\(id)", query: [URLQueryItem(name: "format", value: "full")]) { c, json in
+            fin(c == 200 ? leerOriginal(json) : nil)
+        }
+    }
+
+    private static func borradorEnHilo(_ cuenta: CuentaNube, para: [String], asunto: String, cuerpo: String,
+                                       extras: [(String, String)], hilo: String, fin: @escaping Fin<BorradorGraph>) {
+        var msg: [String: Any] = ["raw": mime(para: para, asunto: asunto, cuerpo: cuerpo, extras: extras)]
+        if !hilo.isEmpty { msg["threadId"] = hilo }
+        llamar(cuenta, "POST", gmail + "/drafts", cuerpo: ["message": msg]) { c, json in
+            guard c == 200, let id = (json as? [String: Any])?["id"] as? String else { fin(.failure(MicrosoftGraph.error(c))); return }
+            fin(.success(BorradorGraph(id: id, asunto: asunto, para: para, enlace: "https://mail.google.com/mail/#drafts",
+                                       inicio: String(cuerpo.prefix(200)), cuerpo: cuerpo)))
+        }
+    }
+
+    /// Respuesta en el mismo hilo, como borrador.
+    static func crearRespuesta(_ cuenta: CuentaNube, _ id: String, texto: String, fin: @escaping Fin<BorradorGraph>) {
+        original(cuenta, id) { o in
+            guard let o else { fin(.failure(.respuesta("no pude leer el correo original"))); return }
+            let para = o.responderA.isEmpty ? o.de : o.responderA
+            let cita = o.texto.split(separator: "\n", omittingEmptySubsequences: false).prefix(40).map { "> " + $0 }.joined(separator: "\n")
+            let cuerpo = texto + "\n\nEl \(o.fecha), \(o.de) escribió:\n" + cita
+            let refs = (o.referencias + " " + o.idMensaje).trimmingCharacters(in: .whitespaces)
+            borradorEnHilo(cuenta, para: [para], asunto: asuntoCon("Re:", o.asunto), cuerpo: cuerpo,
+                           extras: o.idMensaje.isEmpty ? [] : [("In-Reply-To", o.idMensaje), ("References", refs)],
+                           hilo: o.hilo, fin: fin)
+        }
+    }
+
+    /// Reenvío como borrador con el texto del original (sin sus adjuntos).
+    static func crearReenvio(_ cuenta: CuentaNube, _ id: String, para: String, comentario: String, fin: @escaping Fin<BorradorGraph>) {
+        original(cuenta, id) { o in
+            guard let o else { fin(.failure(.respuesta("no pude leer el correo original"))); return }
+            let cuerpo = (comentario.isEmpty ? "" : comentario + "\n\n") + "---------- Mensaje reenviado ----------\n"
+                + "De: \(o.de)\nFecha: \(o.fecha)\nAsunto: \(o.asunto)\n\n" + o.texto
+            borradorEnHilo(cuenta, para: [para], asunto: asuntoCon("Fwd:", o.asunto), cuerpo: cuerpo, extras: [], hilo: "", fin: fin)
+        }
     }
 
     static func crearBorrador(_ cuenta: CuentaNube, para: [String], asunto: String, cuerpo: String,

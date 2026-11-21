@@ -167,7 +167,7 @@ enum Arnes {
         - Marcar (leído, no leído, destacado): marcar_correo · mover a una carpeta: mover_correo · papelera: papelera_correo.
         - Adjuntos de un correo a Descargas/BtoDicta: adjuntos_correo · adjuntar un archivo al borrador: adjuntar_archivo.
         - Agenda: ver_agenda; crear: crear_evento (sin invitados).
-        - Responder y reenviar solo en cuentas Microsoft; en Gmail, un borrador nuevo.
+        - Responder y reenviar funcionan en Microsoft y en Gmail (siempre como borrador).
         - Si no hay ninguna cuenta conectada, abrir el correo web es lo único posible.
         """))
         f.append(("mac.md", """

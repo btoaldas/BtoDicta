@@ -100,3 +100,31 @@ final class CorreoAccionesTests: XCTestCase {
         }
     }
 }
+
+/// Responder y reenviar en Gmail (spec 019, fase 4).
+final class GmailResponderTests: XCTestCase {
+    func testAsuntoSinDuplicarPrefijo() {
+        XCTAssertEqual(GoogleCuenta.asuntoCon("Re:", "Informe"), "Re: Informe")
+        XCTAssertEqual(GoogleCuenta.asuntoCon("Re:", "RE: Informe"), "RE: Informe")
+        XCTAssertEqual(GoogleCuenta.asuntoCon("Fwd:", "Informe"), "Fwd: Informe")
+    }
+
+    func testLeerOriginal() throws {
+        let cuerpo = Data("Hola".utf8).base64EncodedString()
+        let j: [String: Any] = ["threadId": "T1", "payload": ["mimeType": "text/plain", "body": ["data": cuerpo], "headers": [
+            ["name": "From", "value": "Ana <ana@x.example>"], ["name": "Reply-To", "value": "lista@x.example"],
+            ["name": "Subject", "value": "Informe"], ["name": "Message-ID", "value": "<m1@x>"],
+            ["name": "References", "value": "<m0@x>"]]]]
+        let o = try XCTUnwrap(GoogleCuenta.leerOriginal(j))
+        XCTAssertEqual(o.hilo, "T1"); XCTAssertEqual(o.responderA, "lista@x.example")
+        XCTAssertEqual(o.idMensaje, "<m1@x>"); XCTAssertEqual(o.referencias, "<m0@x>"); XCTAssertEqual(o.texto, "Hola")
+    }
+
+    func testCabecerasExtraSinInyeccion() {
+        let raw = GoogleCuenta.mime(para: ["a@x.example"], asunto: "Re: x", cuerpo: "y",
+                                    extras: [("In-Reply-To", "<m1@x>\r\nBcc: espia@x.example")])
+        let t = String(decoding: GoogleCuenta.base64url(raw)!, as: UTF8.self)
+        XCTAssertTrue(t.contains("In-Reply-To: <m1@x>Bcc: espia@x.example\r\n"))
+        XCTAssertFalse(t.contains("\r\nBcc:"))
+    }
+}

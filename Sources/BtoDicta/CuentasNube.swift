@@ -130,7 +130,6 @@ struct OperacionesCorreo {
 
     private var google: CuentaNube? { cuenta?.proveedor == .google ? cuenta : nil }
     private func usarMicrosoft() { if cuenta?.proveedor == .microsoft { MicrosoftGraph.usar(cuenta) } }
-    private func noGmail<T>(_ fin: Fin<T>) { fin(.failure(.respuesta("todavía no disponible en Gmail"))) }
 
     func leerBandeja(dias: Int, fin: @escaping Fin<[CorreoLeido]>) {
         if let g = google { GoogleCuenta.leerBandeja(g, dias: dias, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.leerBandeja(dias: dias, fin: fin) }
@@ -150,10 +149,11 @@ struct OperacionesCorreo {
         else { usarMicrosoft(); MicrosoftGraph.modificarBorrador(b.id, asunto: asunto, cuerpo: cuerpo, fin: fin) }
     }
     func crearRespuesta(_ id: String, texto: String, fin: @escaping Fin<BorradorGraph>) {
-        if google != nil { noGmail(fin) } else { usarMicrosoft(); MicrosoftGraph.crearRespuesta(id, texto: texto, fin: fin) }
+        if let g = google { GoogleCuenta.crearRespuesta(g, id, texto: texto, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.crearRespuesta(id, texto: texto, fin: fin) }
     }
     func crearReenvio(_ id: String, para: String, comentario: String, fin: @escaping Fin<BorradorGraph>) {
-        if google != nil { noGmail(fin) } else { usarMicrosoft(); MicrosoftGraph.crearReenvio(id, para: para, comentario: comentario, fin: fin) }
+        if let g = google { GoogleCuenta.crearReenvio(g, id, para: para, comentario: comentario, fin: fin) }
+        else { usarMicrosoft(); MicrosoftGraph.crearReenvio(id, para: para, comentario: comentario, fin: fin) }
     }
     func marcar(_ id: String, _ m: MarcaCorreo, fin: @escaping Fin<Void>) {
         if let g = google { GoogleCuenta.marcar(g, id, m, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.marcar(id, m, fin: fin) }
