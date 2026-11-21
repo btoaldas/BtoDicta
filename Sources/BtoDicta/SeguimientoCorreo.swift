@@ -49,8 +49,21 @@ enum SeguimientoCorreo {
     enum Resultado: Equatable { case respondio(asunto: String), vencio, sigue }
 
     /// Qué pasó con un seguimiento según los correos encontrados (puro).
+    /// Solo cuenta un correo cuyo remitente es la persona: su dirección exacta si se conoce
+    /// (un nombre visible se puede falsificar), o si no, el nombre completo (puro).
+    static func esDeLaPersona(_ de: String, persona: String) -> Bool {
+        let p = persona.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if p.contains("@") {
+            let direccion = de.range(of: "<[^>]+>", options: .regularExpression)
+                .map { String(de[$0].dropFirst().dropLast()) } ?? de
+            return direccion.trimmingCharacters(in: .whitespaces).lowercased() == p
+        }
+        return PerfilAgente.normalizar(de).contains(PerfilAgente.normalizar(p))
+    }
+
     static func evaluar(_ s: Seguimiento, correos: [CorreoLeido], ahora: Date = Date()) -> Resultado {
-        if let c = correos.filter({ $0.fecha > s.creado }).max(by: { $0.fecha < $1.fecha }) { return .respondio(asunto: c.asunto) }
+        if let c = correos.filter({ $0.fecha > s.creado && esDeLaPersona($0.de, persona: s.persona) })
+            .max(by: { $0.fecha < $1.fecha }) { return .respondio(asunto: c.asunto) }
         return ahora >= s.hasta ? .vencio : .sigue
     }
 }

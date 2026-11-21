@@ -10220,14 +10220,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             }
         case "seguir_correo":
-            let persona = (plan.destinatario ?? plan.contenido).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !persona.isEmpty else { decir("¿De quién espero el correo?", nil); return }
-            let s = SeguimientoCorreo.agregar(persona: persona, cuenta: cuentaCorreo?.id, hasta: plan.inicio)
-            let f = DateFormatter(); f.locale = Locale(identifier: "es"); f.dateFormat = "EEEE d 'a las' HH:mm"
-            decir(s.conPlazo
-                  ? "Listo, si \(persona) no te responde hasta el \(f.string(from: s.hasta)), te aviso. ¿Algo más?"
-                  : "Listo, te aviso en cuanto te escriba \(persona). ¿Algo más?",
-                  "Vigilo el correo de \(persona)\(s.conPlazo ? " hasta el \(f.string(from: s.hasta))" : "").")
+            let nombre = (plan.destinatario ?? plan.contenido).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !nombre.isEmpty else { decir("¿De quién espero el correo?", nil); return }
+            let registrar: (String) -> Void = { [weak self] persona in
+                let s = SeguimientoCorreo.agregar(persona: persona, cuenta: self?.cuentaCorreo?.id, hasta: plan.inicio)
+                let f = DateFormatter(); f.locale = Locale(identifier: "es"); f.dateFormat = "EEEE d 'a las' HH:mm"
+                decir(s.conPlazo
+                      ? "Listo, si \(nombre) no te responde hasta el \(f.string(from: s.hasta)), te aviso. ¿Algo más?"
+                      : "Listo, te aviso en cuanto te escriba \(nombre). ¿Algo más?",
+                      "Vigilo el correo de \(nombre)\(s.conPlazo ? " hasta el \(f.string(from: s.hasta))" : "").")
+            }
+            // Un nombre se resuelve a su dirección exacta: el nombre visible de un correo se puede falsificar.
+            if nombre.contains("@") { registrar(nombre); return }
+            opsCorreo.buscarPersonas(nombre) { r in
+                if case .success(let p) = r, p.count == 1 { registrar(p[0].correo) } else { registrar(nombre) }
+            }
         case "correo_a_tarea":
             let n = plan.numero ?? Int(plan.contenido.prefix(3).filter(\.isNumber)) ?? 1
             guard n >= 1, n <= graphUltimosCorreos.count else { decir("¿De cuál correo hago la tarea? Dime su número.", nil); return }

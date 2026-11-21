@@ -54,6 +54,11 @@ final class BloqueBTests: XCTestCase {
         XCTAssertEqual(SeguimientoCorreo.evaluar(s, correos: [correo(120)], ahora: creado.addingTimeInterval(200)), .respondio(asunto: "Re: informe"))
         XCTAssertEqual(SeguimientoCorreo.evaluar(s, correos: [], ahora: creado.addingTimeInterval(4000)), .vencio)
         XCTAssertEqual(SeguimientoCorreo.consulta(" Paul \"Leones\" "), "from:Paul Leones")
+        XCTAssertTrue(SeguimientoCorreo.esDeLaPersona("Paul Leones <paul@x.example>", persona: "paul@x.example"))
+        XCTAssertFalse(SeguimientoCorreo.esDeLaPersona("Paul Leones <spam@malo.example>", persona: "paul@x.example"))
+        XCTAssertFalse(SeguimientoCorreo.esDeLaPersona("paul@x.example <spam@malo.example>", persona: "paul@x.example"))
+        XCTAssertTrue(SeguimientoCorreo.esDeLaPersona("Paul Leones <p@x.example>", persona: "Paul Leones"))
+        XCTAssertFalse(SeguimientoCorreo.esDeLaPersona("Ana <a@x.example>", persona: "Paul"))
     }
 
     func testPlanesBloqueB() {
