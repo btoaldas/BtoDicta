@@ -10103,8 +10103,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             }
             if contextoAgente {
+                // Solo acción y estado: el mensaje puede traer texto externo y la
+                // memoria vuelve a la IA en cada turno.
                 MemoriaAgente.registrar(usuario: "(resultado de \(Acciones.nombre(id)))",
-                                        asistente: (r.ok ? "Hecho: " : "Falló: ") + r.mensaje)
+                                        asistente: r.ok ? "Hecho." : "Falló.")
             }
             if contextoAgente, !r.ok, id != "grabar_pantalla" {
                 responderBreveAgente(r.mensaje, evento: "fallo_herramienta")
