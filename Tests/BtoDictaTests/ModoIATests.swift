@@ -121,6 +121,14 @@ final class ModoIATests: XCTestCase {
                        "No pude hacerlo. ¿Lo intento de otra forma?")
     }
 
+    func testRouterAceptaLaFraseDeVoz() {
+        let caps = [Capacidad(tipo: "modo", clave: "aplicacion", nombre: "Aplicación", descripcion: "abre",
+                              frases: ["modo abrir aplicación", "modo aplicación"], riesgo: .reversible, fuente: "", hijos: [])]
+        let d = RouterGlobalIA.interpretar(#"{"tipo":"aplicacion","clave":"modo abrir aplicación","contenido":"Calculadora","confianza":1}"#,
+                                           catalogo: caps, texto: "x")
+        XCTAssertEqual(d?.clave, "aplicacion")
+    }
+
     func testInterpretarPlanTerminal() {
         let r = """
         Claro: {"respuesta":"Reviso el disco","comandos":[{"cmd":"df -h","sudo":false,"proposito":"espacio"},{"cmd":"sudo purge","proposito":"memoria"}]}

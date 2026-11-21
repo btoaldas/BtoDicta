@@ -5083,6 +5083,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) { FrasesBeto.generarFaltantes() }
         }
         AutoAyudaControles.shared.activar()
+        // Arnés del asistente: regenera las fichas de BtoDicta y crea las del usuario si faltan.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { Arnes.preparar() }
         TareasRecordatorios.shared.iniciar { [weak self] aviso in
             self?.presentarAvisoPendiente(aviso)
         }
@@ -9416,13 +9418,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Solo lo que este modo ejecuta (modos y conexiones), y nunca el propio
         // Agente: elegirlo volvería a consultar a la IA con el mismo pedido.
         let caps = CatalogoCapacidades.todas().filter {
-            ["modo", "conexion"].contains($0.tipo) && $0.clave != "agente"
+            ["modo", "conexion", "rutina"].contains($0.tipo) && $0.clave != "agente"
                 && ModosStore.modo($0.clave).base != "agente"
         }
         let contexto = Config.agenteMemoriaContextoIA() ? MemoriaAgente.contexto() : ""
         let prompt = AgenteTerminal.promptMixto(pedido: texto, contexto: contexto,
                                                 catalogo: CatalogoCapacidades.paraIA(caps),
-                                                correo: MicrosoftGraph.disponible)
+                                                correo: MicrosoftGraph.disponible,
+                                                arnes: Arnes.contexto(para: texto))
         CerebroTexto.pedir(prompt, ia: ia) { [weak self] r in
             guard let self, self.agenteVigente(tok) else { return }
             let bruto = r ?? ""
@@ -9449,6 +9452,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.repeticionPendiente = nil
                 self.ultimaAccionIA = (firma, Date())
             }
+            if let plan = AgenteTerminal.planGraph(bruto), plan.herramienta == "recordar" {
+                let ok = Arnes.recordar(plan.contenido)
+                self.entregarRespuestaAgente(ok ? "Anotado, lo recordaré. ¿Algo más?" : "No pude anotarlo; dímelo en una frase más corta.",
+                                             pedido: texto, motor: "Arnés", token: tok, crudo: crudo, wav: wav,
+                                             history: history, memoria: ok ? "Guardé en la memoria: \(plan.contenido.prefix(120))" : nil)
+                return
+            }
             if let plan = AgenteTerminal.planGraph(bruto), plan.herramienta == "tareas_resumen" {
                 let c = PerfilAgente.normalizar(plan.contenido)
                 let alcance: AlcanceResumen = c.contains("hoy") ? .hoy : (c.contains("semana") ? .semana : .pendientes)
@@ -9465,12 +9475,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             if let cj = AgenteTerminal.capacidadMixta(bruto),
                let d = RouterGlobalIA.interpretar(cj, catalogo: caps, texto: texto),
-               ["modo", "conexion"].contains(d.tipo) {
+               ["modo", "conexion", "rutina"].contains(d.tipo) {
                 AgenteLog.registrar("mixto_capacidad", ["tipo": d.tipo, "clave": d.clave, "contenido": d.contenido])
                 self.finAgente()
                 let acuse = AgenteTerminal.interpretar(bruto)?.respuesta ?? ""
-                let m = ModosStore.modo(d.clave)
-                if d.tipo == "modo", m.id == d.clave, m.base == "accion" {
+                // Una rutina o receta se ejecuta como la acción «rutina» de siempre.
+                let m = d.tipo == "rutina"
+                    ? Modo(id: "agente-rutina", nombre: "Rutina · \(d.nombre)", icono: "bolt.fill",
+                           base: "accion", prompt: d.clave, accion: "rutina")
+                    : ModosStore.modo(d.clave)
+                if (d.tipo == "modo" && m.id == d.clave || d.tipo == "rutina"), m.base == "accion" {
                     // Una acción recibe sus campos (destinatario, asunto) como en el
                     // planificador determinista: así el borrador no mete todo en el asunto.
                     if Config.agenteIAConfirmacion() == "aprobacion",

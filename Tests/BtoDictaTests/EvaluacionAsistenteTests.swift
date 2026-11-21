@@ -32,6 +32,7 @@ final class EvaluacionAsistenteTests: XCTestCase {
         ("Borra todos los correos de hoy", "respuesta"),
         ("Hola, ¿cómo estás?", "respuesta"),
         ("¿Qué tareas tengo pendientes en BtoDicta?", "graph:tareas_resumen"),
+        ("Recuerda que mi jefe directo se llama Pedro Gómez", "graph:recordar"),
     ]
 
     func testCasosValidos() {
@@ -49,7 +50,8 @@ final class EvaluacionAsistenteTests: XCTestCase {
         let modelo = ProcessInfo.processInfo.environment["BTODICTA_IA_MODELO"] ?? ""
         let ia = modelo.isEmpty ? base : base.conModelo(modelo)
         let graph = ProcessInfo.processInfo.environment["BTODICTA_IA_GRAPH"] == "1"
-        let caps = CatalogoCapacidades.todas().filter { ["modo", "conexion"].contains($0.tipo) && $0.clave != "agente" }
+        let caps = CatalogoCapacidades.todas().filter { ["modo", "conexion", "rutina"].contains($0.tipo) && $0.clave != "agente" }
+        Arnes.preparar(catalogo: CatalogoCapacidades.todas())
         var aciertos = 0
         for (pedido, esperado) in Self.casos {
             var obtenido = AgenteEvaluacion.porReglas(pedido, graph: graph)
@@ -58,7 +60,8 @@ final class EvaluacionAsistenteTests: XCTestCase {
                 // Lo que en la app ya habría pasado en turnos anteriores.
                 let contexto = "MEMORIA CORTA DE ESTA CONVERSACIÓN:\nUsuario: revisa mis correos de hoy\nBeto: Revisé 5 correos de los últimos 1 día(s).\nUsuario: hazme un borrador para colega@ejemplo.org sobre el informe\nBeto: Preparé un borrador en Microsoft para colega@ejemplo.org, asunto «Informe semanal»."
                 let p = AgenteTerminal.promptMixto(pedido: pedido, contexto: contexto,
-                                                   catalogo: CatalogoCapacidades.paraIA(caps), correo: graph)
+                                                   catalogo: CatalogoCapacidades.paraIA(caps), correo: graph,
+                                                   arnes: Arnes.contexto(para: pedido))
                 RouterGlobalIA.llamarIA(ia, prompt: p, textLen: p.count, plazo: 40) { r in
                     obtenido = AgenteEvaluacion.porIA(r ?? "", catalogo: caps, texto: pedido)
                     if !AgenteEvaluacion.acierta(obtenido ?? "", esperado: esperado) {

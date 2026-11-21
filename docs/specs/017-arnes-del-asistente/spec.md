@@ -1,6 +1,6 @@
 # Spec 017 — Arnés del asistente: gobernanza, habilidades, memoria y evaluación
 
-- Estado: En implementación (fase 1 hecha; fases 2–4 pendientes)
+- Estado: En implementación (fases 1 y 2 hechas; 3–5 pendientes)
 - Tipo: funcionalidad
 - Nivel: P (heredado del ROADMAP; lo fija sw-ciclo)
 - Fecha: 2026-11-21
@@ -79,6 +79,9 @@ código determinista de BtoDicta.
    historial, bitácora, transcribir.
 4. **Habilidades propias y recetas**: el usuario crea fichas; las rutinas
    portables se exponen como fichas.
+5. **Varias cuentas** (pedido de Alberto, 2026-11-21): conectar las cuentas de
+   Google (Gmail, Calendar, Contactos) y de Microsoft que el usuario quiera, más
+   de una de cada una, siempre con su autorización (OAuth oficial).
 
 ## 7. Tareas y evidencia
 
@@ -98,3 +101,13 @@ Medición con glm-5.3 y la configuración de Alberto: **68 %** al cerrar los arr
 
 Se detallan al aprobar las fases. Línea base: 30 % estimado por Alberto en la
 prueba real; la evaluación automática dará la cifra medida.
+
+### Fase 2 (aprobada el 2026-11-21, «Sí, fase 2»)
+
+- [x] `Arnes.swift`: carpeta `~/.btodicta/arnes/` con gobernanza (se regenera), gobernanza propia, memoria y habilidades propias (nunca se pisan) y 9 fichas generadas del catálogo real (modos, herramientas nativas, rutinas, atajos, conexiones, tareas, Microsoft, Mac, bitácora e historial).
+- [x] Selección por turno: hasta 4 fichas por palabras clave (las propias ganan en empate) + gobernanza + memoria en el prompt del modo «Todo».
+- [x] Herramienta `recordar` («recuerda que…»): solo añade a `memoria.md`.
+- [x] Rutinas y recetas ejecutables desde el modo «Todo».
+- [x] Ajustes: «Abrir carpeta» y «Regenerar habilidades».
+- [x] El validador acepta la frase de voz de una capacidad («modo abrir aplicación»).
+- Evaluación con el arnés: 25/26 → **26/26** (glm-5.3). `ArnesTests` 5/5.

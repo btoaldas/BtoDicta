@@ -70,6 +70,7 @@ enum RouterGlobalIA {
             ?? catalogo.first { $0.tipo == tipo && norm($0.nombre) == norm(clave) }
             ?? catalogo.first { norm($0.clave) == norm(clave) }        // tipo equivocado, clave real
             ?? catalogo.first { norm($0.nombre) == norm(clave) }       // devolvió el nombre
+            ?? catalogo.first { c in c.frases.contains { norm($0) == norm(clave) } }   // devolvió su frase de voz
         guard let cap else { return nil }
         let conf = (j["confianza"] as? Double) ?? (j["confianza"] as? NSNumber)?.doubleValue ?? 0
         let cont = (j["contenido"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)

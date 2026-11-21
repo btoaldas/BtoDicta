@@ -700,6 +700,19 @@ struct AgenteView: View {
                       placeholder: "Vacío = colega cercano y alegre, frases cortas y el resultado directo")
                 Text("Es solo su forma de hablarte. Los documentos que redacta conservan su propio tono (formal, oficio…).")
                     .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text("Arnés: gobernanza, memoria y habilidades").font(.subheadline)
+                    Spacer()
+                    Button("Abrir carpeta") {
+                        Arnes.preparar()
+                        NSWorkspace.shared.open(Arnes.dir)
+                    }.controlSize(.small)
+                    Button("Regenerar habilidades") {
+                        Arnes.preparar(); m.aviso = "Habilidades del arnés regeneradas desde BtoDicta."
+                    }.controlSize(.small)
+                }
+                Text("Tus reglas van en gobernanza-propia.md, tus datos en memoria.md (o di «recuerda que…») y tus habilidades en habilidades-propias/. BtoDicta nunca los sobrescribe; la carpeta habilidades/ se regenera sola.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Un clic en el icono de la barra calla a Beto mientras habla", isOn: $m.clicCalla)
                 Text("Órdenes directas, sin IA: «calla» corta la voz; «tacha la tarea X» o «marca como hecha X» la completa.")
                     .font(.caption).foregroundStyle(.secondary)
