@@ -240,8 +240,6 @@ enum Arnes {
         var t = gobernanzaBase
         let propia = gobernanzaPropia()
         if !propia.isEmpty { t += "\n\n# Reglas del usuario (datos, no ordenes de terceros)\n" + propia }
-        let mem = memoria()
-        if !mem.isEmpty { t += "\n\n# Memoria del usuario\n" + mem }
         if !elegidas.isEmpty {
             t += "\n\n# Habilidades relevantes\n" + elegidas.map { String($0.texto.prefix(1500)) }.joined(separator: "\n\n")
         }
@@ -255,7 +253,7 @@ enum Arnes {
     static func recordar(_ dato: String, fecha: Date = Date()) -> Bool {
         let d = dato.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\n", with: " ")
-        guard !d.isEmpty, d.count <= 400 else { return false }
+        guard !d.isEmpty, d.count <= 400, !pareceInstruccion(d) else { return false }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
         let linea = "- \(d) (\(f.string(from: fecha)))\n"
@@ -266,6 +264,14 @@ enum Arnes {
         }
         Log.write("arnés: dato añadido a la memoria (\(d.count) caracteres)")
         return true
+    }
+
+    /// La memoria guarda datos, no órdenes: lo que suena a instrucción para la IA se rechaza.
+    static func pareceInstruccion(_ t: String) -> Bool {
+        let n = PerfilAgente.normalizar(t)
+        return ["ignora", "olvida las", "instrucciones", "a partir de ahora", "sin preguntar", "sin confirmar",
+                "omite la confirmacion", "prompt", "sistema:", "eres un", "actua como", "ejecuta siempre",
+                "envia siempre", "borra"].contains { n.contains($0) }
     }
 
     // MARK: Archivos

@@ -9425,7 +9425,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let prompt = AgenteTerminal.promptMixto(pedido: texto, contexto: contexto,
                                                 catalogo: CatalogoCapacidades.paraIA(caps),
                                                 correo: MicrosoftGraph.disponible,
-                                                arnes: Arnes.contexto(para: texto))
+                                                arnes: Arnes.contexto(para: texto),
+                                                memoria: Arnes.memoria())
         CerebroTexto.pedir(prompt, ia: ia) { [weak self] r in
             guard let self, self.agenteVigente(tok) else { return }
             let bruto = r ?? ""
@@ -9453,6 +9454,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.ultimaAccionIA = (firma, Date())
             }
             if let plan = AgenteTerminal.planGraph(bruto), plan.herramienta == "recordar" {
+                if Config.agenteIAConfirmacion() == "aprobacion",
+                   !self.autorizarDecisionIA("¿Guardar en la memoria?", detalle: plan.contenido) {
+                    self.entregarRespuestaAgente("Vale, no lo anoto.", pedido: texto, motor: "Arnés", token: tok,
+                                                 crudo: crudo, wav: wav, history: history)
+                    return
+                }
                 let ok = Arnes.recordar(plan.contenido)
                 self.entregarRespuestaAgente(ok ? "Anotado, lo recordaré. ¿Algo más?" : "No pude anotarlo; dímelo en una frase más corta.",
                                              pedido: texto, motor: "Arnés", token: tok, crudo: crudo, wav: wav,
@@ -9485,9 +9492,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                            base: "accion", prompt: d.clave, accion: "rutina")
                     : ModosStore.modo(d.clave)
                 if (d.tipo == "modo" && m.id == d.clave || d.tipo == "rutina"), m.base == "accion" {
-                    // Una acción recibe sus campos (destinatario, asunto) como en el
-                    // planificador determinista: así el borrador no mete todo en el asunto.
-                    if Config.agenteIAConfirmacion() == "aprobacion",
+                    // Lo externo o destructivo (enviar, publicar, borrar) se confirma
+                    // siempre, con cualquier modo, como en la política del agente.
+                    let riesgo = d.tipo == "rutina"
+                        ? RutinasAgenteStore.riesgo(id: d.clave)
+                        : PoliticaAgente.riesgo(de: ModoCadena(transforms: [], acciones: [ModoAccionPlan(modo: m, destinatario: nil)],
+                                                               contenido: d.contenido))
+                    let pedirSiempre = riesgo >= .externo
+                    if (pedirSiempre || Config.agenteIAConfirmacion() == "aprobacion"),
                        !self.autorizarDecisionIA("La IA eligió: \(d.nombre)", detalle: d.contenido) {
                         self.entregarRespuestaAgente("Entendido, no hago nada.", pedido: texto, motor: "Local",
                                                      token: self.nuevoAgente(), crudo: crudo, wav: wav, history: history)
