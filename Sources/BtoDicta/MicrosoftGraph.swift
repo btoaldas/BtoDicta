@@ -8,6 +8,7 @@ import Foundation
 // Llavero; el de acceso, solo en memoria. Tokens y códigos no van al registro.
 
 struct CorreoLeido: Equatable {
+    var id: String = ""
     let de: String
     let asunto: String
     let fecha: Date
@@ -25,7 +26,7 @@ struct CodigoDispositivo: Equatable {
 }
 
 enum MicrosoftGraph {
-    static let alcances = "offline_access User.Read Mail.Read"
+    static let alcances = "offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite Contacts.ReadWrite People.Read User.ReadBasic.All"
     private static let cuentaLlavero = "microsoft-graph-refresh"
     private static let lock = NSLock()
     private static var acceso: (token: String, vence: Date)?
@@ -143,7 +144,7 @@ enum MicrosoftGraph {
         }
     }
 
-    private static func conToken(_ listo: @escaping (String?) -> Void) {
+    static func conToken(_ listo: @escaping (String?) -> Void) {
         lock.lock(); let a = acceso; lock.unlock()
         if let a, a.vence > Date().addingTimeInterval(60) { listo(a.token); return }
         guard let refresco = SecretosKeychain.leer(cuenta: cuentaLlavero), let url = urlToken else { listo(nil); return }
@@ -201,7 +202,7 @@ enum MicrosoftGraph {
             URLQueryItem(name: "$filter", value: "receivedDateTime ge \(f.string(from: inicio))"),
             URLQueryItem(name: "$orderby", value: "receivedDateTime desc"),
             URLQueryItem(name: "$top", value: "40"),
-            URLQueryItem(name: "$select", value: "subject,from,receivedDateTime,bodyPreview,importance,isRead"),
+            URLQueryItem(name: "$select", value: "id,subject,from,receivedDateTime,bodyPreview,importance,isRead"),
         ]
         return c?.url
     }
@@ -216,7 +217,8 @@ enum MicrosoftGraph {
             let nombre = (correo?["name"] as? String) ?? ""
             let direccion = (correo?["address"] as? String) ?? ""
             guard let fechaTexto = m["receivedDateTime"] as? String, let fecha = f.date(from: fechaTexto) else { return nil }
-            return CorreoLeido(de: nombre.isEmpty ? direccion : "\(nombre) <\(direccion)>",
+            return CorreoLeido(id: (m["id"] as? String) ?? "",
+                               de: nombre.isEmpty ? direccion : "\(nombre) <\(direccion)>",
                                asunto: (m["subject"] as? String) ?? "(sin asunto)",
                                fecha: fecha,
                                vistaPrevia: String(((m["bodyPreview"] as? String) ?? "").prefix(300)),

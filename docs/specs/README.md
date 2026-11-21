@@ -28,5 +28,6 @@ otra spec con `Modifica: NNN`.
 | 013 | Bitácora solo de grabaciones | Implementada | X | funcionalidad | 2026-10-06 | Alberto, 2026-10-06 — «si dale», en respuesta a continuar con plan, tareas e implementación | ninguna; complementa la captura de bitácora existente | Especificando |
 | 014 | Modo IA por tecla propia | Implementada | P | funcionalidad | 2026-11-20 | Alberto — 2026-11-20 — «Creo que es tecla propia… todo parametrizable» | ninguna | Prueba real pendiente |
 | 015 | Leer correo con Microsoft Graph | En implementación | P | funcionalidad | 2026-11-21 | Alberto — 2026-11-21 — «Microsoft Graph» | ninguna | Prueba real pendiente |
+| 016 | Correo, agenda y personas con Microsoft Graph | En implementación | P | funcionalidad | 2026-11-21 | Alberto — 2026-11-21 — «lectura, escritura… calendario… contactos» | 015 | Prueba real pendiente |
 
 <!-- sdd:indice:fin -->

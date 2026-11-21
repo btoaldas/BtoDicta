@@ -63,3 +63,59 @@ final class MicrosoftGraphTests: XCTestCase {
         XCTAssertFalse(MicrosoftGraph.disponible)
     }
 }
+
+/// Herramientas de Graph de la spec 016, partes puras.
+final class MicrosoftGraphAccionesTests: XCTestCase {
+    func testPlanGraph() throws {
+        let r = #"{"respuesta":"x","capacidad":{"tipo":"herramienta","clave":"herramienta:borrador_correo","contenido":"Hola","destinatario":"Ana Pérez","asunto":"Reunión"}}"#
+        let p = try XCTUnwrap(AgenteTerminal.planGraph(r))
+        XCTAssertEqual(p.herramienta, "borrador_correo")
+        XCTAssertEqual(p.destinatario, "Ana Pérez")
+        XCTAssertEqual(p.asunto, "Reunión")
+        let e = try XCTUnwrap(AgenteTerminal.planGraph(#"{"capacidad":{"clave":"crear_evento","contenido":"Dentista","inicio":"2026-11-22T10:30","numero":2}}"#))
+        XCTAssertEqual(e.numero, 2)
+        let comps = Calendar.current.dateComponents([.hour, .minute, .day], from: try XCTUnwrap(e.inicio))
+        XCTAssertEqual(comps.hour, 10); XCTAssertEqual(comps.minute, 30); XCTAssertEqual(comps.day, 22)
+        XCTAssertNil(AgenteTerminal.planGraph(#"{"capacidad":{"clave":"buscar","contenido":"x"}}"#))
+        XCTAssertEqual(AgenteTerminal.dias("3 días"), 3)
+        XCTAssertEqual(AgenteTerminal.dias("", porDefecto: 1), 1)
+    }
+
+    func testBorrador() throws {
+        let c = MicrosoftGraph.cuerpoBorrador(para: ["a@b.com"], asunto: "Hola", cuerpo: "Texto")
+        let to = try XCTUnwrap(c["toRecipients"] as? [[String: Any]])
+        XCTAssertEqual((to.first?["emailAddress"] as? [String: String])?["address"], "a@b.com")
+        let b = try XCTUnwrap(MicrosoftGraph.leerBorrador(["id": "M1", "subject": "Hola", "webLink": "https://x",
+                                                           "toRecipients": [["emailAddress": ["address": "a@b.com"]]],
+                                                           "body": ["content": "Texto"]]))
+        XCTAssertEqual(b.para, ["a@b.com"]); XCTAssertEqual(b.inicio, "Texto")
+        XCTAssertNil(MicrosoftGraph.leerBorrador(["subject": "sin id"]))
+    }
+
+    func testPersonas() {
+        let p = MicrosoftGraph.leerPersonas(["value": [["displayName": "Ana", "jobTitle": "Docente",
+                                                        "scoredEmailAddresses": [["address": "ana@x.edu"]]],
+                                                       ["displayName": "Sin correo"]]])
+        XCTAssertEqual(p, [PersonaGraph(nombre: "Ana", correo: "ana@x.edu", cargo: "Docente")])
+        let u = MicrosoftGraph.leerUsuarios(["value": [["displayName": "Luis", "mail": "luis@x.edu"]]])
+        XCTAssertEqual(u.first?.correo, "luis@x.edu")
+        XCTAssertEqual(MicrosoftGraph.personasHabladas(p), "Ana, Docente, ana@x.edu")
+    }
+
+    func testEventosYFechas() throws {
+        let ev = MicrosoftGraph.leerEventos(["value": [["subject": "Consejo", "isAllDay": false,
+            "start": ["dateTime": "2026-11-22T15:00:00.0000000", "timeZone": "UTC"],
+            "end": ["dateTime": "2026-11-22T16:00:00.0000000", "timeZone": "UTC"],
+            "location": ["displayName": "Sala 1"]]]])
+        let e = try XCTUnwrap(ev.first)
+        XCTAssertEqual(e.fin.timeIntervalSince(e.inicio), 3600)
+        XCTAssertEqual(MicrosoftGraph.utc(e.inicio), "2026-11-22T15:00:00Z")
+        XCTAssertEqual(MicrosoftGraph.utc(e.inicio, conZona: false), "2026-11-22T15:00:00")
+        XCTAssertTrue(MicrosoftGraph.agendaParaIA(ev).contains("Consejo · Sala 1"))
+    }
+
+    func testCatalogoGraphEnPrompt() {
+        let p = AgenteTerminal.promptMixto(pedido: "x", contexto: "", catalogo: "", correo: true)
+        for h in ["borrador_correo", "enviar_borrador", "ver_agenda", "buscar_persona"] { XCTAssertTrue(p.contains(h)) }
+    }
+}

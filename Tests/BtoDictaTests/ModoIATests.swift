@@ -273,12 +273,15 @@ final class ModoIAAPIRealTests: XCTestCase {
             let e = expectation(description: pedido)
             let inicio = Date()
             let ctx = ProcessInfo.processInfo.environment["BTODICTA_IA_CONTEXTO"] ?? ""
-            let p = AgenteTerminal.promptMixto(pedido: pedido, contexto: ctx, catalogo: CatalogoCapacidades.paraIA(caps))
+            let p = AgenteTerminal.promptMixto(pedido: pedido, contexto: ctx, catalogo: CatalogoCapacidades.paraIA(caps),
+                                               correo: ProcessInfo.processInfo.environment["BTODICTA_IA_GRAPH"] == "1")
             RouterGlobalIA.llamarIA(ia, prompt: p, textLen: p.count) { r in
                 print(String(format: "IAREAL %.1f s:", Date().timeIntervalSince(inicio)), r ?? "nil")
                 let d = r.flatMap(AgenteTerminal.capacidadMixta).flatMap { RouterGlobalIA.interpretar($0, catalogo: caps, texto: pedido) }
                 let comandos = r.flatMap(AgenteTerminal.interpretar)?.comandos ?? []
-                XCTAssertTrue(d != nil || !comandos.isEmpty)
+                let g = r.flatMap(AgenteTerminal.planGraph)
+                if let g { print("IAREAL graph:", g.herramienta, g.destinatario ?? "", g.asunto ?? "", g.contenido.prefix(60)) }
+                XCTAssertTrue(d != nil || !comandos.isEmpty || g != nil)
                 e.fulfill()
             }
             wait(for: [e], timeout: 60)
