@@ -145,6 +145,15 @@ final class AgenteSettingsModel: ObservableObject {
     @Published var toolCapturas: Bool { didSet { Config.set("agente_tool_capturas", to: toolCapturas) } }
     @Published var toolClima: Bool { didSet { Config.set("agente_tool_clima", to: toolClima) } }
     @Published var toolVolumen: Bool { didSet { Config.set("agente_tool_volumen", to: toolVolumen) } }
+    // Modo IA por tecla propia (spec 014)
+    @Published var gestoActivo: Bool { didSet { Config.set("agente_gesto_activo", to: gestoActivo) } }
+    @Published var gestoTecla: String { didSet { Config.set("agente_gesto_tecla", to: gestoTecla) } }
+    @Published var gestoVentana: Double { didSet { Config.set("agente_gesto_ventana", to: gestoVentana) } }
+    @Published var gestoConversacion: Bool { didSet { Config.set("agente_gesto_conversacion", to: gestoConversacion) } }
+    @Published var iaDecision: String { didSet { Config.set("agente_ia_decision", to: iaDecision) } }
+    @Published var iaConfirmacion: String { didSet { Config.set("agente_ia_confirmacion", to: iaConfirmacion) } }
+    @Published var terminalTimeout: Double { didSet { Config.set("agente_terminal_timeout", to: terminalTimeout) } }
+    @Published var clicCalla: Bool { didSet { Config.set("agente_clic_calla", to: clicCalla) } }
     @Published var volumenPaso: Double {
         didSet { Config.set("agente_volumen_paso", to: Int(volumenPaso)) }
     }
@@ -238,6 +247,10 @@ final class AgenteSettingsModel: ObservableObject {
         toolAtajos = Config.agenteHerramientaAtajos(); toolCapturas = Config.agenteHerramientaCapturas()
         toolClima = Config.agenteHerramientaClima()
         toolVolumen = Config.agenteHerramientaVolumen()
+        gestoActivo = Config.agenteGestoActivo(); gestoTecla = Config.agenteGestoTecla()
+        gestoVentana = Config.agenteGestoVentana(); gestoConversacion = Config.agenteGestoConversacion()
+        iaDecision = Config.agenteIADecision(); iaConfirmacion = Config.agenteIAConfirmacion()
+        terminalTimeout = Config.agenteTerminalTimeout(); clicCalla = Config.agenteClicCalla()
         volumenPaso = Double(Config.agenteVolumenPaso())
         toolNotasApple = Config.agenteHerramientaNotasApple()
         toolConexiones = Config.agenteHerramientaConexiones()
@@ -612,11 +625,64 @@ struct AgenteView: View {
                 }
             }
 
+            card("Modo IA con tecla propia", "keyboard") {
+                Toggle("Activar el modo IA con un doble toque", isOn: $m.gestoActivo)
+                Picker("Tecla", selection: $m.gestoTecla) {
+                    ForEach(GestoTeclaIA.teclas) { Text($0.nombre).tag($0.id) }
+                }
+                HStack {
+                    Text("Ventana del doble toque")
+                    Slider(value: $m.gestoVentana, in: 0.2...0.8, step: 0.05)
+                    Text(String(format: "%.2f s", m.gestoVentana)).monospacedDigit().frame(width: 56)
+                }
+                Text("Doble toque: Beto escucha. Un toque de la misma tecla envía lo que dijiste. Solo cuentan toques limpios: Control+C y similares no lo activan.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Conversación: tras responder, vuelve a escuchar", isOn: $m.gestoConversacion)
+                Text("Un turno en silencio, Esc o «calla» terminan la conversación.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Picker("Qué puede decidir la IA", selection: $m.iaDecision) {
+                    Text("Solo reglas fijas").tag("reglas")
+                    Text("Elegir del catálogo de acciones").tag("catalogo")
+                    Text("Terminal: proponer comandos").tag("terminal")
+                }
+                Picker("Confirmación de lo que decide la IA", selection: $m.iaConfirmacion) {
+                    Text("Aprobación").tag("aprobacion")
+                    Text("Auto").tag("auto")
+                    Text("Omitir permisos").tag("omitir")
+                }.pickerStyle(.segmented)
+                Text({
+                    switch m.iaConfirmacion {
+                    case "aprobacion": return "Pregunta «¿Autorizas?» antes de cada acción o comando que eligió la IA."
+                    case "omitir": return "Ejecuta lo que elija la IA sin preguntar, comandos de terminal incluidos. Lo que dice una nota, un correo o una página puede influir en la IA."
+                    default: return "Comandos que solo leen o abren algo, sin preguntar; todo lo demás y sudo, con «¿Autorizas?»."
+                    }
+                }()).font(.caption).foregroundStyle(m.iaConfirmacion == "omitir" ? Color.orange : Color.secondary)
+                if m.iaDecision == "terminal" {
+                    HStack {
+                        Text("Tiempo máximo por comando")
+                        Slider(value: $m.terminalTimeout, in: 5...600, step: 5)
+                        Text("\(Int(m.terminalTimeout)) s").monospacedDigit().frame(width: 56)
+                    }
+                    Text("Con sudo, macOS pide tu clave en su propio diálogo; BtoDicta no la ve ni la guarda.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Toggle("Un clic en el icono de la barra calla a Beto mientras habla", isOn: $m.clicCalla)
+                Text("Órdenes directas, sin IA: «calla» corta la voz; «tacha la tarea X» o «marca como hecha X» la completa.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             card("Cerebro y memoria", "brain.head.profile") {
                 Picker("Cerebro principal", selection: $m.motor) {
                     Text("IA configurada en BtoDicta").tag("local")
                     Text("Hermes").tag("hermes")
                     Text("ChatGPT por cuenta (Codex)").tag("codex")
+                    Text("ZCode (GLM)").tag("zcode")
+                }
+                if m.motor == "zcode" {
+                    Text(AgenteZCode.disponible
+                         ? "ZCode detectado. Solo razona y responde, sin herramientas: las acciones las ejecuta BtoDicta."
+                         : "ZCode no está instalado; se usa la IA configurada en BtoDicta.")
+                        .font(.caption).foregroundStyle(AgenteZCode.disponible ? Color.secondary : Color.orange)
                 }
                 if m.motor == "hermes" || m.fallback {
                     Text(AgenteHermes.disponible

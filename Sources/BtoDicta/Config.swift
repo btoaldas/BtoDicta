@@ -1649,4 +1649,34 @@ struct Config {
     static func continuoSistemaUmbral() -> Double {
         min(0.05, max(0.0001, (json()["continuo_sistema_umbral"] as? Double) ?? 0.002))
     }
+
+    // MARK: Modo IA por tecla propia (spec 014)
+    static func agenteGestoActivo() -> Bool { (json()["agente_gesto_activo"] as? Bool) ?? false }
+    /// ctrl | ctrl_der | opt | opt_der | cmd_der | shift_der
+    static func agenteGestoTecla() -> String {
+        let t = (json()["agente_gesto_tecla"] as? String) ?? "ctrl"
+        return GestoTeclaIA.teclas.contains { $0.id == t } ? t : "ctrl"
+    }
+    static func agenteGestoVentana() -> Double {
+        min(0.8, max(0.2, (json()["agente_gesto_ventana"] as? Double) ?? 0.4))
+    }
+    /// Tras la respuesta hablada, vuelve a escuchar; un turno en silencio la cierra.
+    static func agenteGestoConversacion() -> Bool { (json()["agente_gesto_conversacion"] as? Bool) ?? true }
+    /// reglas (solo determinista) | catalogo (la IA elige del catálogo cerrado) |
+    /// terminal (la IA propone comandos y BtoDicta los ejecuta)
+    static func agenteIADecision() -> String {
+        let v = (json()["agente_ia_decision"] as? String) ?? "catalogo"
+        return ["reglas", "catalogo", "terminal"].contains(v) ? v : "catalogo"
+    }
+    /// aprobacion (siempre pregunta) | auto (pregunta lo delicado) | omitir (no pregunta)
+    static func agenteIAConfirmacion() -> String {
+        let v = (json()["agente_ia_confirmacion"] as? String) ?? "auto"
+        return ["aprobacion", "auto", "omitir"].contains(v) ? v : "auto"
+    }
+    static func agenteTerminalTimeout() -> Double {
+        min(600, max(5, (json()["agente_terminal_timeout"] as? Double) ?? 60))
+    }
+    static func agenteZCodeBin() -> String { (json()["agente_zcode_bin"] as? String) ?? "" }
+    /// Un clic en el icono de la barra mientras BtoDicta habla la calla.
+    static func agenteClicCalla() -> Bool { (json()["agente_clic_calla"] as? Bool) ?? true }
 }

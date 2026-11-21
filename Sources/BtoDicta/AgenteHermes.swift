@@ -28,7 +28,7 @@ enum AgenteHermes {
     // Verificado por ejecución (2026-07-14, equivalente en Python): matar los GRUPOS de las
     // herramientas MIENTRAS hermes sigue vivo (sus grupos están intactos), y a hermes AL
     // FINAL. Sin SIGSTOP (interfería). Así muere el árbol entero: hermes + tools + nietos.
-    private static func matarArbol(_ pid: Int32) {
+    static func matarArbol(_ pid: Int32) {
         // Descendientes (BFS por pgrep -P), con hermes aún vivo.
         var desc: [Int32] = []
         var frontera = [pid]

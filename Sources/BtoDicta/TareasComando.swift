@@ -23,7 +23,7 @@ enum TareasComando {
     // Verbos de cada intención (raíz al inicio del dictado).
     private static let verbosCompletar = [
         "quita", "quitar", "quítame", "completa", "completar", "complete", "completé",
-        "termina", "terminar", "termine", "terminé", "marca", "marcar", "marca como hecha",
+        "termina", "terminar", "termine", "terminé", "marca", "marcar", "marca como hecha", "marca como hecho",
         "ya hice", "ya termine", "ya terminé", "hecho", "hice", "lista", "tacha", "tachar",
         "borra", "borrar", "elimina", "eliminar", "saca", "sacar",
     ]
@@ -85,7 +85,8 @@ enum TareasComando {
         }
 
         // COMPLETAR / tachar / eliminar.
-        if let v = verbosCompletar.first(where: { bajo.hasPrefix($0 + " ") || bajo == $0 }) {
+        if let v = verbosCompletar.sorted(by: { $0.count > $1.count })
+            .first(where: { bajo.hasPrefix($0 + " ") || bajo == $0 }) {
             let resto = String(texto.dropFirst(v.count)).trimmingCharacters(in: .whitespaces)
             let objetivo = limpiarObjetivo(resto)
             if !objetivo.isEmpty { return .completar(objetivo) }

@@ -108,7 +108,7 @@ enum RouterGlobalIA {
         intentar(1)
     }
 
-    private static func llamarIA(_ ia: ChatIA, prompt: String, textLen: Int,
+    static func llamarIA(_ ia: ChatIA, prompt: String, textLen: Int,
                                  _ completion: @escaping (String?) -> Void) {
         if ia.esCuentaCodex {
             AgenteCodex.transformar(prompt, modelo: ia.modeloEfectivo,

@@ -42,6 +42,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        if Config.agenteClicCalla(), Voz.hablando {
+            callarTodo(origen: "clic_icono")
+            DispatchQueue.main.async { menu.cancelTrackingWithoutAnimation() }
+            return
+        }
         refrescarControlesRapidos(menu)
         menu.items.first(where: { $0.tag == 84 })?.isHidden = Updater.disponibleAlArrancar == nil
         if let detener = menu.items.first(where: { $0.tag == 86 }) {
@@ -220,6 +225,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// fn fn fn (spec 012): la tercera se arma al soltar la segunda que arrancó.
     fileprivate var terceraPulsacion = DoublePressGate()
     fileprivate var comboEsTercera = false
+    /// Modo IA por tecla propia (spec 014).
+    fileprivate var gestoIA = GestoTeclaIA()
+    /// El dictado en curso lo abrió el gesto: un toque de esa tecla lo envía.
+    private var dictadoPorGestoIA = false
+    /// Tras responder, vuelve a escuchar (se apaga con un turno en silencio).
+    private var conversacionIA = false
     /// El manejador del monitor de fn, para que su arnés lo alimente con eventos
     /// sintéticos sin tocar el teclado del sistema (spec 012, T07).
     fileprivate var manejadorFlags: ((NSEvent) -> Void)?
@@ -299,6 +310,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func cancelDictation(silencioso: Bool = false) {
         AvisoGrabando.shared.apagar()
         guard recorder.isRecording else { return }
+        soltarModoIA()
         limpiarContinuacionDictadoAsistido()
         limpiarAclaracionCaptura(origen: "dictado_cancelado")
         disarmEsc()
@@ -382,6 +394,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// invalida respuestas en vuelo, corta el audio, cierra el notch. Idempotente.
     func cancelarTodo() {
         if hayConfirmacion { resolverConfirmacion(acepta: false, origen: "cancelar"); return }
+        soltarModoIA()
+        AgenteTerminal.cancelar(); AgenteZCode.cancelar()
         limpiarContinuacionDictadoAsistido()
         if recorder.isRecording { cancelDictation(); return }
         if aclaracionCapturaPendiente != nil {
@@ -6161,7 +6175,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let flagsHandler: (NSEvent) -> Void = { [weak self] event in
-            guard let self, !self.comboMods.isEmpty else { return }
+            guard let self else { return }
+            self.procesarGestoIA(event)
+            guard !self.comboMods.isEmpty else { return }
             let active = self.activeMods(event.modifierFlags)
             if active == self.comboMods, !self.comboArmed {
                 self.comboArmed = true          // combo exacto presionado
@@ -6306,6 +6322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let keyHandler: (NSEvent) -> Void = { [weak self] _ in
             guard let self else { return }
+            self.gestoIA.otraTecla()
             if self.comboArmed {
                 self.comboUsedWithKey = true
                 // Push-to-talk: si ya arrancó a grabar y resultó ser un ATAJO
@@ -6330,6 +6347,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             keyHandler(event); return event
+        }
+        let clics: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        NSEvent.addGlobalMonitorForEvents(matching: clics) { [weak self] _ in self?.gestoIA.otraTecla() }
+        NSEvent.addLocalMonitorForEvents(matching: clics) { [weak self] event in
+            self?.gestoIA.otraTecla(); return event
+        }
+    }
+
+    // MARK: Modo IA por tecla propia (spec 014)
+
+    private func procesarGestoIA(_ event: NSEvent) {
+        guard Config.agenteGestoActivo(), Config.agenteNucleoActivo() else { return }
+        let id = Config.agenteGestoTecla()
+        // Si el atajo del dictado ya usa esa misma tecla, el gesto no compite.
+        guard let tecla = GestoTeclaIA.teclas.first(where: { $0.id == id }),
+              !comboMods.contains(tecla.familia) else { return }
+        switch gestoIA.evento(keyCode: event.keyCode, flags: event.modifierFlags, tecla: id,
+                              ventana: Config.agenteGestoVentana()) {
+        case .nada:
+            return
+        case .toque:
+            // Grabando por el gesto: un toque envía, como fn.
+            guard recorder.isRecording, dictadoPorGestoIA else { return }
+            gestoIA.reiniciar()
+            Log.write("hotkey: modo IA — toque envía")
+            DispatchQueue.main.async { self.toggle() }
+        case .doble:
+            Log.write("hotkey: modo IA — doble \(id)")
+            DispatchQueue.main.async { self.activarModoIAPorGesto() }
+        }
+    }
+
+    /// Abre un turno del Agente. Con un dictado ya grabando, lo reorienta al
+    /// Agente sin cortarlo: el modo se congela al cerrar.
+    private func activarModoIAPorGesto() {
+        guard !hayConfirmacion, !CapturaMac.grabacionContinuaEnCurso else { return }
+        let agente = ModosStore.modo("agente")
+        guard agente.id == "agente" else { return }
+        modoPendienteVoz = agente
+        dictadoPorGestoIA = true
+        conversacionIA = Config.agenteGestoConversacion()
+        refrescarModoNotch()
+        AgenteLog.registrar("gesto_ia", ["tecla": Config.agenteGestoTecla(),
+                                          "grabando": recorder.isRecording])
+        if recorder.isRecording {
+            panel.flash("🤖 Modo IA", segundos: 1.2)
+            return
+        }
+        toggle()
+    }
+
+    /// Desarma el turno del gesto: sin esto, el siguiente fn caería en el Agente.
+    private func soltarModoIA() {
+        if dictadoPorGestoIA || conversacionIA, modoPendienteVoz?.id == "agente" {
+            modoPendienteVoz = nil
+            refrescarModoNotch()
+        }
+        dictadoPorGestoIA = false
+        conversacionIA = false
+    }
+
+    /// Conversación hablada: tras la respuesta, otro turno del Agente.
+    private func continuarConversacionIA() {
+        guard conversacionIA, Config.agenteGestoConversacion() else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self, self.conversacionIA, !self.recorder.isRecording,
+                  !self.hayConfirmacion, !self.agenteActivo else { return }
+            self.activarModoIAPorGesto()
         }
     }
 
@@ -6629,7 +6714,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // arranca a grabar lo nuevo. Ese nuevo dictado va como el SIGUIENTE turno —
             // Hermes mantiene la sesión (--resume), así que conserva el contexto y retoma
             // la conversación con lo que acabas de decir. Natural, como interrumpir a alguien.
+            let porGesto = dictadoPorGestoIA
             if agenteActivo || AgenteHermes.enCurso || AgenteCodex.enCurso || Voz.hablando { cancelarTodo() }
+            if porGesto {
+                // cancelarTodo limpia el modo pendiente: el gesto lo vuelve a fijar.
+                modoPendienteVoz = ModosStore.modo("agente"); dictadoPorGestoIA = true
+                conversacionIA = Config.agenteGestoConversacion()
+            } else {
+                conversacionIA = false
+            }
             startDictation()
         }
     }
@@ -7059,6 +7152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             despertarPendiente = nil
             activacionAcuseTextoPendiente = nil
             cierreAlArrancar = nil
+            soltarModoIA()
             panel.show("⚠️ Micrófono: \(error.localizedDescription)")
             panel.hide(after: 3)
             history.discard(); self.history = nil
@@ -7531,6 +7625,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ? (modoPendienteVoz ?? ModosStore.activo())
             : ModosStore.modo("agente")
         modoPendienteVoz = nil
+        dictadoPorGestoIA = false
         ModosStore.revertirADefecto()
         refrescarModoNotch()
         ModosLog.registrar("dictado_cierre", [
@@ -7858,6 +7953,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // no se pega nada y el audio queda guardado por si acaso.
         let tieneContenido = textoFinal.unicodeScalars.contains { CharacterSet.alphanumerics.contains($0) }
         guard tieneContenido else {
+            conversacionIA = false
             history?.finish(wavEn: wavURL, finalText: "")
             avisarSiLibre("(silencio)")
             return
@@ -8901,7 +8997,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Ejecuta un comando del Modo Tarea (completar/modificar/resumen) sin salir
     /// a la nube: actúa sobre las tareas locales y responde en el notch + voz.
     private func manejarComandoTarea(_ comando: ComandoTarea, crudo: String,
-                                     wav: Data, history: HistoryWriter?) {
+                                     wav: Data, history: HistoryWriter?,
+                                     alTerminar: (() -> Void)? = nil) {
         func responder(_ texto: String) {
             Log.write("  ✓ tarea (comando): \(texto)")
             AgenteLog.registrar("comando_tarea", ["respuesta": texto])
@@ -8909,7 +9006,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 panel.flash("✓ \(texto)", segundos: 5)
                 panel.hide(after: 5.2)
             }
-            if Config.ttsActivo() { Voz.decir(texto) }
+            if Config.ttsActivo() { Voz.decir(texto, completion: alTerminar) } else { alTerminar?() }
             history?.finish(wav: wav, finalText: "▶︎ \(texto)")
             restaurarModoVisualSiLibre(origen: "comando_tarea")
         }
@@ -8945,6 +9042,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func responderAgente(_ texto: String, modo: Modo, crudo: String,
                                  wav: Data, history: HistoryWriter?,
                                  modoNormal: Modo?, contextoAgente: Bool) {
+        // Órdenes directas (spec 014): deterministas, antes que cualquier IA.
+        if Config.agenteNucleoActivo(), AgenteOrdenes.esCallar(texto) {
+            callarTodo(origen: "orden_voz")
+            history?.finish(wav: wav, finalText: "▶︎ (callar)")
+            restaurarModoVisualSiLibre(origen: "callar")
+            return
+        }
+        if Config.agenteNucleoActivo(), let q = AgenteOrdenes.tareaACompletar(texto) {
+            manejarComandoTarea(.completar(q), crudo: crudo, wav: wav, history: history) { [weak self] in
+                self?.continuarConversacionIA()
+            }
+            return
+        }
         if Config.agenteNucleoActivo(), let plan = AgenteNucleo.planificar(texto) {
             AgenteLog.registrar("plan", ["descripcion": plan.descripcion,
                 "nivel": PoliticaAgente.nivel.rawValue,
@@ -8967,7 +9077,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // decide sobre TODO el catálogo a qué capacidad cae y se ejecuta por el
         // despacho de modos de siempre (con su política/confirmación). Aditivo y
         // degradable: sin decisión o sin IA/red, cae al cerebro conversacional.
-        if Config.agenteNucleoActivo(), Config.routerGlobalActivo() {
+        let decision = Config.agenteIADecision()
+        if Config.agenteNucleoActivo(), decision == "terminal" {
+            responderAgenteTerminal(texto, modo: modo, crudo: crudo, wav: wav, history: history)
+            return
+        }
+        if Config.agenteNucleoActivo(), Config.routerGlobalActivo(), decision == "catalogo" {
             RouterGlobalIA.decidir(texto) { [weak self] d in
                 guard let self else { return }
                 if let d, self.ejecutarDecisionRouter(d, pedido: texto, crudo: crudo, wav: wav,
@@ -8998,6 +9113,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // consultar): necesita el pedido COMPLETO, no el contenido que el
             // router pudo recortar. Un modo simple recibe el contenido limpio.
             let payload = d.tipo == "conexion" ? pedido : d.contenido
+            if Config.agenteIAConfirmacion() == "aprobacion",
+               !autorizarDecisionIA("La IA eligió: \(d.nombre)", detalle: payload) {
+                AgenteLog.registrar("router_rechazado", ["clave": d.clave])
+                entregarRespuestaAgente("Entendido, no hago nada.", pedido: pedido, motor: "Local",
+                                        token: nuevoAgente(), crudo: crudo, wav: wav, history: history)
+                return true
+            }
             AgenteLog.registrar("router_ejecuta", ["tipo": d.tipo, "clave": d.clave,
                                                     "contenido": payload, "confianza": d.confianza])
             despacharModo(m, textoFinal: payload, crudo: crudo, wav: wav,
@@ -9032,6 +9154,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 entregarRespuestaAgente("Codex oficial no está instalado. Instálalo o activa el failover del cerebro.",
                                         pedido: texto, motor: "Local", token: tok,
                                         crudo: crudo, wav: wav, history: history)
+            }
+        } else if Config.agenteMotor() == "zcode" {
+            if AgenteZCode.disponible {
+                responderConZCode(texto, modo: modo, token: tok, crudo: crudo, wav: wav, history: history)
+            } else {
+                responderAgenteConIA(texto, modo: modo, token: tok, crudo: crudo,
+                                     wav: wav, history: history,
+                                     puedeCaerAHermes: Config.agenteFallbackCerebro())
             }
         } else if Config.agenteMotor() == "hermes" {
             if AgenteHermes.disponible {
@@ -9162,6 +9292,126 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    // MARK: Modo IA — cerebro ZCode, terminal y callar (spec 014)
+
+    private func iaDelAgente(_ modo: Modo) -> ChatIA? {
+        LLMPostProcess.iaDeModo(modoAgenteConfigurado(modo)) ?? ChatIA.seleccionada()
+    }
+
+    private func responderConZCode(_ texto: String, modo: Modo, token: Int,
+                                   crudo: String, wav: Data, history: HistoryWriter?) {
+        if !recorder.isRecording { panel.pensando(ia: "ZCode") }
+        let prompt = """
+        Eres únicamente el cerebro conversacional de BtoDicta. Responde de forma breve,
+        natural y sin Markdown. BtoDicta ejecuta por separado cualquier acción.
+
+        \(PerfilAgente.envolverParaHermes(texto))
+        """
+        AgenteZCode.preguntar(prompt, timeout: Config.agenteCodexTimeout()) { [weak self] r in
+            guard let self, self.agenteVigente(token) else { return }
+            let t = r?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if t.isEmpty, Config.agenteFallbackCerebro() {
+                AgenteLog.registrar("failover_cerebro", ["de": "zcode", "a": "ia_btodicta", "motivo": "sin_respuesta"])
+                self.responderAgenteConIA(texto, modo: modo, token: token, crudo: crudo,
+                                          wav: wav, history: history, puedeCaerAHermes: true)
+                return
+            }
+            self.entregarRespuestaAgente(t.isEmpty ? "ZCode no respondió." : t, pedido: texto,
+                                         motor: "ZCode", token: token, crudo: crudo,
+                                         wav: wav, history: history)
+        }
+    }
+
+    /// Pregunta modal «¿Autorizar?». La app se pone delante para que se vea.
+    private func autorizarDecisionIA(_ titulo: String, detalle: String) -> Bool {
+        NSApp.activate(ignoringOtherApps: true)
+        return ConfirmacionSegura.pedir(titulo, detalle: detalle, boton: "Aceptar")
+    }
+
+    /// Corta la voz propia y avisa a quien tenga un aviso sonando.
+    private func callarTodo(origen: String) {
+        soltarModoIA()
+        Voz.cancelar()
+        AgenteTerminal.cancelar(); AgenteZCode.cancelar()
+        NotificationCenter.default.post(name: .betoCallarAvisos, object: nil)
+        panel.finRespuestaIA()
+        if agenteActivo { finAgente() }
+        AgenteLog.registrar("callar", ["origen": origen])
+    }
+
+    /// La IA propone comandos; BtoDicta los ejecuta con la confirmación elegida.
+    private func responderAgenteTerminal(_ texto: String, modo: Modo, crudo: String,
+                                         wav: Data, history: HistoryWriter?) {
+        let tok = nuevoAgente()
+        let ia = iaDelAgente(modo)
+        if !recorder.isRecording { panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
+        let contexto = Config.agenteMemoriaContextoIA() ? MemoriaAgente.contexto() : ""
+        CerebroTexto.pedir(AgenteTerminal.prompt(pedido: texto, contexto: contexto), ia: ia) { [weak self] r in
+            guard let self, self.agenteVigente(tok) else { return }
+            guard let r, let plan = AgenteTerminal.interpretar(r) else {
+                let t = r?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                self.entregarRespuestaAgente(t.isEmpty ? "No obtuve respuesta del cerebro." : t,
+                                             pedido: texto, motor: "Terminal", token: tok,
+                                             crudo: crudo, wav: wav, history: history)
+                return
+            }
+            AgenteLog.registrar("terminal_plan", ["comandos": plan.comandos.map(\.cmd),
+                                                   "sudo": plan.comandos.map(\.sudo)])
+            self.correrComandosTerminal(plan, indice: 0, salidas: [], pedido: texto, ia: ia,
+                                        token: tok, crudo: crudo, wav: wav, history: history)
+        }
+    }
+
+    private func correrComandosTerminal(_ plan: PlanTerminal, indice: Int, salidas: [String],
+                                        pedido: String, ia: ChatIA?, token: Int, crudo: String,
+                                        wav: Data, history: HistoryWriter?) {
+        guard agenteVigente(token) else { return }
+        let entregar: (String) -> Void = { [weak self] t in
+            self?.entregarRespuestaAgente(t, pedido: pedido, motor: "Terminal", token: token,
+                                          crudo: crudo, wav: wav, history: history)
+        }
+        guard indice < plan.comandos.count else {
+            guard !salidas.isEmpty else { entregar(plan.respuesta.isEmpty ? "Listo." : plan.respuesta); return }
+            if !recorder.isRecording { panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
+            CerebroTexto.pedir(AgenteTerminal.promptResumen(pedido: pedido, salidas: salidas), ia: ia) { [weak self] r in
+                guard let self, self.agenteVigente(token) else { return }
+                let t = r?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                entregar(t.isEmpty ? (plan.respuesta.isEmpty ? "Listo." : plan.respuesta) : t)
+            }
+            return
+        }
+        let c = plan.comandos[indice]
+        let linea = (c.sudo ? "sudo " : "") + c.cmd
+        if AgenteTerminal.requiereAutorizacion(c, modo: Config.agenteIAConfirmacion()) {
+            let detalle = (c.proposito.isEmpty ? "" : c.proposito + "\n\n") + linea
+                + (c.sudo ? "\n\nmacOS te pedirá tu clave de administrador." : "")
+            guard autorizarDecisionIA("¿Autorizas este comando?", detalle: detalle) else {
+                AgenteLog.registrar("terminal_rechazado", ["cmd": linea])
+                if salidas.isEmpty {
+                    entregar("Entendido, no ejecuté nada.")
+                } else {
+                    // Lo que ya corrió se resume; lo demás no se ejecuta.
+                    correrComandosTerminal(PlanTerminal(respuesta: plan.respuesta, comandos: []),
+                                           indice: 0, salidas: salidas + ["«\(linea)»: no autorizado; me detuve."],
+                                           pedido: pedido, ia: ia, token: token, crudo: crudo,
+                                           wav: wav, history: history)
+                }
+                return
+            }
+        }
+        if !recorder.isRecording { panel.update("⚙️ \(c.proposito.isEmpty ? linea : c.proposito)") }
+        AgenteLog.registrar("terminal_ejecuta", ["cmd": linea])
+        AgenteTerminal.ejecutar(c, timeout: Config.agenteTerminalTimeout()) { [weak self] res in
+            guard let self, self.agenteVigente(token) else { return }
+            Log.write("  terminal: \(linea) → \(res.codigo)\(res.agotado ? " (tiempo agotado)" : "")")
+            let nota = "$ \(linea)\ncódigo \(res.codigo)\(res.agotado ? ", tiempo agotado" : "")\n\(res.salida)"
+            // Un fallo detiene los siguientes: dependían de este.
+            let siguiente = res.codigo == 0 ? indice + 1 : plan.comandos.count
+            self.correrComandosTerminal(plan, indice: siguiente, salidas: salidas + [nota], pedido: pedido,
+                                        ia: ia, token: token, crudo: crudo, wav: wav, history: history)
+        }
+    }
+
     private func entregarRespuestaAgente(_ respuesta: String, pedido: String, motor: String,
                                          token: Int, crudo: String, wav: Data,
                                          history: HistoryWriter?) {
@@ -9172,9 +9422,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                            "respuesta": respuesta])
         if Config.agenteRespuestaConVoz() {
             Voz.decir(respuesta, empezar: { [weak self] in self?.panel.respuestaIA(respuesta) },
-                      completion: { [weak self] in self?.panel.finRespuestaIA(); self?.finAgente() })
+                      completion: { [weak self] in
+                          self?.panel.finRespuestaIA(); self?.finAgente(); self?.continuarConversacionIA()
+                      })
         } else {
-            panel.respuestaIA(respuesta); panel.finRespuestaIA(); finAgente()
+            panel.respuestaIA(respuesta); panel.finRespuestaIA(); finAgente(); continuarConversacionIA()
         }
         finishDelivery(respuesta, rawText: crudo, wav: wav, history: history,
                        pegar: Config.agentePega())
