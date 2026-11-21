@@ -29,5 +29,6 @@ otra spec con `Modifica: NNN`.
 | 014 | Modo IA por tecla propia | Implementada | P | funcionalidad | 2026-11-20 | Alberto — 2026-11-20 — «Creo que es tecla propia… todo parametrizable» | ninguna | Prueba real pendiente |
 | 015 | Leer correo con Microsoft Graph | En implementación | P | funcionalidad | 2026-11-21 | Alberto — 2026-11-21 — «Microsoft Graph» | ninguna | Prueba real pendiente |
 | 016 | Correo, agenda y personas con Microsoft Graph | En implementación | P | funcionalidad | 2026-11-21 | Alberto — 2026-11-21 — «lectura, escritura… calendario… contactos» | 015 | Prueba real pendiente |
+| 017 | Arnés del asistente: gobernanza, habilidades, memoria y evaluación | Borrador | P | funcionalidad | 2026-11-21 | pendiente (fases) | 014, 016 | Diseño |
 
 <!-- sdd:indice:fin -->
