@@ -27,18 +27,33 @@ struct CodigoDispositivo: Equatable {
 
 enum MicrosoftGraph {
     static let alcances = "offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite People.Read User.ReadBasic.All"
-    private static let cuentaLlavero = "microsoft-graph-refresh"
     private static let lock = NSLock()
-    private static var acceso: (token: String, vence: Date)?
+    /// Caché de acceso por cuenta (clave: su entrada del Llavero). Solo en memoria.
+    private static var accesos: [String: (token: String, vence: Date)] = [:]
     private static var esperandoCodigo = false
+    /// La cuenta Microsoft con la que se trabaja ahora (spec 018); por defecto la predeterminada.
+    private static var elegida: CuentaNube?
 
     // MARK: Estado
 
+    static var cuenta: CuentaNube? {
+        elegida ?? CuentasNube.conectadas.first { $0.proveedor == .microsoft && $0.predeterminada }
+            ?? CuentasNube.conectadas.first { $0.proveedor == .microsoft }
+    }
+    static func usar(_ c: CuentaNube?) { lock.lock(); elegida = c; lock.unlock() }
+    private static var cuentaLlavero: String { cuenta?.llavero ?? CuentasNube.llaveroMicrosoftAnterior }
+    private static var acceso: (token: String, vence: Date)? {
+        get { accesos[cuentaLlavero] }
+        set { accesos[cuentaLlavero] = newValue }
+    }
+
     static var conectado: Bool { SecretosKeychain.leer(cuenta: cuentaLlavero) != nil }
     static var disponible: Bool { Config.agenteGraphActivo() && !clientID.isEmpty && conectado }
-    private static var clientID: String { Config.graphClientID().trimmingCharacters(in: .whitespaces) }
+    private static var clientID: String {
+        (cuenta?.clientID ?? Config.graphClientID()).trimmingCharacters(in: .whitespaces)
+    }
     private static var tenant: String {
-        let t = Config.graphTenant().trimmingCharacters(in: .whitespaces)
+        let t = (cuenta?.tenant ?? Config.graphTenant()).trimmingCharacters(in: .whitespaces)
         return t.isEmpty ? "common" : t
     }
     private static var urlToken: URL? {
@@ -46,7 +61,7 @@ enum MicrosoftGraph {
     }
 
     static func desconectar() {
-        lock.lock(); acceso = nil; lock.unlock()
+        lock.lock(); acceso = nil; lock.unlock()   // de la cuenta actual
         SecretosKeychain.borrar(cuenta: cuentaLlavero)
         Log.write("correo Microsoft: cuenta desconectada")
     }
@@ -90,6 +105,7 @@ enum MicrosoftGraph {
                 if codigo == 200, let json, guardarTokens(json) {
                     lock.lock(); esperandoCodigo = false; lock.unlock()
                     Log.write("correo Microsoft: cuenta conectada")
+                    anotarCorreoDeLaCuenta()
                     DispatchQueue.main.async { fin(nil) }
                 } else if error == "authorization_pending" {
                     esperarAutorizacion(c, limite: limite, intervalo: espera, fin: fin)
@@ -131,15 +147,27 @@ enum MicrosoftGraph {
         }
     }
 
+    /// Guarda en el registro el correo de la cuenta recién conectada (para nombrarla).
+    private static func anotarCorreoDeLaCuenta() {
+        guard var c = cuenta else { return }
+        llamar("GET", "/me", query: [URLQueryItem(name: "$select", value: "mail,userPrincipalName")]) { codigo, json in
+            guard codigo == 200, let j = json as? [String: Any] else { return }
+            let correo = (j["mail"] as? String) ?? (j["userPrincipalName"] as? String) ?? ""
+            guard !correo.isEmpty else { return }
+            c.correo = correo
+            CuentasNube.actualizar(c)
+        }
+    }
+
     enum ErrorGraph: Error, Equatable {
         case sinCuenta, sesionVencida, sinPermiso, sinRed, respuesta(String)
         var mensaje: String {
             switch self {
-            case .sinCuenta: return "No hay una cuenta de Microsoft conectada. Conéctala en Ajustes, Asistente."
-            case .sesionVencida: return "La sesión de Microsoft venció. Vuelve a conectar la cuenta en Ajustes, Asistente."
-            case .sinPermiso: return "Microsoft no dio permiso para leer el correo. Puede que tu organización lo bloquee."
-            case .sinRed: return "No pude conectarme a Microsoft. Revisa la conexión a internet."
-            case .respuesta(let m): return "Microsoft respondió con un error (\(m))."
+            case .sinCuenta: return "No hay una cuenta de correo conectada. Conéctala en Ajustes, Asistente."
+            case .sesionVencida: return "La sesión de esa cuenta venció. Vuelve a conectarla en Ajustes, Asistente."
+            case .sinPermiso: return "El servicio no dio permiso para eso. Puede que tu organización lo bloquee."
+            case .sinRed: return "No pude conectarme. Revisa la conexión a internet."
+            case .respuesta(let m): return "El servicio respondió con un error (\(m))."
             }
         }
     }

@@ -193,7 +193,8 @@ enum AgenteTerminal {
     }
 
     /// Herramientas de la cuenta Microsoft para el prompt del modo «Todo».
-    static func catalogoGraph(ahora: Date) -> String {
+    static func catalogoGraph(ahora: Date, cuentas: String? = nil) -> String {
+        let lista = cuentas ?? CuentasNube.paraIA()
         let f = DateFormatter()
         f.locale = Locale(identifier: "es")
         f.dateFormat = "EEEE d 'de' MMMM 'de' yyyy, HH:mm"
@@ -202,13 +203,14 @@ enum AgenteTerminal {
         - [herramienta:leer_correo] Leer correo recibido. "contenido" = días atrás: 1 = hoy, 2 = ayer y hoy (máx. 7).
         - [herramienta:buscar_correo] Buscar en todo el buzón. "contenido" = palabras clave; para un remitente usa from:correo o from:nombre. No pongas palabras de tiempo ("hoy", "esta semana"): para correos recientes usa leer_correo.
         - [herramienta:buscar_persona] Buscar a una persona (contactos frecuentes y directorio). "contenido" = nombre.
-        - [herramienta:borrador_correo] Crear un borrador real en la cuenta Microsoft (carpeta Borradores). "destinatario" = correo o nombre; "asunto"; "contenido" = cuerpo redactado. Para correo de la cuenta Microsoft usa ESTA herramienta y no la app de correo.
+        - [herramienta:borrador_correo] Crear un borrador real en la cuenta (carpeta Borradores). "destinatario" = correo o nombre; "asunto"; "contenido" = cuerpo redactado. Para correo de una cuenta conectada usa ESTA herramienta y no la app de correo.
         - [herramienta:modificar_borrador] Cambiar el último borrador creado. "asunto" y/o "contenido" con la versión completa nueva.
         - [herramienta:responder_correo] Preparar como borrador la respuesta a un correo de la última lista leída. "numero" = su número en la lista; "contenido" = texto de la respuesta.
         - [herramienta:reenviar_correo] Preparar como borrador el reenvío de un correo de la última lista. "numero"; "destinatario" = correo o nombre; "contenido" = comentario opcional.
         - [herramienta:enviar_borrador] Enviar el último borrador. BtoDicta pedirá confirmación al usuario.
         - [herramienta:ver_agenda] Ver eventos del calendario. "contenido" = días desde hoy (1–7).
         - [herramienta:crear_evento] Crear un evento propio, sin invitados. "contenido" = título; "inicio" y "fin" = "AAAA-MM-DDTHH:MM" en hora local; "lugar" opcional.
+        Cuentas conectadas: \(lista.isEmpty ? "una" : lista). Si el pedido nombra una cuenta («mi correo personal», «el de la universidad», «Gmail»), pon su nombre corto en "cuenta"; si no, deja "cuenta" vacío y se usa la predeterminada.
         Ahora es \(f.string(from: ahora)) (hora local).
         """
     }
@@ -226,6 +228,7 @@ enum AgenteTerminal {
         var tipoDocumento: String?
         var filas: [[String]]?
         var palabras: String?
+        var cuenta: String?
     }
 
     static let herramientasGraph: Set<String> = ["leer_correo", "buscar_correo", "buscar_persona", "borrador_correo",
@@ -262,7 +265,7 @@ enum AgenteTerminal {
         return PlanGraph(herramienta: clave, contenido: s("contenido") ?? "", destinatario: s("destinatario"),
                          asunto: s("asunto"), numero: s("numero").flatMap { Int($0) },
                          inicio: fecha("inicio"), fin: fecha("fin"), lugar: s("lugar"),
-                         tipoDocumento: s("tipo_documento"), filas: filas, palabras: s("palabras"))
+                         tipoDocumento: s("tipo_documento"), filas: filas, palabras: s("palabras"), cuenta: s("cuenta"))
     }
 
     /// ¿El usuario pidió con sus palabras mirar la pantalla?

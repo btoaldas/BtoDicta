@@ -180,6 +180,74 @@ final class AgenteSettingsModel: ObservableObject {
         MicrosoftGraph.cancelarConexion(); MicrosoftGraph.desconectar()
         graphCodigo = nil; graphConectado = false; graphEstado = "Cuenta desconectada."
     }
+
+    // Varias cuentas de Microsoft y Google (spec 018)
+    @Published var cuentas: [CuentaNube] = CuentasNube.todas()
+    @Published var conectandoCuenta: String?
+    @Published var nuevaProveedor: ProveedorNube = .microsoft
+    @Published var nuevaAlias = ""
+    @Published var nuevaClientID = ""
+    @Published var nuevaTenant = "common"
+    @Published var nuevaSecreto = ""
+
+    func refrescarCuentas() { cuentas = CuentasNube.todas(); graphConectado = !CuentasNube.conectadas.isEmpty }
+
+    func agregarCuenta() {
+        let c = CuentasNube.agregar(proveedor: nuevaProveedor, alias: nuevaAlias, clientID: nuevaClientID,
+                                    tenant: nuevaProveedor == .microsoft ? nuevaTenant : "")
+        let secreto = nuevaSecreto
+        nuevaAlias = ""; nuevaSecreto = ""
+        refrescarCuentas()
+        conectarCuenta(c, secreto: secreto)
+    }
+
+    func conectarCuenta(_ c: CuentaNube, secreto: String? = nil) {
+        conectandoCuenta = c.id
+        let fin: (String?) -> Void = { [weak self] error in
+            self?.graphCodigo = nil; self?.conectandoCuenta = nil
+            self?.refrescarCuentas()
+            self?.graphEstado = error ?? "«\(c.alias)» conectada. Ya puedes pedir «revisa mi correo de \(c.alias)»."
+        }
+        switch c.proveedor {
+        case .microsoft:
+            graphEstado = "Pidiendo el código a Microsoft…"
+            MicrosoftGraph.usar(c)
+            MicrosoftGraph.conectar(mostrar: { [weak self] cod in
+                self?.graphCodigo = cod
+                self?.graphEstado = "Escribe el código en la página de Microsoft que se abrió."
+                if let u = URL(string: cod.url) { NSWorkspace.shared.open(u) }
+            }, fin: fin)
+        case .google:
+            let s = secreto ?? SecretosKeychain.leer(cuenta: CuentasNube.llaveSecreto(c)) ?? ""
+            graphEstado = "Autoriza en el navegador que se abrió (tienes 5 minutos)."
+            GoogleCuenta.conectar(c, secreto: s, fin: fin)
+        }
+    }
+
+    func cancelarConexionCuenta() {
+        MicrosoftGraph.cancelarConexion()
+        graphCodigo = nil; conectandoCuenta = nil; graphEstado = "Conexión cancelada."
+    }
+
+    func predeterminarCuenta(_ c: CuentaNube) { CuentasNube.predeterminar(c.id); refrescarCuentas() }
+
+    func renombrarCuenta(_ c: CuentaNube, _ alias: String) {
+        let a = alias.trimmingCharacters(in: .whitespaces)
+        guard !a.isEmpty, a != c.alias else { return }
+        var n = c; n.alias = a; CuentasNube.actualizar(n); refrescarCuentas()
+    }
+
+    /// Pide confirmación y quita la cuenta con su sesión del Llavero (RF-02).
+    func quitarCuenta(_ c: CuentaNube) {
+        let a = NSAlert()
+        a.messageText = "¿Quitar la cuenta «\(c.etiqueta)»?"
+        a.informativeText = "Se borra solo su sesión guardada en este Mac. Tus correos y tu cuenta no se tocan; podrás volver a conectarla."
+        a.addButton(withTitle: "Quitar"); a.addButton(withTitle: "Cancelar")
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        MicrosoftGraph.usar(nil)
+        CuentasNube.quitar(c.id); refrescarCuentas()
+        graphEstado = "Cuenta quitada."
+    }
     @Published var volumenPaso: Double {
         didSet { Config.set("agente_volumen_paso", to: Int(volumenPaso)) }
     }
@@ -718,38 +786,68 @@ struct AgenteView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-            card("Correo de Microsoft (solo lectura)", "envelope.open") {
-                Toggle("Permitir que el asistente lea mi correo", isOn: $m.graphActivo)
-                Text("Lee la bandeja de entrada de una cuenta Microsoft 365 u Outlook.com con Microsoft Graph: remitente, asunto, fecha y el inicio del texto. Nunca envía, borra ni mueve correos. Lo leído viaja a la IA del asistente para resumirlo.")
+            card("Cuentas de correo, agenda y contactos", "envelope.open") {
+                Toggle("Permitir que el asistente use mis cuentas", isOn: $m.graphActivo)
+                Text("Microsoft 365, Outlook.com y Google (Gmail, Calendar, Contactos); puedes conectar varias de cada una. Lee y busca correo, prepara borradores y eventos. Enviar SIEMPRE te pide confirmación; nunca borra ni mueve correos. Lo leído viaja a la IA del asistente para resumirlo. Di el nombre corto («revisa mi correo Personal») o usa la predeterminada.")
                     .font(.caption).foregroundStyle(.orange)
                 if m.graphActivo {
-                    field("Identificador de la aplicación (client ID)", text: $m.graphClientID,
-                          placeholder: "00000000-0000-0000-0000-000000000000")
-                    field("Directorio (tenant)", text: $m.graphTenant, placeholder: "common")
-                    Text("Registra una aplicación en Microsoft Entra (portal de Azure → Registros de aplicaciones): tipo cliente público, «Permitir flujos de cliente públicos» activado y permisos delegados Mail.Read y User.Read. Pega aquí su identificador. «common» admite cualquier cuenta; tu organización puede exigir su propio directorio o la aprobación de un administrador.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    HStack {
-                        Circle().fill(m.graphConectado ? Color.green : Color.orange).frame(width: 7, height: 7)
-                        Text(m.graphConectado ? "Cuenta conectada" : "Sin cuenta conectada").font(.caption)
-                        Spacer()
-                        Button(m.graphConectado ? "Volver a conectar" : "Conectar cuenta") { m.conectarGraph() }
-                            .controlSize(.small)
-                            .disabled(m.graphClientID.trimmingCharacters(in: .whitespaces).isEmpty || m.graphCodigo != nil)
-                        if m.graphConectado || m.graphCodigo != nil {
-                            Button("Desconectar") { m.desconectarGraph() }.controlSize(.small)
+                    ForEach(m.cuentas) { c in
+                        HStack(spacing: 6) {
+                            Circle().fill(CuentasNube.conectada(c) ? Color.green : Color.orange).frame(width: 7, height: 7)
+                            Image(systemName: c.proveedor == .google ? "g.circle" : "m.square").foregroundStyle(.secondary)
+                            TextField("Nombre corto", text: Binding(get: { c.alias }, set: { m.renombrarCuenta(c, $0) }))
+                                .textFieldStyle(.roundedBorder).frame(width: 120)
+                            Text(c.correo.isEmpty ? c.proveedor.nombre : c.correo).font(.caption).foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer()
+                            if c.predeterminada { Text("Predeterminada").font(.caption2).foregroundStyle(.secondary) }
+                            else { Button("Predeterminar") { m.predeterminarCuenta(c) }.controlSize(.small) }
+                            Button(CuentasNube.conectada(c) ? "Reconectar" : "Conectar") { m.conectarCuenta(c) }
+                                .controlSize(.small).disabled(m.conectandoCuenta != nil)
+                            Button("Quitar") { m.quitarCuenta(c) }.controlSize(.small)
                         }
                     }
-                    if let c = m.graphCodigo {
+                    if m.cuentas.isEmpty { Text("Aún no hay cuentas.").font(.caption).foregroundStyle(.secondary) }
+                    if m.conectandoCuenta != nil {
                         HStack {
-                            Text("Código:").font(.caption)
-                            Text(c.codigoUsuario).font(.system(.title3, design: .monospaced)).textSelection(.enabled)
-                            Button("Copiar") {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(c.codigoUsuario, forType: .string)
-                            }.controlSize(.small)
+                            if let c = m.graphCodigo {
+                                Text("Código:").font(.caption)
+                                Text(c.codigoUsuario).font(.system(.title3, design: .monospaced)).textSelection(.enabled)
+                                Button("Copiar") {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(c.codigoUsuario, forType: .string)
+                                }.controlSize(.small)
+                            }
+                            Spacer()
+                            Button("Cancelar") { m.cancelarConexionCuenta() }.controlSize(.small)
                         }
                     }
                     if !m.graphEstado.isEmpty { Text(m.graphEstado).font(.caption) }
+                    Divider()
+                    Text("Agregar cuenta").font(.caption.bold())
+                    Picker("Proveedor", selection: $m.nuevaProveedor) {
+                        ForEach(ProveedorNube.allCases, id: \.self) { Text($0.nombre).tag($0) }
+                    }.pickerStyle(.segmented)
+                    field("Nombre corto (p. ej. Trabajo, Personal)", text: $m.nuevaAlias, placeholder: m.nuevaProveedor.nombre)
+                    field("Identificador de la aplicación (client ID)", text: $m.nuevaClientID,
+                          placeholder: m.nuevaProveedor == .microsoft ? "00000000-0000-0000-0000-000000000000" : "….apps.googleusercontent.com")
+                    if m.nuevaProveedor == .microsoft {
+                        field("Directorio (tenant)", text: $m.nuevaTenant, placeholder: "common")
+                        Text("Microsoft Entra → Registros de aplicaciones: cliente público con «Permitir flujos de cliente públicos» y permisos delegados Mail.ReadWrite, Mail.Send, Calendars.ReadWrite, People.Read, User.Read y User.ReadBasic.All. «common» admite cualquier cuenta.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        SecureField("Secreto del cliente", text: $m.nuevaSecreto).textFieldStyle(.roundedBorder)
+                        Text("Google Cloud → APIs: Gmail, Calendar y People activadas; pantalla de consentimiento en modo prueba con tu correo como usuario de prueba; credencial «App de escritorio». El secreto se guarda en el Llavero.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Spacer()
+                        Button("Agregar y conectar") { m.agregarCuenta() }
+                            .controlSize(.small)
+                            .disabled(m.nuevaClientID.trimmingCharacters(in: .whitespaces).isEmpty
+                                      || (m.nuevaProveedor == .google && m.nuevaSecreto.isEmpty)
+                                      || m.conectandoCuenta != nil)
+                    }
                 }
             }
 

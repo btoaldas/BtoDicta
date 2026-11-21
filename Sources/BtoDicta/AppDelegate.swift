@@ -234,6 +234,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Última lista de correos leída y último borrador (spec 016).
     private var graphUltimosCorreos: [CorreoLeido] = []
     private var graphUltimoBorrador: BorradorGraph?
+    /// Cuenta (Microsoft o Google) con la que trabaja este turno del asistente (spec 018).
+    private var cuentaCorreo: CuentaNube?
+    private var opsCorreo: OperacionesCorreo { OperacionesCorreo(cuenta: cuentaCorreo ?? CuentasNube.elegir(nil)) }
     /// Última acción del modo «Todo» y la repetición ya consultada (anti-duplicados).
     private var ultimaAccionIA: (firma: String, cuando: Date)?
     private var repeticionPendiente: String?
@@ -8842,7 +8845,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // decide la IA (con Microsoft, el calendario va por Graph).
             if Config.agenteNucleoActivo(), (contextoAgente || normal.base == "agente"),
                Config.agenteIADecision() == "mixto",
-               !ReglasModoTodo.admite(pregunta, graph: MicrosoftGraph.disponible) {
+               !ReglasModoTodo.admite(pregunta, graph: CuentasNube.hayDisponible) {
                 responderAgente(textoNormal ?? crudo, modo: ModosStore.modo("agente"), crudo: crudo,
                                 wav: wav, history: history, modoNormal: normal, contextoAgente: true)
                 return
@@ -8947,7 +8950,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let pregunta = ModoPlanificador.pregunta(para: cadena, fuente: .natural,
                                                   confianza: confianza)
         if Config.agenteIADecision() == "mixto",
-           !ReglasModoTodo.admite(pregunta, graph: MicrosoftGraph.disponible) {
+           !ReglasModoTodo.admite(pregunta, graph: CuentasNube.hayDisponible) {
             responderAgente(textoNormal, modo: ModosStore.modo("agente"), crudo: crudo, wav: wav,
                             history: history, modoNormal: modoNormal, contextoAgente: true)
             return true
@@ -9095,7 +9098,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         if Config.agenteNucleoActivo(), let plan = AgenteNucleo.planificar(texto),
-           Config.agenteIADecision() != "mixto" || ReglasModoTodo.admite(plan, graph: MicrosoftGraph.disponible) {
+           Config.agenteIADecision() != "mixto" || ReglasModoTodo.admite(plan, graph: CuentasNube.hayDisponible) {
             AgenteLog.registrar("plan", ["descripcion": plan.descripcion,
                 "nivel": PoliticaAgente.nivel.rawValue,
                 "riesgo": PoliticaAgente.riesgo(de: plan.cadena).rawValue,
@@ -9424,7 +9427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let contexto = Config.agenteMemoriaContextoIA() ? MemoriaAgente.contexto() : ""
         let prompt = AgenteTerminal.promptMixto(pedido: texto, contexto: contexto,
                                                 catalogo: CatalogoCapacidades.paraIA(caps),
-                                                correo: MicrosoftGraph.disponible,
+                                                correo: CuentasNube.hayDisponible,
                                                 arnes: Arnes.contexto(para: texto),
                                                 memoria: Arnes.memoria())
         CerebroTexto.pedir(prompt, ia: ia) { [weak self] r in
@@ -9479,7 +9482,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                self.ejecutarHerramientaLocal(plan, pedido: texto, ia: ia, token: tok) {
                 return
             }
-            if MicrosoftGraph.disponible, let plan = AgenteTerminal.planGraph(bruto) {
+            if CuentasNube.hayDisponible, let plan = AgenteTerminal.planGraph(bruto) {
                 AgenteLog.registrar("graph_herramienta", ["herramienta": plan.herramienta])
                 self.ejecutarGraph(plan, pedido: texto, ia: ia, token: tok)
                 return
@@ -9765,6 +9768,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                          crudo: "", wav: Data(), history: nil, memoria: memoria)
         }
         let fallo: (MicrosoftGraph.ErrorGraph) -> Void = { e in decir(e.mensaje, nil) }
+        // La cuenta que nombra el pedido («mi correo personal», «desde EZTIC») o la predeterminada.
+        let nueva = CuentasNube.elegir(plan.cuenta ?? pedido)
+        if nueva?.id != cuentaCorreo?.id { graphUltimosCorreos = []; graphUltimoBorrador = nil }
+        cuentaCorreo = nueva
         // «Aprobación» pregunta antes de escribir algo elegido por la IA.
         let escribe = ["borrador_correo", "modificar_borrador", "responder_correo", "reenviar_correo",
                        "crear_evento"].contains(plan.herramienta)
@@ -9778,7 +9785,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "leer_correo":
             leerCorreoYResumir(pedido, dias: AgenteTerminal.dias(plan.contenido), ia: ia, token: token)
         case "buscar_correo":
-            MicrosoftGraph.buscarCorreo(plan.contenido.isEmpty ? pedido : plan.contenido) { [weak self] r in
+            self.opsCorreo.buscarCorreo(plan.contenido.isEmpty ? pedido : plan.contenido) { [weak self] r in
                 guard let self, self.agenteVigente(token) else { return }
                 switch r {
                 case .failure(let e): fallo(e)
@@ -9787,7 +9794,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             }
         case "buscar_persona":
-            MicrosoftGraph.buscarPersonas(plan.contenido) { [weak self] r in
+            self.opsCorreo.buscarPersonas(plan.contenido) { [weak self] r in
                 guard let self, self.agenteVigente(token) else { return }
                 switch r {
                 case .failure(let e): fallo(e)
@@ -9801,7 +9808,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case "borrador_correo":
             resolverDestinatario(plan.destinatario, token: token, decir: decir) { [weak self] correo in
                 guard let self else { return }
-                MicrosoftGraph.crearBorrador(para: [correo], asunto: plan.asunto ?? "", cuerpo: plan.contenido) { r in
+                self.opsCorreo.crearBorrador(para: [correo], asunto: plan.asunto ?? "", cuerpo: plan.contenido) { r in
                     guard self.agenteVigente(token) else { return }
                     switch r {
                     case .failure(let e): fallo(e)
@@ -9815,7 +9822,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         case "modificar_borrador":
             guard let b = graphUltimoBorrador else { decir("No tengo un borrador reciente para cambiar. ¿Creo uno nuevo?", nil); return }
-            MicrosoftGraph.modificarBorrador(b.id, asunto: plan.asunto,
+            self.opsCorreo.modificarBorrador(b, asunto: plan.asunto,
                                              cuerpo: plan.contenido.isEmpty ? nil : plan.contenido) { [weak self] r in
                 guard let self, self.agenteVigente(token) else { return }
                 switch r {
@@ -9832,7 +9839,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 decir("¿A cuál correo respondo? Primero pídeme que revise o busque tus correos.", nil); return
             }
             let original = graphUltimosCorreos[n - 1]
-            MicrosoftGraph.crearRespuesta(original.id, texto: plan.contenido) { [weak self] r in
+            self.opsCorreo.crearRespuesta(original.id, texto: plan.contenido) { [weak self] r in
                 guard let self, self.agenteVigente(token) else { return }
                 switch r {
                 case .failure(let e): fallo(e)
@@ -9850,7 +9857,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let original = graphUltimosCorreos[n - 1]
             resolverDestinatario(plan.destinatario, token: token, decir: decir) { [weak self] correo in
                 guard let self else { return }
-                MicrosoftGraph.crearReenvio(original.id, para: correo, comentario: plan.contenido) { r in
+                self.opsCorreo.crearReenvio(original.id, para: correo, comentario: plan.contenido) { r in
                     guard self.agenteVigente(token) else { return }
                     switch r {
                     case .failure(let e): fallo(e)
@@ -9866,7 +9873,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let b = graphUltimoBorrador else { decir("No tengo un borrador listo para enviar.", nil); return }
             // Enviar SIEMPRE se confirma, con cualquier modo de confirmación, y con
             // lo que hay de verdad en el buzón: se relee el borrador justo antes.
-            MicrosoftGraph.detalleParaEnviar(b.id) { [weak self] detalle in
+            self.opsCorreo.detalleParaEnviar(b.id) { [weak self] detalle in
                 guard let self, self.agenteVigente(token) else { return }
                 guard let detalle else { decir("No pude leer el borrador antes de enviarlo. No envié nada.", nil); return }
                 guard self.autorizarDecisionIA("¿Enviar este correo?", detalle: detalle) else {
@@ -9876,7 +9883,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         case "ver_agenda":
             let d = AgenteTerminal.dias(plan.contenido, porDefecto: 1)
-            MicrosoftGraph.agenda(dias: d) { [weak self] r in
+            self.opsCorreo.agenda(dias: d) { [weak self] r in
                 guard let self, self.agenteVigente(token) else { return }
                 switch r {
                 case .failure(let e): fallo(e)
@@ -9902,7 +9909,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let inicio = plan.inicio else { decir("¿Para qué día y hora lo agendo?", nil); return }
             let fin = plan.fin.flatMap { $0 > inicio ? $0 : nil } ?? inicio.addingTimeInterval(3600)
             let titulo = plan.contenido.isEmpty ? "Evento" : plan.contenido
-            MicrosoftGraph.crearEvento(asunto: titulo, inicio: inicio, fin: fin, lugar: plan.lugar) { [weak self] r in
+            self.opsCorreo.crearEvento(asunto: titulo, inicio: inicio, fin: fin, lugar: plan.lugar) { [weak self] r in
                 guard let self, self.agenteVigente(token) else { return }
                 switch r {
                 case .failure(let e): fallo(e)
@@ -9919,7 +9926,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func enviarConfirmado(_ b: BorradorGraph, token: Int,
                                   decir: @escaping (String, String?) -> Void,
                                   fallo: @escaping (MicrosoftGraph.ErrorGraph) -> Void) {
-        MicrosoftGraph.enviarBorrador(b.id) { [weak self] r in
+        self.opsCorreo.enviarBorrador(b.id) { [weak self] r in
             guard let self, self.agenteVigente(token) else { return }
             switch r {
             case .failure(let e): fallo(e)
@@ -9937,7 +9944,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let t = d?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if t.contains("@") { listo(t); return }
         guard !t.isEmpty else { decir("¿A quién le escribo?", nil); return }
-        MicrosoftGraph.buscarPersonas(t) { [weak self] r in
+        self.opsCorreo.buscarPersonas(t) { [weak self] r in
             guard let self, self.agenteVigente(token) else { return }
             switch r {
             case .failure(let e): decir(e.mensaje, nil)
@@ -9955,7 +9962,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func leerCorreoYResumir(_ texto: String, dias: Int, ia: ChatIA?, token: Int) {
         if !recorder.isRecording { panel.update("📬 Leyendo tu correo…") }
         AgenteLog.registrar("correo_leer", ["dias": dias])
-        MicrosoftGraph.leerBandeja(dias: dias) { [weak self] r in
+        self.opsCorreo.leerBandeja(dias: dias) { [weak self] r in
             guard let self, self.agenteVigente(token) else { return }
             switch r {
             case .failure(let e):

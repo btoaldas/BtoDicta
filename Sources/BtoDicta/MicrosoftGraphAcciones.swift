@@ -17,6 +17,8 @@ struct BorradorGraph: Equatable {
     let para: [String]
     let enlace: String
     let inicio: String
+    /// Cuerpo completo cuando se conoce (Gmail lo necesita para cambiar solo el asunto).
+    var cuerpo: String = ""
 }
 
 struct EventoGraph: Equatable {
@@ -240,7 +242,7 @@ extension MicrosoftGraph {
         let cuerpo = ((j["body"] as? [String: Any])?["content"] as? String) ?? (j["bodyPreview"] as? String) ?? ""
         return BorradorGraph(id: id, asunto: (j["subject"] as? String) ?? "", para: para,
                              enlace: (j["webLink"] as? String) ?? "",
-                             inicio: String(cuerpo.prefix(200)))
+                             inicio: String(cuerpo.prefix(200)), cuerpo: cuerpo)
     }
 
     static func leerPersonas(_ json: Any?) -> [PersonaGraph] {
