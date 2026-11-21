@@ -1,6 +1,6 @@
 # Spec 017 — Arnés del asistente: gobernanza, habilidades, memoria y evaluación
 
-- Estado: En implementación (fases 1 y 2 hechas; 3–5 pendientes)
+- Estado: En implementación (fases 1, 2 y 3 hechas; 4 y 5 pendientes)
 - Tipo: funcionalidad
 - Nivel: P (heredado del ROADMAP; lo fija sw-ciclo)
 - Fecha: 2026-11-21
@@ -111,3 +111,10 @@ prueba real; la evaluación automática dará la cifra medida.
 - [x] Ajustes: «Abrir carpeta» y «Regenerar habilidades».
 - [x] El validador acepta la frase de voz de una capacidad («modo abrir aplicación»).
 - Evaluación con el arnés: 25/26 → **26/26** (glm-5.3). `ArnesTests` 5/5.
+
+### Fase 3 (aprobada el 2026-11-21, «Sí, fase 3»)
+
+- [x] `DocumentosAgente.swift`: Word con plantilla (memo, oficio, informe, carta, documento) por `textutil`, numeración «N.° ____», guardado en `Documentos/BtoDicta` sin sobrescribir y abierto; hoja de Excel (CSV con BOM) desde filas; búsqueda en el historial de dictados (60 días); elección del audio más reciente de Descargas o Escritorio.
+- [x] Herramientas del modo «Todo»: `crear_documento`, `crear_hoja`, `buscar_historial`, `resumen_bitacora` (usa `ContinuoResumen`), `transcribir_archivo` (usa `AudioArchivo.transcribir`, guarda el .txt y lo abre).
+- [x] Fichas del arnés actualizadas; regla: abrir apps con `open -a`.
+- Evidencia: `DocumentosAgenteTests` 6/6; `textutil` real produce «Microsoft Word 2007+» con la plantilla; evaluación 30 casos: 97 % → **100 % y 97 %** (el fallo restante pregunta un dato, conducta aceptada).

@@ -148,6 +148,11 @@ enum AgenteTerminal {
         let lineaCorreo = (correo ? AgenteTerminal.catalogoGraph(ahora: Date()) : "")
             + "\n- [herramienta:tareas_resumen] Decir las tareas y pendientes de BtoDicta. \"contenido\" = hoy, semana o pendientes."
             + "\n- [herramienta:recordar] Guardar un dato duradero del usuario cuando diga «recuerda que…» o «anota que…». \"contenido\" = el dato, en una frase."
+            + "\n- [herramienta:crear_documento] Crear un Word con formato (memo, oficio, informe, carta o documento) y abrirlo. \"tipo_documento\"; \"asunto\"; \"destinatario\" = para quién (opcional); \"contenido\" = el cuerpo ya redactado. La numeración la deja en blanco BtoDicta."
+            + "\n- [herramienta:crear_hoja] Crear una hoja de Excel desde una tabla y abrirla. \"asunto\" = título; \"filas\" = [[\"Encabezado\",\"…\"],[\"dato\",\"…\"]]."
+            + "\n- [herramienta:buscar_historial] Buscar en los dictados anteriores de BtoDicta. \"contenido\" = palabras clave."
+            + "\n- [herramienta:resumen_bitacora] Resumen de la bitácora (lo que hizo el usuario en el equipo). \"contenido\" = hoy o ayer."
+            + "\n- [herramienta:transcribir_archivo] Transcribir un audio o video. \"contenido\" = la ruta, o vacío para el más reciente de Descargas o Escritorio."
         return """
         <INSTRUCCIONES_INTERNAS_NO_REPRODUCIR>
         Eres el operador de BtoDicta en una Mac (macOS, zsh). El usuario te habla por voz y quiere que HAGAS cosas.
@@ -162,7 +167,8 @@ enum AgenteTerminal {
         3. Si es charla o una pregunta que respondes tú, "capacidad" null y "comandos" vacío.
         - Un BORRADOR de correo en la app de correo se abre con el comando: open "mailto:destino?subject=…&body=…" (texto codificado para URL). Abre el borrador sin enviarlo. Las capacidades que "reescriben" texto solo lo transforman y lo pegan: no crean borradores.
         - Una página o búsqueda web se abre con: open "https://…". Si no conoces la dirección EXACTA, no la inventes: abre una búsqueda (open "https://www.google.com/search?q=…").
-        - Un documento de Word: escribe el texto en un .txt temporal y conviértelo con: textutil -convert docx /tmp/archivo.txt -output ~/Documents/Nombre.docx; luego ábrelo. Una hoja de Excel: crea un .csv y ábrelo con open -a "Microsoft Excel". Nunca sobrescribas un archivo existente: usa un nombre nuevo con la fecha.
+        - Un documento de Word, memo, oficio, informe o carta: usa crear_documento. Una hoja de Excel: crear_hoja. No los hagas con comandos.
+        - Abrir una aplicación del Mac (Calculadora, Teams, Safari…): el comando open -a "Nombre". No inventes capacidades con el nombre de la app.
         - Lo que se puede calcular (hora en otra zona, fechas, operaciones) se obtiene con un comando, no de memoria. Hora en otra ciudad: TZ=Zona/Ciudad date.
         - CÓMO HABLAS (solo en "respuesta", nunca en documentos): \(Config.agentePersonaVoz())
         - Nunca inventes numeración de documentos (oficios, memorandos, trámites): deja «N.° ____» para que la ponga el usuario o su sistema oficial.
@@ -214,11 +220,15 @@ enum AgenteTerminal {
         var inicio: Date?
         var fin: Date?
         var lugar: String?
+        var tipoDocumento: String?
+        var filas: [[String]]?
     }
 
     static let herramientasGraph: Set<String> = ["leer_correo", "buscar_correo", "buscar_persona", "borrador_correo",
                                                  "modificar_borrador", "responder_correo", "reenviar_correo", "enviar_borrador",
-                                                 "ver_agenda", "crear_evento", "tareas_resumen", "recordar"]
+                                                 "ver_agenda", "crear_evento", "tareas_resumen", "recordar",
+                                                 "crear_documento", "crear_hoja", "buscar_historial",
+                                                 "resumen_bitacora", "transcribir_archivo"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,
@@ -243,9 +253,11 @@ enum AgenteTerminal {
             }
             return nil
         }
+        let filas = (c["filas"] as? [[Any]])?.map { $0.map { "\($0)" } }
         return PlanGraph(herramienta: clave, contenido: s("contenido") ?? "", destinatario: s("destinatario"),
                          asunto: s("asunto"), numero: s("numero").flatMap { Int($0) },
-                         inicio: fecha("inicio"), fin: fecha("fin"), lugar: s("lugar"))
+                         inicio: fecha("inicio"), fin: fecha("fin"), lugar: s("lugar"),
+                         tipoDocumento: s("tipo_documento"), filas: filas)
     }
 
     /// Días (1–7) a partir del contenido; por defecto 2.

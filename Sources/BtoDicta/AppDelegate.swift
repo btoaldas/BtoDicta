@@ -9475,6 +9475,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 return
             }
+            if let plan = AgenteTerminal.planGraph(bruto),
+               self.ejecutarHerramientaLocal(plan, pedido: texto, ia: ia, token: tok) {
+                return
+            }
             if MicrosoftGraph.disponible, let plan = AgenteTerminal.planGraph(bruto) {
                 AgenteLog.registrar("graph_herramienta", ["herramienta": plan.herramienta])
                 self.ejecutarGraph(plan, pedido: texto, ia: ia, token: tok)
@@ -9557,6 +9561,96 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.correrComandosTerminal(plan, indice: 0, salidas: [], pedido: texto, ia: ia,
                                         token: tokActual, crudo: crudo, wav: wav, history: history)
         }
+    }
+
+    // MARK: Herramientas deterministas de BtoDicta (spec 017, fase 3)
+
+    /// Documentos, hojas, historial, bitácora y transcripción. true si la atendió.
+    private func ejecutarHerramientaLocal(_ plan: AgenteTerminal.PlanGraph, pedido: String,
+                                          ia: ChatIA?, token: Int) -> Bool {
+        let locales: Set<String> = ["crear_documento", "crear_hoja", "buscar_historial",
+                                    "resumen_bitacora", "transcribir_archivo"]
+        guard locales.contains(plan.herramienta) else { return false }
+        let decir: (String, String?) -> Void = { [weak self] t, memoria in
+            guard let self else { return }
+            self.entregarRespuestaAgente(t, pedido: pedido, motor: "BtoDicta", token: token,
+                                         crudo: "", wav: Data(), history: nil, memoria: memoria)
+        }
+        if ["crear_documento", "crear_hoja"].contains(plan.herramienta), Config.agenteIAConfirmacion() == "aprobacion",
+           !autorizarDecisionIA("La IA quiere: \(plan.herramienta.replacingOccurrences(of: "_", with: " "))",
+                                detalle: [plan.asunto, plan.destinatario, plan.contenido].compactMap { $0 }.joined(separator: "\n")) {
+            decir("Entendido, no hago nada.", nil); return true
+        }
+        AgenteLog.registrar("herramienta_local", ["herramienta": plan.herramienta])
+        switch plan.herramienta {
+        case "crear_documento":
+            let tipo = plan.tipoDocumento ?? "documento"
+            if !recorder.isRecording { panel.update("📝 Creando el \(tipo)…") }
+            DocumentosAgente.crearDocumento(tipo: tipo, asunto: plan.asunto ?? "", para: plan.destinatario,
+                                            de: nil, cuerpo: plan.contenido) { r in
+                switch r {
+                case .success(let u):
+                    decir("Listo, te hice el \(tipo) y ya está abierto en Word. Quedó en Documentos, carpeta BtoDicta. ¿Algo más?",
+                          AgenteTerminal.resumenAccion(nombre: "un \(tipo) en Word (\(u.lastPathComponent))",
+                                                       destinatario: plan.destinatario, asunto: plan.asunto,
+                                                       contenido: plan.contenido))
+                case .failure(let e): decir("No pude crear el Word: \(e.localizedDescription)", nil)
+                }
+            }
+        case "crear_hoja":
+            guard let filas = plan.filas, !filas.isEmpty else { decir("¿Qué columnas y datos le pongo a la hoja?", nil); return true }
+            do {
+                let u = try DocumentosAgente.crearHoja(titulo: plan.asunto ?? "Tabla", filas: filas)
+                decir("Listo, la hoja está abierta. Quedó en Documentos, carpeta BtoDicta. ¿Algo más?",
+                      "Creé la hoja \(u.lastPathComponent) con \(filas.count) filas.")
+            } catch { decir("No pude crear la hoja: \(error.localizedDescription)", nil) }
+        case "buscar_historial":
+            let q = plan.contenido.isEmpty ? pedido : plan.contenido
+            DispatchQueue.global(qos: .userInitiated).async {
+                let r = DocumentosAgente.buscarHistorial(q)
+                DispatchQueue.main.async {
+                    if r.isEmpty { decir("No encontré dictados sobre eso en los últimos dos meses. ¿Lo busco con otras palabras?", nil) }
+                    else { decir("Encontré \(r.count == 5 ? "varios" : String(r.count)): " + DocumentosAgente.historialHablado(r) + ". ¿Algo más?",
+                                 "Busqué en el historial «\(q.prefix(60))»: \(r.count) resultado(s).") }
+                }
+            }
+        case "resumen_bitacora":
+            let dia = PerfilAgente.normalizar(plan.contenido).contains("ayer")
+                ? Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date() : Date()
+            if !recorder.isRecording { panel.update("📒 Resumiendo la bitácora…") }
+            ContinuoResumen.generar(dia: dia) { r in
+                DispatchQueue.main.async {
+                    switch r {
+                    case .success(let u):
+                        NSWorkspace.shared.open(u)
+                        decir("Listo, te abrí el resumen de la bitácora. ¿Algo más?", "Abrí el resumen de la bitácora.")
+                    case .failure(let e): decir("No pude resumir la bitácora: \(e.localizedDescription).", nil)
+                    }
+                }
+            }
+        case "transcribir_archivo":
+            guard let url = DocumentosAgente.archivoParaTranscribir(plan.contenido) else {
+                decir("No encontré un audio para transcribir. Ponlo en Descargas o dime la ruta.", nil); return true
+            }
+            if !recorder.isRecording { panel.update("🎧 Transcribiendo \(url.lastPathComponent)…") }
+            AudioArchivo.transcribir(url) { r in
+                switch r {
+                case .success(let (texto, _, _)):
+                    do {
+                        try FileManager.default.createDirectory(at: DocumentosAgente.carpeta, withIntermediateDirectories: true)
+                        let destino = DocumentosAgente.nombreLibre("Transcripcion " + url.deletingPathExtension().lastPathComponent,
+                                                                   extension: "txt", en: DocumentosAgente.carpeta)
+                        try texto.write(to: destino, atomically: true, encoding: .utf8)
+                        NSWorkspace.shared.open(destino)
+                        decir("Listo, transcribí «\(url.lastPathComponent)» y te lo abrí. Quedó en Documentos, carpeta BtoDicta. ¿Algo más?",
+                              "Transcribí \(url.lastPathComponent) (\(texto.count) caracteres).")
+                    } catch { decir("Transcribí el audio, pero no pude guardar el texto.", nil) }
+                case .failure(let e): decir("No pude transcribir el audio: \(e.localizedDescription)", nil)
+                }
+            }
+        default: return false
+        }
+        return true
     }
 
     // MARK: Microsoft Graph — herramientas del modo «Todo» (spec 016)

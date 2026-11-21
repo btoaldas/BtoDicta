@@ -169,8 +169,8 @@ enum Arnes {
         palabras: word, excel, documento, hoja, archivo, abre, aplicación, página, web, hora, disco, espacio, calculadora, captura
         ---
         # Mac: archivos, apps y datos
-        - Word real: texto en /tmp/x.txt → textutil -convert docx /tmp/x.txt -output ~/Documents/Nombre_fecha.docx → open.
-        - Excel: un .csv → open -a "Microsoft Excel". Nunca sobrescribas: nombre nuevo con fecha.
+        - Word, memo, oficio, informe o carta: [herramienta:crear_documento] (plantilla de BtoDicta, numeración en blanco).
+        - Excel desde una tabla: [herramienta:crear_hoja] con las filas. Se guardan en Documentos/BtoDicta sin sobrescribir.
         - Abrir apps: open -a "Nombre". Páginas: open "https://…" o una búsqueda si no conoces la dirección.
         - Hora en otra ciudad: TZ=Zona/Ciudad date "+%H:%M". Disco: df -h /.
         - Volumen y silencio: los resuelve la regla fija («silencia la computadora», «volumen al 50 %»).
@@ -180,9 +180,9 @@ enum Arnes {
         palabras: bitácora, historial, dictado, dictados, transcribir, transcripción, grabación, grabar, audio
         ---
         # Bitácora, historial y transcripción
-        - Lo dictado queda en el historial de BtoDicta; la bitácora guarda grabaciones y capturas si está activa.
-        - Transcribir un archivo de audio se hace desde la pestaña Transcribir.
-        - Si el usuario pide algo de esto que no está en las herramientas, dile dónde está en la app.
+        - «¿Qué dicté sobre…?», «busca en mis dictados…»: [herramienta:buscar_historial] con las palabras clave.
+        - «Resume mi día / mi bitácora de ayer»: [herramienta:resumen_bitacora] (requiere la bitácora activa).
+        - «Transcribe este audio / el último audio que bajé»: [herramienta:transcribir_archivo].
         """))
         return f
     }
