@@ -167,3 +167,30 @@ final class ModoIATests: XCTestCase {
         wait(for: [e], timeout: 15)
     }
 }
+
+/// Prueba real contra ZCode (solo con BTODICTA_ZCODE_REAL=1): el plan mixto
+/// elige una capacidad del catálogo para pedidos de acción.
+final class ModoIAZCodeRealTests: XCTestCase {
+    func testPlanMixtoEligeCapacidad() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["BTODICTA_ZCODE_REAL"] == "1")
+        let caps = CatalogoCapacidades.todas()
+        for pedido in ["Haz un borrador de correo para persona@ejemplo.com con asunto Prueba y texto: esto es una prueba.",
+                       "Abre el navegador y busca información sobre seguridad de los autos BMW."] {
+            let e = expectation(description: pedido)
+            AgenteZCode.preguntar(AgenteTerminal.promptMixto(pedido: pedido, contexto: "",
+                                                             catalogo: CatalogoCapacidades.paraIA(caps)),
+                                  timeout: 120) { r in
+                print("ZCODE PEDIDO:", pedido)
+                print("ZCODE RESPUESTA:", r ?? "nil")
+                let cj = r.flatMap(AgenteTerminal.capacidadMixta)
+                let d = cj.flatMap { RouterGlobalIA.interpretar($0, catalogo: caps, texto: pedido) }
+                print("ZCODE DECISION:", d.map { "\($0.tipo)/\($0.clave): \($0.contenido)" } ?? "ninguna")
+                // Hace algo: una capacidad del catálogo o comandos (p. ej. open "mailto:…").
+                let comandos = r.flatMap(AgenteTerminal.interpretar)?.comandos ?? []
+                XCTAssertTrue(d != nil || !comandos.isEmpty)
+                e.fulfill()
+            }
+            wait(for: [e], timeout: 150)
+        }
+    }
+}

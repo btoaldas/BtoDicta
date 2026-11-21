@@ -25,7 +25,7 @@ enum RouterGlobalIA {
         """
         <INSTRUCCIONES_INTERNAS_NO_REPRODUCIR>
         Eres el ROUTER de BtoDicta. El usuario pidió algo por voz. Elige EXACTAMENTE UNA capacidad del CATÁLOGO donde cae el pedido. Tu única salida es un objeto JSON válido, sin Markdown.
-        FORMATO: {"tipo":"<tipo>","clave":"<clave>","confianza":0.0,"contenido":"<lo que hay que hacer, sin la orden de enrutar>"}
+        FORMATO: {"tipo":"<tipo>","clave":"<clave>","confianza":<número de 0 a 1: qué tan seguro estás>,"contenido":"<lo que hay que hacer, sin la orden de enrutar>"}
         REGLAS:
         - Usa un par tipo+clave que exista EXACTAMENTE en el catálogo. Jamás inventes uno.
         - Si ninguna capacidad concreta aplica, elige {"tipo":"cerebro","clave":"cerebro"} (conversar).
@@ -80,6 +80,12 @@ enum RouterGlobalIA {
     /// ¿Hay una IA HTTP directa utilizable para enrutar? (la cuenta Codex se
     /// evita: su envoltorio degrada la obediencia al contrato, como en conexiones.)
     static func iaRuteo() -> ChatIA? {
+        // La IA elegida para el Asistente manda; si no hay, la cascada de pulido.
+        let p = Config.agenteIAProveedor()
+        if !p.isEmpty, let ia = ChatIA.catalogo.first(where: { $0.id == p }), ia.key != nil {
+            let m = Config.agenteIAModelo()
+            return m.isEmpty ? ia : ia.conModelo(m)
+        }
         let cadena = ChatIA.cadenaPulido()
         return cadena.first { !$0.esCuentaCodex } ?? cadena.first
     }

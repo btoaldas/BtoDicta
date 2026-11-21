@@ -9082,6 +9082,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             responderAgenteTerminal(texto, modo: modo, crudo: crudo, wav: wav, history: history)
             return
         }
+        if Config.agenteNucleoActivo(), decision == "mixto" {
+            responderAgenteMixto(texto, modo: modo, crudo: crudo, wav: wav, history: history,
+                                 modoNormal: modoNormal)
+            return
+        }
         if Config.agenteNucleoActivo(), Config.routerGlobalActivo(), decision == "catalogo" {
             RouterGlobalIA.decidir(texto) { [weak self] d in
                 guard let self else { return }
@@ -9359,6 +9364,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                                    "sudo": plan.comandos.map(\.sudo)])
             self.correrComandosTerminal(plan, indice: 0, salidas: [], pedido: texto, ia: ia,
                                         token: tok, crudo: crudo, wav: wav, history: history)
+        }
+    }
+
+    /// Una sola consulta al cerebro del Agente: capacidad del catálogo, comandos
+    /// o respuesta. La capacidad pasa por el mismo despacho (y confirmación) del router.
+    private func responderAgenteMixto(_ texto: String, modo: Modo, crudo: String,
+                                      wav: Data, history: HistoryWriter?, modoNormal: Modo?) {
+        let tok = nuevoAgente()
+        let ia = iaDelAgente(modo)
+        if !recorder.isRecording { panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
+        let caps = CatalogoCapacidades.todas()
+        let contexto = Config.agenteMemoriaContextoIA() ? MemoriaAgente.contexto() : ""
+        let prompt = AgenteTerminal.promptMixto(pedido: texto, contexto: contexto,
+                                                catalogo: CatalogoCapacidades.paraIA(caps))
+        CerebroTexto.pedir(prompt, ia: ia) { [weak self] r in
+            guard let self, self.agenteVigente(tok) else { return }
+            let bruto = r ?? ""
+            if let cj = AgenteTerminal.capacidadMixta(bruto),
+               let d = RouterGlobalIA.interpretar(cj, catalogo: caps, texto: texto),
+               ["modo", "conexion"].contains(d.tipo) {
+                AgenteLog.registrar("mixto_capacidad", ["tipo": d.tipo, "clave": d.clave, "contenido": d.contenido])
+                self.finAgente()
+                if self.ejecutarDecisionRouter(d, pedido: texto, crudo: crudo, wav: wav,
+                                               history: history, modoNormal: modoNormal) { return }
+                // No ejecutable: sigue con comandos o respuesta.
+                _ = self.nuevoAgente()
+            }
+            let tokActual = self.agenteToken
+            guard let plan = AgenteTerminal.interpretar(bruto) else {
+                let t = bruto.trimmingCharacters(in: .whitespacesAndNewlines)
+                self.entregarRespuestaAgente(t.isEmpty ? "No obtuve respuesta del cerebro." : t,
+                                             pedido: texto, motor: "Mixto", token: tokActual,
+                                             crudo: crudo, wav: wav, history: history)
+                return
+            }
+            if plan.comandos.isEmpty {
+                self.entregarRespuestaAgente(plan.respuesta.isEmpty ? "Listo." : plan.respuesta,
+                                             pedido: texto, motor: "Mixto", token: tokActual,
+                                             crudo: crudo, wav: wav, history: history)
+                return
+            }
+            AgenteLog.registrar("mixto_comandos", ["comandos": plan.comandos.map(\.cmd)])
+            self.correrComandosTerminal(plan, indice: 0, salidas: [], pedido: texto, ia: ia,
+                                        token: tokActual, crudo: crudo, wav: wav, history: history)
         }
     }
 

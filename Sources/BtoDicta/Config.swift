@@ -1666,7 +1666,7 @@ struct Config {
     /// terminal (la IA propone comandos y BtoDicta los ejecuta)
     static func agenteIADecision() -> String {
         let v = (json()["agente_ia_decision"] as? String) ?? "catalogo"
-        return ["reglas", "catalogo", "terminal"].contains(v) ? v : "catalogo"
+        return ["reglas", "catalogo", "terminal", "mixto"].contains(v) ? v : "catalogo"
     }
     /// aprobacion (siempre pregunta) | auto (pregunta lo delicado) | omitir (no pregunta)
     static func agenteIAConfirmacion() -> String {

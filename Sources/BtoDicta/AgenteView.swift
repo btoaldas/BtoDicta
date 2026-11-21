@@ -644,6 +644,7 @@ struct AgenteView: View {
                     Text("Solo reglas fijas").tag("reglas")
                     Text("Elegir del catálogo de acciones").tag("catalogo")
                     Text("Terminal: proponer comandos").tag("terminal")
+                    Text("Todo: acción, terminal o respuesta").tag("mixto")
                 }
                 Picker("Confirmación de lo que decide la IA", selection: $m.iaConfirmacion) {
                     Text("Aprobación").tag("aprobacion")
