@@ -34,6 +34,19 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.88.0
+
+- **Tu correo, agenda y contactos, de varias cuentas.** Microsoft 365, Outlook.com
+  y Gmail, incluso buzones delegados: leer, buscar, borradores, responder, reenviar,
+  archivar, marcar, mover, papelera y adjuntos. Enviar y todo lo que cambia el
+  buzón te pide confirmación.
+- **Un asistente con oficio.** Gobernanza, memoria («recuerda que…») y habilidades
+  propias; Word y Excel con plantilla, leer documentos y páginas, mirar la pantalla,
+  editar el texto seleccionado, YouTube, abrir Claude Code o Codex en un proyecto y
+  preparar una firma (BtoDicta nunca firma).
+- **Tus habilidades de otras herramientas.** Opcional: suma los skills de Claude,
+  Codex, ZCode o Gemini y le encarga a Claude Code lo que describen.
+
 ### Novedades 0.87.0
 
 - **Un asistente que hace, no solo conversa.** El modo «Todo» decide en una sola

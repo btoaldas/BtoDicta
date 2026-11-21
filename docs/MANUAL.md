@@ -547,6 +547,73 @@ Claves en `config.json`: `agente_gesto_activo`, `agente_gesto_tecla`,
 `agente_ia_confirmacion`, `agente_terminal_timeout`, `agente_zcode_bin`,
 `agente_clic_calla`.
 
+### Cuentas de correo, agenda y contactos (desde 0.88.0)
+
+En **Asistente → Cuentas de correo, agenda y contactos** se conectan **varias
+cuentas de Microsoft (365 u Outlook.com) y de Google (Gmail)**, cada una con un
+nombre corto («Trabajo», «Personal»). Una es la **predeterminada**; para usar otra,
+nómbrala: «revisa mi correo Personal», «lo del Gmail».
+
+- **Microsoft**: registra una aplicación en Microsoft Entra (cliente público, con
+  «Permitir flujos de cliente públicos»), pega su identificador y el directorio, y
+  pulsa **Agregar y conectar**: escribes un código en la página de Microsoft.
+- **Buzón compartido o delegado** (Microsoft): en el mismo formulario, el correo de
+  ese buzón. Entras con tu cuenta y el asistente trabaja en ese buzón como una
+  cuenta más.
+- **Google**: crea en Google Cloud un proyecto con las API de Gmail, Calendar y
+  People, la pantalla de consentimiento en modo prueba (tú como usuario de prueba)
+  y una credencial «App de escritorio». Pega el identificador y el secreto (se
+  guarda en el Llavero) y autoriza en el navegador. En modo prueba Google pide
+  reconectar cada 7 días.
+- **Quitar** una cuenta pide confirmación y borra solo su sesión de este Mac.
+
+Lo que puede hacer el asistente con ellas: leer («los tres últimos», «los de hoy»),
+buscar, borradores, cambiarlos, responder y reenviar (en el mismo hilo), **enviar
+— siempre con tu confirmación, releyendo el borrador real**—, archivar, marcar
+(leído, no leído, destacado), mover a una carpeta, mandar a la papelera (nunca
+borra definitivamente), bajar adjuntos a `Descargas/BtoDicta` (con la cuarentena
+de macOS; no se abren solos), adjuntar un archivo de Descargas, Escritorio o
+Documentos (nunca claves ni certificados), ver la agenda, crear eventos y buscar
+personas. Si pides archivar o marcar sin haber leído antes, lee la bandeja solo
+(el 1 es el más reciente). Mover, papelera, archivar y adjuntar se confirman
+**siempre**, con cualquier modo de confirmación.
+
+### Arnés del asistente (desde 0.88.0)
+
+La carpeta `~/.btodicta/arnes/` guarda cómo trabaja Beto: `gobernanza.md` (las
+reglas de BtoDicta, se regenera), `gobernanza-propia.md` (tus reglas),
+`memoria.md` (tus datos: di «recuerda que…»), `habilidades/` (las de BtoDicta, se
+regeneran) y `habilidades-propias/` (las tuyas: di «crea una habilidad: cuando
+pida X, haz Y»). BtoDicta nunca sobrescribe lo tuyo. **Abrir carpeta** y
+**Regenerar habilidades** están en la tarjeta del Modo IA. **Cómo te habla Beto**
+fija su tono hablado; los documentos conservan el suyo.
+
+Herramientas que el asistente usa por su cuenta: Word con plantilla (memo, oficio,
+informe, carta; la numeración queda en blanco), hoja de Excel desde una tabla,
+leer y resumir un Word, Excel o PDF que ya tienes, resumir una página web
+(confirmando la dirección; solo direcciones públicas), buscar en tus dictados,
+resumen de la bitácora, transcribir un audio, **mirar la pantalla** y responder
+sobre ella, **editar el texto seleccionado** en cualquier app (⌘Z lo deshace),
+poner algo en **YouTube** (abre el primer video en el navegador que nombres), abrir
+**Claude, Claude Code, Codex, ChatGPT o Gemini** (Claude Code y Codex en la carpeta
+de un proyecto de `~/Developer`) y **preparar una firma**: abre el PDF en FirmaEC;
+BtoDicta nunca firma.
+
+### Habilidades de otras herramientas (desde 0.88.0)
+
+**Sumar habilidades de otras herramientas** (apagado de fábrica) lee los `SKILL.md`
+de `.claude/skills`, `.agents/skills`, `.codex/skills`, `.zcode/skills` y
+`.gemini/skills` de tu carpeta de usuario, o de las carpetas que agregues. Entra
+solo la que viene al caso y **solo si BtoDicta no tiene una propia** para ese
+pedido. Si preguntas cómo se hace algo, te lo explica con tu habilidad; si pides
+que se haga, **se lo encarga a Claude Code** (o a Codex si lo nombras): confirmas
+el encargo y la Terminal lo abre, y ahí apruebas cada paso. Son guía, no autoridad:
+no saltan ninguna confirmación. El registro anota cuál se usó en cada pedido.
+
+Claves en `config.json`: `agente_graph_activo`, `agente_persona_voz`,
+`arnes_externo_activo`, `arnes_externo_carpetas`. Cuentas en
+`~/.btodicta/cuentas.json`; sus sesiones, en el Llavero.
+
 ## 12. Pestaña Acciones
 
 ![Pestaña Acciones](img/acciones.png)

@@ -8,11 +8,20 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.87.0"
-    static let fecha = "2026-11-20"
+    static let numero = "0.88.0"
+    static let fecha = "2026-11-21"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.88.0", "2026-11-21", [
+            "NUEVO varias cuentas de correo, agenda y contactos: Microsoft 365, Outlook.com y Gmail (con OAuth oficial), incluido el buzón compartido o delegado de Microsoft. Se eligen por su nombre corto («revisa mi correo Personal»)",
+            "NUEVO el asistente lee, busca, redacta, responde y reenvía correos; archiva, marca, mueve, manda a la papelera (nunca borra definitivamente), baja adjuntos a Descargas/BtoDicta y adjunta archivos. Enviar, mover, archivar, papelera y adjuntar se confirman siempre",
+            "NUEVO arnés del asistente: gobernanza, memoria («recuerda que…»), habilidades de BtoDicta y propias («crea una habilidad…») y la forma en que te habla Beto",
+            "NUEVO herramientas: Word con plantilla, Excel desde una tabla, leer Word/Excel/PDF, resumir una página web, mirar la pantalla, editar el texto seleccionado, YouTube, abrir Claude, Claude Code, Codex, ChatGPT o Gemini, y preparar una firma en FirmaEC (BtoDicta nunca firma)",
+            "NUEVO opcional: sumar las habilidades de Claude, Codex, ZCode y Gemini de tu Mac; si pides que se haga algo que describen, se lo encarga a Claude Code o Codex en la Terminal",
+            "MEJORADO la conversación con Beto: frases cortas, vuelve a escuchar tras cada acción y respeta «los tres últimos»",
+            "SEGURIDAD lo leído (correos, páginas, documentos, pantalla, habilidades externas) es dato y no puede autorizar nada; páginas solo públicas; adjuntos con cuarentena; el Llavero ya no pide tu clave solo por revisar las cuentas",
+        ]),
         ("0.87.0", "2026-11-21", [
             "NUEVO modo de decisión «Todo: acción, terminal o respuesta» para el asistente. Una sola consulta a la IA decide si usar una acción de BtoDicta (búsqueda web, tarea, música…), proponer comandos (por ejemplo abrir un borrador de correo con mailto, sin enviarlo) o solo responder. Funciona con la IA que elijas: cualquier proveedor por API, Codex, Hermes o ZCode",
             "NUEVO en Asistente, junto al modelo de la IA del asistente: «Descubrir» consulta los modelos del proveedor y «Elegir» los ofrece en un menú, sin escribirlos a mano",
