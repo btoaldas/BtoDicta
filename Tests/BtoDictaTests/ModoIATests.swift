@@ -272,7 +272,8 @@ final class ModoIAAPIRealTests: XCTestCase {
         for pedido in pedidos {
             let e = expectation(description: pedido)
             let inicio = Date()
-            let p = AgenteTerminal.promptMixto(pedido: pedido, contexto: "", catalogo: CatalogoCapacidades.paraIA(caps))
+            let ctx = ProcessInfo.processInfo.environment["BTODICTA_IA_CONTEXTO"] ?? ""
+            let p = AgenteTerminal.promptMixto(pedido: pedido, contexto: ctx, catalogo: CatalogoCapacidades.paraIA(caps))
             RouterGlobalIA.llamarIA(ia, prompt: p, textLen: p.count) { r in
                 print(String(format: "IAREAL %.1f s:", Date().timeIntervalSince(inicio)), r ?? "nil")
                 let d = r.flatMap(AgenteTerminal.capacidadMixta).flatMap { RouterGlobalIA.interpretar($0, catalogo: caps, texto: pedido) }

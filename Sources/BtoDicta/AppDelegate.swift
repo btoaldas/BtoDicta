@@ -9409,6 +9409,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         return
                     }
                     let campos = AgenteTerminal.camposMixtos(bruto)
+                    // Lo que la IA redactó para esta acción: sin esto, «hazlo más largo»
+                    // o «sí, hazlo» no tienen con qué trabajar en el siguiente turno.
+                    MemoriaAgente.registrar(usuario: texto, asistente: AgenteTerminal.resumenAccion(
+                        nombre: d.nombre, destinatario: campos.destinatario, asunto: campos.asunto,
+                        contenido: d.contenido))
                     // Primero la acción, en silencio; después Beto cuenta el resultado
                     // real y pregunta. Escuchar de nuevo llega al terminar de hablar.
                     var contado = false
