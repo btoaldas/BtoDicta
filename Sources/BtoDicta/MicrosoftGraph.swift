@@ -47,7 +47,7 @@ enum MicrosoftGraph {
         set { accesos[cuentaLlavero] = newValue }
     }
 
-    static var conectado: Bool { SecretosKeychain.leer(cuenta: cuentaLlavero) != nil }
+    static var conectado: Bool { SecretosKeychain.existe(cuenta: cuentaLlavero) }
     static var disponible: Bool { Config.agenteGraphActivo() && !clientID.isEmpty && conectado }
     private static var clientID: String {
         (cuenta?.clientID ?? Config.graphClientID()).trimmingCharacters(in: .whitespaces)

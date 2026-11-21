@@ -35,7 +35,7 @@ enum CuentasNube {
            let c = try? JSONDecoder().decode([CuentaNube].self, from: d) { return c }
         // Migración: la única cuenta Microsoft de antes pasa al registro.
         let id = Config.graphClientID().trimmingCharacters(in: .whitespaces)
-        guard !id.isEmpty, SecretosKeychain.leer(cuenta: llaveroMicrosoftAnterior) != nil else { return [] }
+        guard !id.isEmpty, SecretosKeychain.existe(cuenta: llaveroMicrosoftAnterior) else { return [] }
         let migrada = CuentaNube(id: "microsoft-1", proveedor: .microsoft, alias: "Microsoft", correo: "",
                                  clientID: id, tenant: Config.graphTenant(), llavero: llaveroMicrosoftAnterior,
                                  predeterminada: true)
@@ -87,7 +87,7 @@ enum CuentasNube {
         guardar(todas().map { var c = $0; c.predeterminada = ($0.id == id); return c })
     }
 
-    static func conectada(_ c: CuentaNube) -> Bool { SecretosKeychain.leer(cuenta: c.llavero) != nil }
+    static func conectada(_ c: CuentaNube) -> Bool { SecretosKeychain.existe(cuenta: c.llavero) }
     static func llaveSecreto(_ c: CuentaNube) -> String { "cuenta-\(c.id)-secreto" }
 
     static var conectadas: [CuentaNube] { todas().filter(conectada) }

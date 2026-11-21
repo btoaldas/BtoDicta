@@ -131,3 +131,19 @@ final class GoogleCuentaTests: XCTestCase {
         XCTAssertEqual(GoogleCuenta.leerContactos(j), [PersonaGraph(nombre: "Ana Pérez", correo: "ana@x.example", cargo: "Analista")])
     }
 }
+
+/// El estado «conectada» no abre el secreto; lo leído queda en memoria.
+final class SecretosKeychainExisteTests: XCTestCase {
+    func testExisteSinLeerYCacheSeLimpiaAlBorrar() {
+        let cuenta = "prueba-existe-\(UUID().uuidString.prefix(8))"
+        defer { SecretosKeychain.borrar(cuenta: cuenta) }
+        XCTAssertFalse(SecretosKeychain.existe(cuenta: cuenta))
+        XCTAssertTrue(SecretosKeychain.guardar("valor-de-prueba", cuenta: cuenta).ok)
+        XCTAssertTrue(SecretosKeychain.existe(cuenta: cuenta))
+        XCTAssertNotNil(SecretosKeychain.donde(cuenta: cuenta))
+        XCTAssertEqual(SecretosKeychain.leer(cuenta: cuenta), "valor-de-prueba")
+        SecretosKeychain.borrar(cuenta: cuenta)
+        XCTAssertFalse(SecretosKeychain.existe(cuenta: cuenta))
+        XCTAssertNil(SecretosKeychain.leer(cuenta: cuenta))
+    }
+}

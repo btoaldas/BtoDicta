@@ -9772,6 +9772,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let nueva = CuentasNube.elegir(plan.cuenta ?? pedido)
         if nueva?.id != cuentaCorreo?.id { graphUltimosCorreos = []; graphUltimoBorrador = nil }
         cuentaCorreo = nueva
+        if let nueva { Log.write("correo: cuenta «\(nueva.alias)» (\(nueva.proveedor.nombre)) para \(plan.herramienta)") }
         // «Aprobación» pregunta antes de escribir algo elegido por la IA.
         let escribe = ["borrador_correo", "modificar_borrador", "responder_correo", "reenviar_correo",
                        "crear_evento"].contains(plan.herramienta)

@@ -35,6 +35,7 @@ enum SecretosKeychain {
         let s = secreto.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { borrar(cuenta: cuenta); return (true, .keychain) }
         SecItemDelete(consulta(cuenta) as CFDictionary)
+        lockCache.lock(); cache[cuenta] = s; lockCache.unlock()
         var attrs = consulta(cuenta)
         attrs[kSecValueData as String] = Data(s.utf8)
         attrs[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
@@ -47,8 +48,36 @@ enum SecretosKeychain {
         return (guardarEnArchivo(s, cuenta: cuenta), .archivo)
     }
 
+    /// Lo ya leído en esta ejecución: macOS pide la clave del Mac en cada lectura
+    /// del Llavero de una app sin Team ID recién compilada; así pide una sola vez.
+    private static var cache: [String: String] = [:]
+    private static let lockCache = NSLock()
+
+    /// ¿Hay secreto? Solo mira los atributos, sin abrir el valor: no pide la clave del Mac.
+    static func existe(cuenta: String) -> Bool {
+        lockCache.lock(); let enCache = cache[cuenta] != nil; lockCache.unlock()
+        if enCache { return true }
+        var q = consulta(cuenta)
+        q[kSecReturnAttributes as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: CFTypeRef?
+        if SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess { return true }
+        var viejo = q
+        viejo[kSecAttrService as String] = servicioAnterior
+        if SecItemCopyMatching(viejo as CFDictionary, &out) == errSecSuccess { return true }
+        return leerDeArchivo(cuenta) != nil
+    }
+
     /// Lee el secreto (Keychain primero, luego el respaldo). nil si no hay.
     static func leer(cuenta: String) -> String? {
+        lockCache.lock(); let enCache = cache[cuenta]; lockCache.unlock()
+        if let enCache { return enCache }
+        let s = leerSinCache(cuenta)
+        if let s { lockCache.lock(); cache[cuenta] = s; lockCache.unlock() }
+        return s
+    }
+
+    private static func leerSinCache(_ cuenta: String) -> String? {
         var q = consulta(cuenta)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -81,16 +110,16 @@ enum SecretosKeychain {
     /// ¿Dónde está guardado hoy? nil = no hay secreto. Para el letrero de la UI.
     static func donde(cuenta: String) -> Almacen? {
         var q = consulta(cuenta)
-        q[kSecReturnData as String] = true
+        q[kSecReturnAttributes as String] = true   // sin abrir el valor: no pide la clave del Mac
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var out: CFTypeRef?
-        if SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess,
-           let d = out as? Data, !d.isEmpty { return .keychain }
+        if SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess { return .keychain }
         return leerDeArchivo(cuenta) != nil ? .archivo : nil
     }
 
     /// Purga total (se llama también al borrar el modo dueño de la conexión).
     static func borrar(cuenta: String) {
+        lockCache.lock(); cache[cuenta] = nil; lockCache.unlock()
         SecItemDelete(consulta(cuenta) as CFDictionary)
         borrarDeArchivo(cuenta)
     }
