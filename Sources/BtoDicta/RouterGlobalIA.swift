@@ -140,7 +140,10 @@ enum RouterGlobalIA {
             }()
             if out == nil {
                 // Sin esto el fallo era mudo («no obtuve respuesta») y no había por dónde empezar.
-                let cuerpo = data.map { String(decoding: $0.prefix(200), as: UTF8.self) } ?? ""
+                // Solo el mensaje de error del servidor; una respuesta 2xx puede traer texto del usuario.
+                let cuerpo = (200..<300).contains(code)
+                    ? "(respuesta de \(data?.count ?? 0) bytes sin contenido legible)"
+                    : (data.map { String(decoding: $0.prefix(200), as: UTF8.self) } ?? "")
                 Log.write("IA \(ia.etiqueta): sin respuesta — HTTP \(code) \(error?.localizedDescription ?? "") \(cuerpo)")
             }
             completion(out)
