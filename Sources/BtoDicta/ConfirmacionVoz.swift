@@ -31,6 +31,11 @@ final class EscuchaSiNo {
 
     /// Empieza a escuchar. false si no se puede (sin permiso, sin modelo o sin micrófono).
     func iniciar() -> Bool {
+        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+            // Primera vez: macOS pregunta; esta confirmación queda con el cuadro y las siguientes ya escuchan.
+            SFSpeechRecognizer.requestAuthorization { _ in }
+            return false
+        }
         guard SFSpeechRecognizer.authorizationStatus() == .authorized,
               let rec = SFSpeechRecognizer(locale: Locale(identifier: "es-ES")), rec.isAvailable else { return false }
         let p = SFSpeechAudioBufferRecognitionRequest()
