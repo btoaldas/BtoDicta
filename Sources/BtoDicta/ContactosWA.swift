@@ -294,6 +294,26 @@ enum ContactosWA {
         return (nil, t)
     }
 
+    /// El contacto que nombra un pedido libre («…por WhatsApp a Diego Cisneros diciéndole…»):
+    /// las palabras con mayúscula tras «a» o «para» (puro).
+    static func nombreEnPedido(_ texto: String) -> String? {
+        let palabras = texto.components(separatedBy: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",.;:¿?¡!")))
+            .filter { !$0.isEmpty }
+        let conectores: Set<String> = ["de", "del", "la", "las", "los"]
+        for (i, w) in palabras.enumerated() where ["a", "para"].contains(w.lowercased()) && i + 1 < palabras.count {
+            var nombre: [String] = []
+            for x in palabras[(i + 1)...] {
+                if let f = x.first, f.isUppercase { nombre.append(x) }
+                else if !nombre.isEmpty, conectores.contains(x.lowercased()) { nombre.append(x) }
+                else { break }
+                if nombre.count == 4 { break }
+            }
+            while let u = nombre.last, conectores.contains(u.lowercased()) { nombre.removeLast() }
+            if !nombre.isEmpty, !["WhatsApp", "Whatsapp"].contains(nombre[0]) { return nombre.joined(separator: " ") }
+        }
+        return nil
+    }
+
     /// URL de WhatsApp a un número (o sin número para elegir), con failover app→wa.me.
     static func urlEnvio(numero: String?, texto: String, tieneApp: Bool) -> String {
         var cs = CharacterSet.alphanumerics; cs.insert(charactersIn: "-._~")

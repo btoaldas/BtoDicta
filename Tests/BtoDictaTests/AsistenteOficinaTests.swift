@@ -82,3 +82,19 @@ extension AsistenteOficinaTests {
         XCTAssertEqual(b?.herramienta, "buscar_correo"); XCTAssertEqual(b?.contenido, "from:ana@x.example")
     }
 }
+
+/// WhatsApp desde el asistente y reclamos (spec 021).
+final class WhatsAppAsistenteTests: XCTestCase {
+    func testNombreEnPedido() {
+        XCTAssertEqual(ContactosWA.nombreEnPedido("Eh, mmm, mándale un mensaje por WhatsApp a Diego Cisneros diciéndole que revise"), "Diego Cisneros")
+        XCTAssertEqual(ContactosWA.nombreEnPedido("escríbele a María de la Torre que ya llegué"), "María de la Torre")
+        XCTAssertEqual(ContactosWA.nombreEnPedido("manda un WhatsApp para Ana, que llego tarde"), "Ana")
+        XCTAssertNil(ContactosWA.nombreEnPedido("manda un mensaje a todos que hay reunión"))
+    }
+
+    func testReclamo() {
+        XCTAssertTrue(AgenteTerminal.esReclamo("No, no le mandaste nada"))
+        XCTAssertTrue(AgenteTerminal.esReclamo("Lo hiciste, no está hecho."))
+        XCTAssertFalse(AgenteTerminal.esReclamo("Mándale otra vez el mensaje a Diego"))
+    }
+}

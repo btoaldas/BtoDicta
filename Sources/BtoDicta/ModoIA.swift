@@ -173,6 +173,7 @@ enum AgenteTerminal {
         CÓMO DECIDIR, en este orden:
         1. Si una capacidad del CATÁLOGO hace lo pedido (redactar o abrir un borrador de correo, buscar en la web, crear o tachar una tarea, música, abrir una app…), pon "capacidad" con un tipo y una clave que existan EXACTAMENTE en el catálogo y deja "comandos" vacío. "contenido" es SOLO el dato, en palabras naturales, como lo dictaría el usuario; nunca describas la tarea ("Crear un correo…", "Verificar…").
            · Correo o borrador (Outlook, Mail, Gmail…): "contenido" = el cuerpo del mensaje ya redactado; "destinatario" y "asunto" en sus campos. Si el usuario dicta el asunto o el destinatario, cópialos LITERALMENTE, sin acortarlos ni cambiarlos.
+           · WhatsApp: "destinatario" = el nombre del contacto tal como lo dijo (OBLIGATORIO); "contenido" = solo el mensaje.
            · Recordatorio o evento: "contenido" = el título y cuándo, en palabras ("Comprobar la IA de BtoDicta en 15 minutos", "Reunión con Ana mañana a las 9").
            · Búsqueda: "contenido" = solo lo que se busca.
         2. Si no hay capacidad pero se puede hacer en la Mac con la terminal, deja "capacidad" en null y propone como mucho 5 comandos. No pongas "sudo" dentro de "cmd": marca "sudo": true.
@@ -367,6 +368,14 @@ enum AgenteTerminal {
         let cifras = n.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
         let elegidos = cifras.isEmpty ? (numero.map { [$0] } ?? []) : cifras
         return Array(Set(elegidos.filter { (1...total).contains($0) }.map { $0 - 1 })).sorted()
+    }
+
+    /// ¿El usuario reclama que algo no se hizo? Entonces no se le contesta «eso ya lo hice» (puro).
+    static func esReclamo(_ texto: String) -> Bool {
+        let n = PerfilAgente.normalizar(texto)
+        return ["no le mandaste", "no mandaste", "no se envio", "no enviaste", "no lo enviaste", "no esta hecho",
+                "no lo hiciste", "no hiciste", "no funciono", "no paso nada", "no se hizo", "no lo hizo", "no hizo nada",
+                "no salio", "no aparece", "no veo que"].contains { n.contains($0) }
     }
 
     static func dias(_ contenido: String, porDefecto: Int = 2) -> Int {

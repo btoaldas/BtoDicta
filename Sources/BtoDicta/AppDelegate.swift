@@ -9460,7 +9460,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Lo mismo otra vez en poco tiempo: se pregunta antes de repetirlo.
             if let firma = AgenteTerminal.firmaAccion(bruto) {
                 if let u = self.ultimaAccionIA, u.firma == firma, Date().timeIntervalSince(u.cuando) < 90,
-                   self.repeticionPendiente != firma {
+                   self.repeticionPendiente != firma, !AgenteTerminal.esReclamo(texto) {
                     self.repeticionPendiente = firma
                     self.entregarRespuestaAgente("Eso ya lo hice hace un momento. ¿Quieres que lo haga otra vez?",
                                                  pedido: texto, motor: "Mixto", token: tok,
@@ -9526,7 +9526,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                                      token: self.nuevoAgente(), crudo: crudo, wav: wav, history: history)
                         return
                     }
-                    let campos = AgenteTerminal.camposMixtos(bruto)
+                    var campos = AgenteTerminal.camposMixtos(bruto)
+                    // WhatsApp sin destinatario: se toma el nombre del propio pedido.
+                    if m.accion == "whatsapp", campos.destinatario == nil {
+                        campos.destinatario = ContactosWA.nombreEnPedido(texto)
+                    }
                     // Lo que la IA redactó para esta acción: sin esto, «hazlo más largo»
                     // o «sí, hazlo» no tienen con qué trabajar en el siguiente turno.
                     MemoriaAgente.registrar(usuario: texto, asistente: AgenteTerminal.resumenAccion(
