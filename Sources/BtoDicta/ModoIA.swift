@@ -225,8 +225,12 @@ enum AgenteTerminal {
                 // -f carga asignaciones desde un archivo: solo lectura con -n/-a/-h.
                 if partes.dropFirst().contains(where: { $0.hasPrefix("-") && !["-n", "-a", "-h"].contains($0) }) { return false }
             case "ps":
-                // ps e / ps -E muestran las variables de entorno (claves).
-                if partes.dropFirst().contains(where: { $0 == "-E" || (!$0.hasPrefix("-") && $0.contains("e")) }) { return false }
+                // Lista cerrada: otras formas (ps e, -E, -eE…) muestran el entorno, con claves.
+                if !["ps", "ps aux", "ps -A", "ps -ax", "ps -ef"].contains(partes.joined(separator: " ")) { return false }
+            case "grep", "egrep":
+                // Recursivo vuelca carpetas enteras (secretos incluidos) hacia la IA.
+                if partes.dropFirst().contains(where: { $0 == "--recursive" || $0.hasPrefix("--dereference-recursive")
+                    || ($0.hasPrefix("-") && !$0.hasPrefix("--") && ($0.contains("r") || $0.contains("R"))) }) { return false }
             case "top": if !resto.contains("-l") { return false }
             default:
                 if !lectura.contains(cabeza) { return false }

@@ -108,6 +108,11 @@ final class ModoIATests: XCTestCase {
         XCTAssertFalse(AgenteTerminal.esSoloLectura("ps eww"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("ps -E"))
         XCTAssertTrue(AgenteTerminal.esSoloLectura("ps aux"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("ps -eE"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("ps -AE"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("grep -ri clave ."))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("grep --recursive x Documents"))
+        XCTAssertTrue(AgenteTerminal.esSoloLectura("grep -i error log.txt"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("sysctl -f archivo"))
         XCTAssertTrue(AgenteTerminal.esSoloLectura("sysctl -n hw.ncpu"))
     }
