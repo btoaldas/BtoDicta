@@ -55,3 +55,18 @@ extension HabilidadesExternasTests {
         XCTAssertTrue(HabilidadesExternas.seleccionar("revisa mi correo", de: l, minimo: 4).isEmpty)
     }
 }
+
+/// Con las carpetas reales del usuario (solo con BTODICTA_EXTERNAS=1): qué se elegiría.
+final class HabilidadesExternasRealesTests: XCTestCase {
+    func testSeleccionConCarpetasReales() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["BTODICTA_EXTERNAS"] == "1")
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let todas = HabilidadesExternas.escanear(HabilidadesExternas.carpetasPorDefecto.map { home.appendingPathComponent($0) })
+        print("EXT total \(todas.count)")
+        for p in ["¿Cómo emito una factura de EZTIC?", "Explícame cómo hago un overlay para OBS con dos cámaras",
+                  "¿Cómo registro mis actividades en el sistema de evaluación?", "Ayúdame a preparar una proforma para el SERCOP",
+                  "¿Cómo despliego campus?", "revisa mi correo"] {
+            print("EXT «\(p)» → " + HabilidadesExternas.seleccionar(p, de: todas).map(\.nombre).joined(separator: ", "))
+        }
+    }
+}
