@@ -166,8 +166,12 @@ enum DocumentosAgente {
     /// La ruta dada si es audio o video; si no, el más reciente de Descargas o Escritorio.
     static func archivoParaTranscribir(_ pista: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL? {
         let p = (pista.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
-        if p.hasPrefix("/"), extensionesAudio.contains(URL(fileURLWithPath: p).pathExtension.lowercased()),
-           FileManager.default.fileExists(atPath: p) { return URL(fileURLWithPath: p) }
+        if p.hasPrefix("/") {
+            // Solo de Descargas, Escritorio o Documentos, con la ruta real.
+            let u = URL(fileURLWithPath: p).resolvingSymlinksInPath().standardizedFileURL
+            return extensionesAudio.contains(u.pathExtension.lowercased()) && CorreoAcciones.permitido(u, home: home)
+                && FileManager.default.fileExists(atPath: u.path) ? u : nil
+        }
         let carpetas = ["Downloads", "Desktop"].map { home.appendingPathComponent($0) }
         let candidatos = carpetas.flatMap { c in
             ((try? FileManager.default.contentsOfDirectory(at: c, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [])

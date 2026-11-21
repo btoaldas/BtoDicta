@@ -88,6 +88,9 @@ enum GoogleCuenta {
                 let cuerpo = "<html><body style='font-family:-apple-system;padding:40px'><h2>\(html)</h2></body></html>"
                 let resp = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(cuerpo.utf8.count)\r\nConnection: close\r\n\r\n\(cuerpo)"
                 con.send(content: Data(resp.utf8), completion: .contentProcessed { _ in con.cancel() })
+                // Solo la respuesta con nuestro «state» decide; cualquier otra petición local se ignora
+                // (una web ajena no puede cortar la conexión en curso).
+                guard r.estado == estado else { return }
                 guard ok, let codigo = r.codigo else { terminar(r.error.map { "Google respondió «\($0)»." } ?? "No se completó la autorización."); return }
                 intercambiar(cuenta, secreto: secreto, codigo: codigo, verificador: verif,
                              redireccion: redireccionDe(l)) { e in terminar(e) }
