@@ -222,7 +222,8 @@ enum AgenteTerminal {
                 for a in partes.dropFirst() {
                     if a.hasPrefix("-") { if !f.opciones.contains(a) { return false } }
                     // Un número solo vale como valor de -n; si no, sería un archivo.
-                    else if !(anterior == "-n" && Int(a) != nil) { sueltos += 1 }
+                    // Solo en head/tail -n lleva valor; en grep -n numera líneas.
+                    else if !(["head", "tail"].contains(cabeza) && anterior == "-n" && Int(a) != nil) { sueltos += 1 }
                     anterior = a
                 }
                 if sueltos > f.sueltos { return false }

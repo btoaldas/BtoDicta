@@ -120,6 +120,8 @@ final class ModoIATests: XCTestCase {
         XCTAssertFalse(AgenteTerminal.esSoloLectura("ls | grep -v 0 archivo"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("ls | grep x 123"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("ls | head 123"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("ls | grep -n x 5"))
+        XCTAssertTrue(AgenteTerminal.esSoloLectura("ls | tail -n 3"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("defaults read com.app"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("launchctl print system"))
         XCTAssertTrue(AgenteTerminal.esSoloLectura("ls -la Downloads | wc -l"))
