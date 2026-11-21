@@ -8,11 +8,19 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.85.0"
+    static let numero = "0.86.0"
     static let fecha = "2026-11-20"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.86.0", "2026-11-20", [
+            "NUEVO modo IA con tecla propia. Con dos toques rápidos de Control (o la tecla que elijas en Asistente) Beto escucha; un toque de la misma tecla envía. Responde con su voz y, si quieres, vuelve a escuchar para seguir la conversación; un turno en silencio, Esc o «calla» la terminan. Viene apagado: se enciende en Asistente → Modo IA con tecla propia",
+            "NUEVO qué puede decidir la IA y cómo se confirma, todo configurable. Decisión: solo reglas fijas, elegir del catálogo de acciones, o terminal (la IA propone comandos y BtoDicta los ejecuta; con sudo, macOS pide tu clave en su propio diálogo). Confirmación: Aprobación (pregunta siempre), Auto (solo lo que únicamente lee pasa sin preguntar) u Omitir permisos (no pregunta)",
+            "NUEVO ZCode como cerebro del asistente, junto a la IA de BtoDicta, Hermes y Codex. Solo razona y responde; las acciones las ejecuta BtoDicta",
+            "NUEVO órdenes directas sin IA: «calla» corta la voz y el aviso que esté sonando; «tacha la tarea X» o «marca como hecha X» la completa. Un clic en el icono de la barra calla a Beto mientras habla",
+            "NUEVO las tareas vencidas vuelven a avisar a los 15, 30 y 60 minutos (configurable); después solo aparecen en los resúmenes. Las repeticiones respetan las horas quietas. Resumen del mediodía opcional. El resumen periódico cada N horas viene apagado",
+            "ARREGLADO que «marca como hecha X» buscara una tarea llamada «como hecha X»",
+        ]),
         ("0.85.0", "2026-11-20", [
             "ARREGLADO que el resumen de tareas se leyera de corrido y repitiera a diario tareas de dentro de meses. Ahora dice cuántas tienes y luego una frase por tarea («La primera: …, hoy a las 10:00. La segunda: …»), acorta los títulos largos a la primera línea y 12 palabras, y solo nombra las vencidas, las sin fecha y las que vencen dentro del plazo que elijas en Tareas (por defecto 3 días; en horas, en días o cualquier fecha). Con el resumen por IA activo sigue enviando como mucho tres títulos",
         ]),

@@ -488,6 +488,51 @@ El contrato admite `musica`, `calendario`, `recordatorio`, `aplicacion`, `atajo`
 
 El diagnóstico detallado queda en `~/.btodicta/logs/agente.jsonl`; los Modos mantienen además `~/.btodicta/logs/modos.jsonl`. Para una orden estructurada registra ruta, etapas, destino, destinatario, asunto/nombre de archivo, confirmación y resultado; el evento de correo marca expresamente `enviado: false`. No se guardan API keys en esos registros.
 
+### Modo IA con tecla propia (desde 0.86.0)
+
+En **Asistente → Modo IA con tecla propia** se enciende un gesto propio para hablar
+con Beto sin decir su nombre. Viene **apagado**.
+
+- **Tecla**: Control (cualquiera, por defecto), Control derecho, Opción, Opción
+  derecha, Comando derecho o Mayúsculas derecha. **Dos toques rápidos** abren el
+  turno; **un toque** de la misma tecla envía lo dicho (fn también). Solo cuentan
+  los toques limpios: Control+C, Control mantenido o Control-clic no lo activan.
+  La ventana del doble toque se ajusta entre 0,2 y 0,8 s. Si el atajo del dictado
+  ya usa esa tecla, el gesto no compite con él. Con un dictado ya grabando, el
+  doble toque lo reorienta al asistente sin cortarlo.
+- **Conversación**: tras responder con su voz, Beto vuelve a escuchar. Un turno en
+  silencio, Esc o «calla» la terminan.
+- **Qué puede decidir la IA**:
+  - *Solo reglas fijas*: actúan las reglas locales; si ninguna aplica, Beto
+    conversa pero no ejecuta nada elegido por una IA.
+  - *Elegir del catálogo de acciones* (por defecto): la IA elige una capacidad
+    existente; nunca inventa otra.
+  - *Terminal*: la IA propone hasta cinco comandos y BtoDicta los ejecuta uno a
+    uno, se detiene ante el primer fallo y resume el resultado en voz alta. Con
+    sudo usa `sudo -n` si ya lo dejaste sin clave; si no, macOS pide tu clave en su
+    propio diálogo. BtoDicta no la ve ni la guarda.
+- **Confirmación de lo que decide la IA**:
+  - *Aprobación*: «¿Autorizas?» antes de cada acción o comando.
+  - *Auto* (por defecto): solo pasa sin preguntar lo que muestra el estado del
+    equipo sin abrir archivos (`df`, `ls`, `ps aux`, `pmset -g`…), sin comillas,
+    comodines, rutas ocultas ni palabras de secretos. Leer el contenido de un
+    archivo (`cat`, `grep`, `defaults read`…), escribir y todo sudo pregunta: lo
+    que se lee viaja a la IA en el resumen.
+  - *Omitir permisos*: ejecuta sin preguntar. Lo que diga una nota, un correo o
+    una página puede influir en la IA: úsalo sabiendo eso.
+- **Tiempo máximo por comando** (terminal): 5–600 s. Esc o «calla» detienen el
+  comando en curso, salvo uno que corra con clave de administrador.
+- **Órdenes directas, sin IA**: «calla» corta la voz y el aviso que suene;
+  «tacha la tarea X» o «marca como hecha X» la completa. **Un clic en el icono de
+  la barra** calla a Beto mientras habla (se puede apagar).
+- **Cerebro**: además de la IA de BtoDicta, Hermes y Codex, puedes elegir
+  **ZCode (GLM)**. Corre sin herramientas: solo razona y responde.
+
+Claves en `config.json`: `agente_gesto_activo`, `agente_gesto_tecla`,
+`agente_gesto_ventana`, `agente_gesto_conversacion`, `agente_ia_decision`,
+`agente_ia_confirmacion`, `agente_terminal_timeout`, `agente_zcode_bin`,
+`agente_clic_calla`.
+
 ## 12. Pestaña Acciones
 
 ![Pestaña Acciones](img/acciones.png)
@@ -642,7 +687,7 @@ Cada modo de texto usa **su propia IA y su propio prompt** — o la IA global de
 
 **Tareas y notas** (pestaña propia): lo que dictas con Tarea/Nota se acumula ahí. Marca tareas como **hechas**, bórralas, **"Limpiar hechas"**, o agrega a mano. BtoDicta reconoce fechas dentro del texto (*"modo tarea llamar a Rafael mañana a las 8:00 p. m."*) o permite escogerlas manualmente. El tablero separa **vencidas, hoy, mañana y sin fecha**, y muestra el siguiente aviso. Cada ítem puede avisar una sola vez mediante una **notificación de macOS**, el notch y, de forma opcional, la voz TTS elegida; nunca habla durante una grabación de pantalla. Al despertar la Mac, volver a BtoDicta o abrirlo después de la hora, recupera lo vencido.
 
-En **Avisos y resúmenes** puedes apagar todo, elegir sonido/voz, incluir **Notas locales con fecha** y configurar una hora por la mañana y otra por la tarde. Ahí mismo ves el estado de macOS: **Activar notificaciones** solicita el permiso y **Permisos de BtoDicta…** abre directamente su configuración para corregirlo después. **Probar aviso ahora** comprueba notificación, notch y voz sin crear una tarea. Los resúmenes incluyen tareas vencidas por hora, de hoy, mañana, próximas y —si quieres— sin fecha. **Desde 0.85.0** primero dicen cuántas tareas tienes y luego nombran cada una en su propia frase («La primera: …, hoy a las 10:00. La segunda: …»), hasta cinco y después «Y N más»; los títulos largos se acortan a su primera línea y 12 palabras. **Nombrar tareas que vencen en** fija el plazo: un número en horas o días (por defecto 3 días) o cualquier fecha. Las vencidas y las sin fecha siempre se nombran; una tarea de dentro de meses no aparece hasta que entra en el plazo, y si no hay nada en él, el recordatorio periódico no suena. Por defecto se calculan completamente en local. **Dar forma al resumen con IA** es opt-in: puede enviar como máximo tres títulos al proveedor de chat elegido; la IA solo redacta, nunca decide fechas. Si tarda más de seis segundos o altera una cifra, fecha u hora, se descarta y se usa el resultado local. El **Calendario local** permite escoger un día, ver sus ítems con hora y abrir un modal para crear una Tarea o Nota. Los datos siguen en `~/.btodicta/pendientes.json` con permisos privados.
+En **Avisos y resúmenes** puedes apagar todo, elegir sonido/voz, incluir **Notas locales con fecha** y configurar una hora por la mañana y otra por la tarde. Ahí mismo ves el estado de macOS: **Activar notificaciones** solicita el permiso y **Permisos de BtoDicta…** abre directamente su configuración para corregirlo después. **Probar aviso ahora** comprueba notificación, notch y voz sin crear una tarea. Los resúmenes incluyen tareas vencidas por hora, de hoy, mañana, próximas y —si quieres— sin fecha. **Desde 0.85.0** primero dicen cuántas tareas tienes y luego nombran cada una en su propia frase («La primera: …, hoy a las 10:00. La segunda: …»), hasta cinco y después «Y N más»; los títulos largos se acortan a su primera línea y 12 palabras. **Nombrar tareas que vencen en** fija el plazo: un número en horas o días (por defecto 3 días) o cualquier fecha. Las vencidas y las sin fecha siempre se nombran; una tarea de dentro de meses no aparece hasta que entra en el plazo, y si no hay nada en él, el recordatorio periódico no suena. Por defecto se calculan completamente en local. **Dar forma al resumen con IA** es opt-in: puede enviar como máximo tres títulos al proveedor de chat elegido; la IA solo redacta, nunca decide fechas. Si tarda más de seis segundos o altera una cifra, fecha u hora, se descarta y se usa el resultado local. **Desde 0.86.0** una tarea vencida sin tachar vuelve a avisar a los 15, 30 y 60 minutos (lista configurable en «Si sigue sin tachar, volver a avisar a los»); pasado el último plazo solo aparece en los resúmenes, y las repeticiones respetan las horas quietas. Puedes añadir un **resumen del mediodía** (12:30 por defecto). El resumen periódico cada N horas viene apagado. El **Calendario local** permite escoger un día, ver sus ítems con hora y abrir un modal para crear una Tarea o Nota. Los datos siguen en `~/.btodicta/pendientes.json` con permisos privados.
 
 **Acciones a apps de Mac:** vienen creados modos de acción para Outlook, Correo, WhatsApp, **Nota de Apple**, Recordatorios, Calendario, Finder, Safari, Música, Terminal, Mapas, Spotlight y tu web. **Recordatorios y Calendario usan EventKit nativo**. **Nota de Apple** usa el diccionario oficial de automatización de Notas: crea el elemento, conserva formato y vuelve a leerlo antes de anunciar éxito. La primera vez macOS puede pedir permiso en **Privacidad y seguridad → Automatización → BtoDicta → Notas**. La carpeta, su creación automática y la apertura final se configuran en **Ajustes → Asistente → Herramientas nativas**. Si el permiso falta o Notas falla, no finge éxito: abre Notas y deja todo el texto en el portapapeles. Esto es distinto de **Nota local de BtoDicta**, que se guarda únicamente en la pestaña Tareas y notas.
 

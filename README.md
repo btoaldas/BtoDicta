@@ -34,6 +34,17 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.86.0
+
+- **Modo IA con tecla propia.** Dos toques de Control y Beto escucha; un toque
+  envía. Responde con su voz y puede seguir la conversación. Eliges qué puede
+  decidir la IA (reglas fijas, catálogo de acciones o terminal) y cómo se confirma
+  (aprobación, auto u omitir permisos). ZCode se suma como cerebro.
+- **Órdenes directas.** «Calla» corta la voz y el aviso; «tacha la tarea X» la
+  completa; un clic en el icono calla a Beto.
+- **Tareas vencidas que insisten.** Vuelven a avisar a los 15, 30 y 60 minutos y
+  luego solo en los resúmenes. Resumen del mediodía opcional.
+
 ### Novedades 0.85.0
 
 - **Resumen de tareas que se entiende.** Dice cuántas tienes y luego una frase por
