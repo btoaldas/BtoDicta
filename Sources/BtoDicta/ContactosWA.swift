@@ -315,10 +315,31 @@ enum ContactosWA {
     }
 
     /// URL de WhatsApp a un número (o sin número para elegir), con failover app→wa.me.
+    /// Código de país para números locales: el configurado o el de la región del Mac.
+    static func codigoPais() -> String {
+        let dado = Config.whatsappCodigoPais().filter(\.isNumber)
+        if !dado.isEmpty { return dado }
+        let mapa = ["EC": "593", "CO": "57", "PE": "51", "MX": "52", "US": "1", "ES": "34", "AR": "54", "CL": "56",
+                    "VE": "58", "BO": "591", "GT": "502", "CR": "506", "PA": "507", "DO": "1", "UY": "598", "PY": "595"]
+        return mapa[Locale.current.region?.identifier ?? ""] ?? ""
+    }
+
+    /// Número en formato internacional, solo dígitos, como lo pide WhatsApp (puro).
+    /// «+593 99…» → 59399…; «0099…» → 99…; «099…» (local) → código + 99…
+    static func numeroWA(_ crudo: String, codigoPais: String) -> String {
+        let conMas = crudo.trimmingCharacters(in: .whitespaces).hasPrefix("+")
+        var d = crudo.filter(\.isNumber)
+        if conMas || d.isEmpty { return d }
+        if d.hasPrefix("00") { return String(d.dropFirst(2)) }
+        if d.hasPrefix("0") { d.removeFirst(); return codigoPais + d }
+        if !codigoPais.isEmpty, d.hasPrefix(codigoPais), d.count >= codigoPais.count + 8 { return d }
+        return d.count <= 10 ? codigoPais + d : d
+    }
+
     static func urlEnvio(numero: String?, texto: String, tieneApp: Bool) -> String {
         var cs = CharacterSet.alphanumerics; cs.insert(charactersIn: "-._~")
         let enc = texto.addingPercentEncoding(withAllowedCharacters: cs) ?? texto
-        let num = soloNumero(numero ?? "")
+        let num = numero.map { numeroWA($0, codigoPais: codigoPais()) } ?? ""
         if tieneApp {
             return num.isEmpty ? "whatsapp://send?text=\(enc)" : "whatsapp://send?phone=\(num)&text=\(enc)"
         }

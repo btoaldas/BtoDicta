@@ -4720,11 +4720,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let bien = r.nombre == n && r.mensaje == m; ok = ok && bien
                 print("WATEST \(bien ? "OK" : "✗") objetivo(\"\(t)\") → \(r.nombre ?? "nil") | \"\(r.mensaje)\"")
             }
-            let u1 = ContactosWA.urlEnvio(numero: "593999", texto: "hola", tieneApp: true)
+            let u1 = ContactosWA.urlEnvio(numero: "593991234567", texto: "hola", tieneApp: true)
             let u2 = ContactosWA.urlEnvio(numero: nil, texto: "hola", tieneApp: false)
-            let u3 = ContactosWA.urlEnvio(numero: "+59 3-999", texto: "hola", tieneApp: false)
-            let urlOk = u1 == "whatsapp://send?phone=593999&text=hola"
-                && u2 == "https://wa.me/?text=hola" && u3 == "https://wa.me/+593999?text=hola"
+            let u3 = ContactosWA.urlEnvio(numero: "+593 99-123-4567", texto: "hola", tieneApp: false)
+            let urlOk = u1 == "whatsapp://send?phone=593991234567&text=hola"
+                && u2 == "https://wa.me/?text=hola" && u3 == "https://wa.me/593991234567?text=hola"
             ok = ok && urlOk
             print("WATEST \(urlOk ? "OK" : "✗") urls: \(u1) | \(u2) | \(u3)")
             // CSV estilo Google: comas dentro de comillas, First/Last, "Phone 1 - Value", ::: multi.

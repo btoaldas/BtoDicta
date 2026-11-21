@@ -98,3 +98,16 @@ final class WhatsAppAsistenteTests: XCTestCase {
         XCTAssertFalse(AgenteTerminal.esReclamo("Mándale otra vez el mensaje a Diego"))
     }
 }
+
+extension WhatsAppAsistenteTests {
+    func testNumeroWAInternacional() {
+        XCTAssertEqual(ContactosWA.numeroWA("0991234567", codigoPais: "593"), "593991234567")
+        XCTAssertEqual(ContactosWA.numeroWA("099 123 4567", codigoPais: "593"), "593991234567")
+        XCTAssertEqual(ContactosWA.numeroWA("+593 99-123-4567", codigoPais: "593"), "593991234567")
+        XCTAssertEqual(ContactosWA.numeroWA("593991234567", codigoPais: "593"), "593991234567")
+        XCTAssertEqual(ContactosWA.numeroWA("0034612345678", codigoPais: "593"), "34612345678")
+        XCTAssertEqual(ContactosWA.numeroWA("+34 612 345 678", codigoPais: "593"), "34612345678")
+        XCTAssertEqual(ContactosWA.numeroWA("991234567", codigoPais: "593"), "593991234567")
+        XCTAssertFalse(ContactosWA.urlEnvio(numero: "+593 99 123 4567", texto: "x", tieneApp: true).contains("+"))
+    }
+}
