@@ -44,6 +44,28 @@ final class CorreoAccionesTests: XCTestCase {
         XCTAssertNil(CorreoAcciones.archivoParaAdjuntar("/etc/hosts"))
     }
 
+    func testSoloCarpetasPermitidasYSinAtajosSimbolicos() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("home-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let desc = home.appendingPathComponent("Downloads"), lib = home.appendingPathComponent("Library")
+        try FileManager.default.createDirectory(at: desc, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: lib, withIntermediateDirectories: true)
+        try "x".write(to: desc.appendingPathComponent("ok.txt"), atomically: true, encoding: .utf8)
+        try "secreto".write(to: lib.appendingPathComponent("datos.txt"), atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(at: desc.appendingPathComponent("atajo.txt"),
+                                                   withDestinationURL: lib.appendingPathComponent("datos.txt"))
+        XCTAssertEqual(CorreoAcciones.archivoParaAdjuntar(desc.appendingPathComponent("ok.txt").path, home: home)?.lastPathComponent, "ok.txt")
+        XCTAssertNil(CorreoAcciones.archivoParaAdjuntar(lib.appendingPathComponent("datos.txt").path, home: home))
+        XCTAssertNil(CorreoAcciones.archivoParaAdjuntar(desc.appendingPathComponent("atajo.txt").path, home: home))
+    }
+
+    func testAdjuntoGuardadoQuedaEnCuarentena() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("q-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let u = try CorreoAcciones.guardar(AdjuntoCorreo(nombre: "a.command", datos: Data("echo".utf8)), en: dir)
+        XCTAssertNotNil(try u.resourceValues(forKeys: [.quarantinePropertiesKey]).quarantineProperties)
+    }
+
     func testAdjuntosMicrosoftYPartesGmail() {
         let ms: [String: Any] = ["value": [
             ["@odata.type": "#microsoft.graph.fileAttachment", "name": "a.txt", "contentBytes": Data("hola".utf8).base64EncodedString()],

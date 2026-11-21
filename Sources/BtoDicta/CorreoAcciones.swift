@@ -64,6 +64,12 @@ enum CorreoAcciones {
             u = dir.appendingPathComponent(ext.isEmpty ? "\(raiz)-\(i)" : "\(raiz)-\(i).\(ext)"); i += 1
         }
         try a.datos.write(to: u, options: .withoutOverwriting)
+        // Cuarentena de macOS: al abrirlo, Gatekeeper lo revisa como cualquier descarga.
+        var v = URLResourceValues()
+        v.quarantineProperties = [kLSQuarantineAgentNameKey as String: "BtoDicta",
+                                  kLSQuarantineTypeKey as String: kLSQuarantineTypeOtherDownload as String]
+        var marcado = u
+        try? marcado.setResourceValues(v)
         return u
     }
 
@@ -79,16 +85,17 @@ enum CorreoAcciones {
     /// Archivo para adjuntar: la ruta dada, o el más reciente de Descargas o Escritorio. Máx. 3 MB.
     static func archivoParaAdjuntar(_ pista: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL? {
         let p = (pista.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
-        // Solo dentro de la carpeta del usuario.
+        // Solo de Descargas, Escritorio o Documentos, con la ruta real (sin atajos simbólicos).
         if p.hasPrefix("/") {
-            let u = URL(fileURLWithPath: p).standardizedFileURL
-            return u.path.hasPrefix(home.standardizedFileURL.path + "/") && FileManager.default.fileExists(atPath: u.path) ? u : nil
+            let u = URL(fileURLWithPath: p).resolvingSymlinksInPath().standardizedFileURL
+            return permitido(u, home: home) && FileManager.default.fileExists(atPath: u.path) ? u : nil
         }
         let carpetas = ["Downloads", "Desktop"].map { home.appendingPathComponent($0) }
-        let candidatos = carpetas.flatMap { c in
+        let candidatos = carpetas.flatMap { c -> [URL] in
             ((try? FileManager.default.contentsOfDirectory(at: c, includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
                                                            options: [.skipsHiddenFiles])) ?? [])
-                .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
+                .map { $0.resolvingSymlinksInPath() }
+                .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true && permitido($0, home: home) }
         }
         let fecha: (URL) -> Date = { (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast }
         if !p.isEmpty, let c = candidatos.filter({ PerfilAgente.normalizar($0.lastPathComponent).contains(PerfilAgente.normalizar(p)) })
@@ -97,6 +104,12 @@ enum CorreoAcciones {
     }
 
     static let maximoAdjunto = 3 * 1024 * 1024
+
+    /// Carpetas desde las que se puede adjuntar (ruta ya resuelta). Puro.
+    static func permitido(_ u: URL, home: URL) -> Bool {
+        let real = home.resolvingSymlinksInPath().standardizedFileURL.path
+        return ["Downloads", "Desktop", "Documents"].contains { u.standardizedFileURL.path.hasPrefix(real + "/" + $0 + "/") }
+    }
 
     /// Claves, certificados y carpetas ocultas nunca se adjuntan (ni por error ni por un texto malicioso). Puro.
     static func archivoSensible(_ u: URL) -> Bool {
