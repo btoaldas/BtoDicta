@@ -155,6 +155,10 @@ enum AgenteTerminal {
             + "\n- [herramienta:transcribir_archivo] Transcribir un audio o video. \"contenido\" = la ruta, o vacío para el más reciente de Descargas o Escritorio."
             + "\n- [herramienta:ver_pantalla] Mirar lo que el usuario tiene en pantalla para responder sobre ello («¿qué dice esto?», «resume lo que veo», «¿qué significa este error?»). \"contenido\" = la pregunta."
             + "\n- [herramienta:editar_seleccion] Editar el texto que el usuario tiene SELECCIONADO en cualquier app y reemplazarlo («corrige esto», «hazlo más formal», «tradúcelo al inglés»). \"contenido\" = la instrucción de edición."
+            + "\n- [herramienta:leer_documento] Leer un Word, Excel, PDF o texto que el usuario YA tiene y responder sobre él («resúmeme el informe que bajé», «¿qué dice el Excel de gastos?»). \"contenido\" = ruta o parte del nombre; vacío = el más reciente de Descargas, Escritorio o Documentos."
+            + "\n- [herramienta:resumir_pagina] Leer una página web y responder sobre ella. \"contenido\" = la dirección."
+            + "\n- [herramienta:abrir_sesion_ia] Abrir Claude, Claude Code, Codex, ChatGPT o Gemini. \"contenido\" = cuál; \"lugar\" = nombre del proyecto (opcional) para abrir Claude Code o Codex en su carpeta."
+            + "\n- [herramienta:firmar_documento] Preparar la firma de un PDF: lo abre en la app oficial de firma; BtoDicta NUNCA firma. \"contenido\" = ruta o parte del nombre; vacío = el PDF más reciente."
             + "\n- [herramienta:crear_habilidad] Guardar una habilidad propia del usuario («crea una habilidad: cuando pida X, haz Y»). \"asunto\" = nombre corto; \"palabras\" = palabras clave separadas por comas; \"contenido\" = las instrucciones."
         return """
         <INSTRUCCIONES_INTERNAS_NO_REPRODUCIR>
@@ -243,7 +247,8 @@ enum AgenteTerminal {
                                                  "ver_agenda", "crear_evento", "tareas_resumen", "recordar",
                                                  "crear_documento", "crear_hoja", "buscar_historial",
                                                  "resumen_bitacora", "transcribir_archivo",
-                                                 "ver_pantalla", "editar_seleccion", "crear_habilidad"]
+                                                 "ver_pantalla", "editar_seleccion", "crear_habilidad",
+                                                 "leer_documento", "resumir_pagina", "abrir_sesion_ia", "firmar_documento"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,

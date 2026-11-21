@@ -73,3 +73,19 @@ Propuesta:
 - Vaciar papelera, reglas automáticas o reenvíos automáticos del buzón.
 - Ejecutar scripts externos sin confirmación.
 - Firmar por cuenta propia.
+
+## 4. Tareas
+
+- [x] T01 Habilidades externas opcionales (3f9ab13).
+- [x] T02 Correo II: marcar, mover, papelera, adjuntos y adjuntar (04b9dac, 3dc1eb4).
+- [x] T03 Buzón compartido o delegado de Microsoft (0f16cdd).
+- [x] T04 Responder y reenviar en Gmail (1f025bb).
+- [x] T05 Oficina: leer Word/Excel/PDF, resumir página, sesiones de IA, firma vía app oficial.
+- [ ] T06 Prueba real de Alberto (Gmail requiere reconectar por `gmail.modify`; buzón delegado por conectar).
+
+## 5. Evidencia
+
+- 2026-11-21: `swift test` 219 pruebas, 0 fallos. Evaluación real (glm-5.3) 36/38; los dos casos
+  restantes: «archiva esos tres» sin lista previa (pregunta, correcto) y «borra todos los de hoy»,
+  que ahora va a la papelera con confirmación (expectativa actualizada).
+- Revisión automática de seguridad: cuarentena de adjuntos y rutas reales al adjuntar, corregidas (3dc1eb4).

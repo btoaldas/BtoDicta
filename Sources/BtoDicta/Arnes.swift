@@ -172,10 +172,14 @@ enum Arnes {
         """))
         f.append(("mac.md", """
         ---
-        palabras: word, excel, documento, hoja, archivo, abre, aplicación, página, web, hora, disco, espacio, calculadora, captura
+        palabras: word, excel, pdf, documento, hoja, archivo, abre, aplicación, página, web, resume, resumen, firma, firmar, claude, codex, chatgpt, gemini, sesión, proyecto, hora, disco, espacio, calculadora, captura
         ---
         # Mac: archivos, apps y datos
         - Word, memo, oficio, informe o carta: [herramienta:crear_documento] (plantilla de BtoDicta, numeración en blanco).
+        - Leer o resumir un Word, Excel o PDF que ya existe: [herramienta:leer_documento]. Una página web: [herramienta:resumir_pagina].
+        - Abrir Claude, Claude Code, Codex, ChatGPT o Gemini (en un proyecto): [herramienta:abrir_sesion_ia].
+        - Firmar un PDF: [herramienta:firmar_documento] (abre la app oficial; firma el usuario, nunca BtoDicta).
+        - Todo lo que baja el asistente queda en Descargas/BtoDicta.
         - Excel desde una tabla: [herramienta:crear_hoja] con las filas. Se guardan en Documentos/BtoDicta sin sobrescribir.
         - Abrir apps: open -a "Nombre". Páginas: open "https://…" o una búsqueda si no conoces la dirección.
         - Hora en otra ciudad: TZ=Zona/Ciudad date "+%H:%M". Disco: df -h /.
