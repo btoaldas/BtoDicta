@@ -9674,11 +9674,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let u = OficinaAgente.urlPublica(plan.contenido) else {
                 decir("Esa dirección no es una página web pública que pueda leer.", nil); break
             }
-            // Una dirección que el usuario no dijo (la propuso la IA) se confirma antes de abrirla.
-            let base = (u.host ?? "").replacingOccurrences(of: "www.", with: "")
-            if !PerfilAgente.normalizar(pedido).replacingOccurrences(of: " ", with: "").contains(
-                PerfilAgente.normalizar(base).replacingOccurrences(of: " ", with: "")),
-               !autorizarDecisionIA("¿Leer esta página?", detalle: u.absoluteString) {
+            // La dirección la arma la IA a partir de lo dictado: se confirma SIEMPRE, mostrándola completa.
+            if !autorizarDecisionIA("¿Leer esta página?", detalle: u.absoluteString) {
                 decir("Vale, no la abro.", nil); break
             }
             if !recorder.isRecording { panel.update("🌐 Leyendo \(u.host ?? "la página")…") }

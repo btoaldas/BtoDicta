@@ -147,6 +147,8 @@ enum OficinaAgente {
         guard o.count == 4 else { return true }
         return o[0] == 0 || o[0] == 10 || o[0] == 127 || (o[0] == 169 && o[1] == 254) || (o[0] == 192 && o[1] == 168)
             || (o[0] == 172 && (16...31).contains(o[1])) || (o[0] == 100 && (64...127).contains(o[1])) || o[0] >= 224
+            || (o[0] == 198 && (18...19).contains(o[1])) || (o[0] == 192 && o[1] == 0 && (o[2] == 0 || o[2] == 2))
+            || (o[0] == 198 && o[1] == 51 && o[2] == 100) || (o[0] == 203 && o[1] == 0 && o[2] == 113)
     }
 
     /// IPv6 de uso no público (propia, enlace local, única local, multidifusión, IPv4 incrustada). Puro.
@@ -158,6 +160,12 @@ enum OficinaAgente {
         if b[0..<10].allSatisfy({ $0 == 0 }) && ((b[10] == 0xff && b[11] == 0xff) || (b[10] == 0 && b[11] == 0)) {
             return ipPrivada(b[12..<16].map(Int.init))
         }
+        // NAT64 (64:ff9b::/96 con la IPv4 al final; 64:ff9b:1::/48 local) y 6to4 (2002::/16 con la IPv4 en los bytes 2–5).
+        if b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xff && b[3] == 0x9b {
+            if b[4] == 0 && b[5] == 1 { return true }
+            return ipPrivada(b[12..<16].map(Int.init))
+        }
+        if b[0] == 0x20 && b[1] == 0x02 { return ipPrivada(b[2..<6].map(Int.init)) }
         return false
     }
 
@@ -186,16 +194,6 @@ enum OficinaAgente {
         return alguna
     }
 
-    /// Revisa cada redirección con las mismas reglas.
-    private final class Redirecciones: NSObject, URLSessionTaskDelegate {
-        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-            guard let u = request.url, let v = OficinaAgente.urlPublica(u.absoluteString), let h = v.host,
-                  OficinaAgente.hostResuelvePublico(h) else { completionHandler(nil); return }
-            completionHandler(request)
-        }
-    }
-
     /// Texto visible de una página HTML (puro y sencillo).
     static func textoDeHTML(_ html: String, maximo: Int = 12000) -> String {
         var s = html
@@ -219,13 +217,57 @@ enum OficinaAgente {
         req.setValue("Mozilla/5.0 (Macintosh) BtoDicta", forHTTPHeaderField: "User-Agent")
         DispatchQueue.global(qos: .userInitiated).async {
             guard let h = u.host, hostResuelvePublico(h) else { DispatchQueue.main.async { fin(nil) }; return }
-            let sesion = URLSession(configuration: .ephemeral, delegate: Redirecciones(), delegateQueue: nil)
-            sesion.dataTask(with: req) { data, resp, _ in
-                sesion.finishTasksAndInvalidate()
-            let ok = ((resp as? HTTPURLResponse)?.statusCode ?? 0) == 200
-            let t = ok ? data.flatMap { $0.count <= 3_000_000 ? String(data: $0, encoding: .utf8) ?? String(data: $0, encoding: .isoLatin1) : nil } : nil
-            DispatchQueue.main.async { fin(t.map { textoDeHTML($0) }) }
-            }.resume()
+            let lector = Lector(fin: fin)
+            let sesion = URLSession(configuration: .ephemeral, delegate: lector, delegateQueue: nil)
+            sesion.dataTask(with: req).resume()
+            sesion.finishTasksAndInvalidate()
+        }
+    }
+
+    /// IP remota de verdad (la de la conexión hecha), por si el nombre cambió de dirección entre la revisión y la conexión.
+    static func direccionPublica(_ texto: String?) -> Bool {
+        guard var t = texto, !t.isEmpty else { return false }
+        if let i = t.firstIndex(of: "%") { t = String(t[..<i]) }   // zona IPv6
+        var a4 = in_addr(), a6 = in6_addr()
+        if inet_pton(AF_INET, t, &a4) == 1 {
+            let v = UInt32(bigEndian: a4.s_addr)
+            return !ipPrivada([Int(v >> 24), Int((v >> 16) & 255), Int((v >> 8) & 255), Int(v & 255)])
+        }
+        if inet_pton(AF_INET6, t, &a6) == 1 { return !ipv6Privada(withUnsafeBytes(of: a6) { Array($0) }) }
+        return false
+    }
+
+    /// Junta la respuesta (máx. 3 MB), revisa cada redirección y la IP real de cada conexión.
+    private final class Lector: NSObject, URLSessionDataDelegate {
+        private var datos = Data(), codigo = 0, remotaPublica = true
+        private let fin: (String?) -> Void
+        init(fin: @escaping (String?) -> Void) { self.fin = fin }
+
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+            guard let u = request.url, let v = OficinaAgente.urlPublica(u.absoluteString), let h = v.host,
+                  OficinaAgente.hostResuelvePublico(h) else { completionHandler(nil); return }
+            completionHandler(request)
+        }
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+            codigo = (response as? HTTPURLResponse)?.statusCode ?? 0
+            completionHandler(codigo == 200 ? .allow : .cancel)
+        }
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+            datos.append(data)
+            if datos.count > 3_000_000 { dataTask.cancel() }
+        }
+        func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+            remotaPublica = metrics.transactionMetrics.filter { $0.remoteAddress != nil }
+                .allSatisfy { OficinaAgente.direccionPublica($0.remoteAddress) }
+        }
+        func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+            let ok = error == nil && codigo == 200 && remotaPublica && datos.count <= 3_000_000
+            let t = ok ? (String(data: datos, encoding: .utf8) ?? String(data: datos, encoding: .isoLatin1)) : nil
+            if !remotaPublica { Log.write("página descartada: la conexión fue a una dirección no pública") }
+            let f = fin
+            DispatchQueue.main.async { f(t.map { OficinaAgente.textoDeHTML($0) }) }
         }
     }
 

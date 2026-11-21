@@ -24,6 +24,15 @@ final class OficinaAgenteTests: XCTestCase {
         XCTAssertTrue(OficinaAgente.ipv6Privada(b("fd00::1")))
         XCTAssertTrue(OficinaAgente.ipv6Privada(b("::ffff:192.168.1.1")))
         XCTAssertFalse(OficinaAgente.ipv6Privada(b("2606:4700::1111")))
+        XCTAssertTrue(OficinaAgente.ipv6Privada(b("64:ff9b::7f00:1")))       // NAT64 → 127.0.0.1
+        XCTAssertFalse(OficinaAgente.ipv6Privada(b("64:ff9b::808:808")))     // NAT64 → 8.8.8.8
+        XCTAssertTrue(OficinaAgente.ipv6Privada(b("64:ff9b:1::1")))
+        XCTAssertTrue(OficinaAgente.ipv6Privada(b("2002:c0a8:0101::1")))     // 6to4 → 192.168.1.1
+        XCTAssertTrue(OficinaAgente.ipPrivada([198, 18, 0, 1]))
+        XCTAssertTrue(OficinaAgente.ipPrivada([192, 0, 0, 8]))
+        XCTAssertFalse(OficinaAgente.direccionPublica("127.0.0.1"))
+        XCTAssertFalse(OficinaAgente.direccionPublica("fe80::1%en0"))
+        XCTAssertTrue(OficinaAgente.direccionPublica("8.8.8.8"))
     }
 
     func testNombreQueResuelveALocalSeRechaza() {
@@ -89,5 +98,18 @@ final class OficinaAgenteTests: XCTestCase {
         for h in ["leer_documento", "resumir_pagina", "abrir_sesion_ia", "firmar_documento"] {
             XCTAssertEqual(AgenteTerminal.planGraph(#"{"capacidad":{"tipo":"herramienta","clave":"\#(h)","contenido":"x"}}"#)?.herramienta, h)
         }
+    }
+}
+
+/// Lectura real de una página (solo con BTODICTA_RED=1: usa internet).
+final class OficinaPaginaRealTests: XCTestCase {
+    func testLeePaginaPublicaYRechazaLocal() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["BTODICTA_RED"] == "1")
+        let e1 = expectation(description: "pública"), e2 = expectation(description: "local")
+        OficinaAgente.leerPagina(URL(string: "https://example.com")!) { t in
+            XCTAssertTrue(t?.contains("documentation examples") == true, t ?? "nil"); e1.fulfill()
+        }
+        OficinaAgente.leerPagina(URL(string: "http://localhost.:8787/")!) { t in XCTAssertNil(t); e2.fulfill() }
+        wait(for: [e1, e2], timeout: 20)
     }
 }
