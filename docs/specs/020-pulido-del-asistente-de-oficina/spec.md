@@ -11,9 +11,12 @@
 ## Alcance
 
 1. **Confirmar por voz.** El cuadro sigue; además Beto pregunta en voz alta y, al
-   terminar, escucha «sí» o «no» con el reconocimiento local de Apple. Cualquier
-   «no» gana. Ajuste `agente_confirmar_voz` (encendido). Sin permiso o sin modelo,
-   solo el cuadro.
+   terminar, escucha con el reconocimiento local de Apple. Cualquier «no» cancela.
+   Aprobar exige una respuesta corta (máx. 3 palabras) estable 0,9 s. Lo leve
+   (archivar, mover, leer una página, memoria, reemplazar selección) acepta «sí»;
+   todo lo demás (enviar, papelera, adjuntar, delegar, firmar, comandos, pantalla)
+   solo «confirmo». Ajuste `agente_confirmar_voz` (encendido). Sin permiso o sin
+   modelo, solo el cuadro.
 2. **Sin cortes al empezar a hablar.** En la conversación seguida, el aviso «tin»
    sonaba antes de que el micrófono grabara y se perdían las primeras palabras.
    Ahora suena cuando llega el primer audio.

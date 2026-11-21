@@ -9383,9 +9383,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Pregunta modal «¿Autorizar?». La app se pone delante para que se vea.
-    private func autorizarDecisionIA(_ titulo: String, detalle: String) -> Bool {
+    /// `leve`: acciones reversibles y sin salida al exterior (archivar, mover, leer una página…),
+    /// donde basta un «sí» hablado. Todo lo demás exige «confirmo» de viva voz o el clic.
+    private func autorizarDecisionIA(_ titulo: String, detalle: String, leve: Bool = false) -> Bool {
         NSApp.activate(ignoringOtherApps: true)
-        return ConfirmacionVoz.pedir(titulo, detalle: detalle, pregunta: titulo, boton: "Aceptar")
+        return ConfirmacionVoz.pedir(titulo, detalle: detalle, pregunta: titulo, boton: "Aceptar", estricta: !leve)
     }
 
     /// Corta la voz propia y avisa a quien tenga un aviso sonando.
@@ -9470,7 +9472,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             if let plan = AgenteTerminal.planGraph(bruto), plan.herramienta == "recordar" {
                 if Config.agenteIAConfirmacion() == "aprobacion",
-                   !self.autorizarDecisionIA("¿Guardar en la memoria?", detalle: plan.contenido) {
+                   !self.autorizarDecisionIA("¿Guardar en la memoria?", detalle: plan.contenido, leve: true) {
                     self.entregarRespuestaAgente("Vale, no lo anoto.", pedido: texto, motor: "Arnés", token: tok,
                                                  crudo: crudo, wav: wav, history: history)
                     return
@@ -9684,7 +9686,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 decir("Esa dirección no es una página web pública que pueda leer.", nil); break
             }
             // La dirección la arma la IA a partir de lo dictado: se confirma SIEMPRE, mostrándola completa.
-            if !autorizarDecisionIA("¿Leer esta página?", detalle: u.absoluteString) {
+            if !autorizarDecisionIA("¿Leer esta página?", detalle: u.absoluteString, leve: true) {
                 decir("Vale, no la abro.", nil); break
             }
             if !recorder.isRecording { panel.update("🌐 Leyendo \(u.host ?? "la página")…") }
@@ -9895,7 +9897,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard !nuevo.isEmpty else { decir("No pude editar el texto.", nil); return }
                 let esTerminal = AgenteTerminal.esTerminal(appActiva?.bundleIdentifier)
                 if esTerminal || Config.agenteIAConfirmacion() == "aprobacion",
-                   !self.autorizarDecisionIA("¿Reemplazar el texto seleccionado?", detalle: String(nuevo.prefix(1200))) {
+                   !self.autorizarDecisionIA("¿Reemplazar el texto seleccionado?", detalle: String(nuevo.prefix(1200)), leve: true) {
                     decir("Vale, no lo cambio.", nil); return
                 }
                 // La confirmación pudo traer BtoDicta al frente: se devuelve el foco antes de pegar.
@@ -10067,7 +10069,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard let self else { return }
                 // Mover o mandar a la papelera cambia el buzón: se confirma SIEMPRE.
                 let titulo = aPapelera ? "¿Mandar a la papelera \(elegidos.count) correo(s)?" : "¿Mover \(elegidos.count) correo(s) a «\(nombre)»?"
-                guard self.autorizarDecisionIA(titulo, detalle: lista + (aPapelera ? "\n\nSe pueden recuperar desde la papelera; no se borran definitivamente." : "")) else {
+                guard self.autorizarDecisionIA(titulo, detalle: lista + (aPapelera ? "\n\nSe pueden recuperar desde la papelera; no se borran definitivamente." : ""), leve: !aPapelera) else {
                     decir("Vale, no los muevo.", nil); return
                 }
                 self.aplicarEnOrden(elegidos, hechos: 0, token: token,
@@ -10162,7 +10164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let lista = zip(idx, elegidos).map { "\($0 + 1). \($1.de) — \($1.asunto)" }.joined(separator: "\n")
             // Mover correos cambia el buzón: se confirma SIEMPRE, con cualquier modo.
             guard autorizarDecisionIA("¿Archivar \(elegidos.count == 1 ? "este correo" : "estos \(elegidos.count) correos")?",
-                                      detalle: lista + "\n\nSalen de la bandeja de entrada; no se borran.") else {
+                                      detalle: lista + "\n\nSalen de la bandeja de entrada; no se borran.", leve: true) else {
                 decir("Vale, no archivo nada.", nil); return
             }
             archivarEnOrden(elegidos, hechos: 0, token: token, decir: decir, fallo: fallo)

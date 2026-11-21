@@ -848,7 +848,7 @@ struct AgenteView: View {
                 Text("Agenda, correos de todas tus cuentas y recordatorios, contado por Beto una vez al día (si el Mac dormía, hasta mediodía). También: «dame el resumen de la mañana».")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Confirmar también de viva voz («sí» o «no»)", isOn: $m.confirmarVoz)
-                Text("Beto pregunta en voz alta y escucha tu respuesta con el reconocimiento local de Apple; el cuadro sigue ahí. Cualquier «no» cancela.")
+                Text("Beto pregunta en voz alta y escucha con el reconocimiento local de Apple; el cuadro sigue ahí. Lo leve (archivar, mover, leer una página) acepta «sí»; enviar, papelera, adjuntar, delegar, firmar y comandos solo aceptan «confirmo». Cualquier «no» cancela.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Un clic en el icono de la barra calla a Beto mientras habla", isOn: $m.clicCalla)
                 Text("Órdenes directas, sin IA: «calla» corta la voz; «tacha la tarea X» o «marca como hecha X» la completa.")

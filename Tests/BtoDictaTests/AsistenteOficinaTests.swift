@@ -12,6 +12,16 @@ final class AsistenteOficinaTests: XCTestCase {
         XCTAssertEqual(EscuchaSiNo.decision("sí… no, no lo envíes"), false)   // cualquier no gana
         XCTAssertNil(EscuchaSiNo.decision("mmm a ver"))
         XCTAssertNil(EscuchaSiNo.decision("para Juan"))
+        XCTAssertNil(EscuchaSiNo.decision("sí claro que lo pienso enviar mañana"))   // frase larga: no aprueba
+    }
+
+    func testModoEstrictoSoloConConfirmo() {
+        XCTAssertNil(EscuchaSiNo.decision("sí", estricta: true))
+        XCTAssertNil(EscuchaSiNo.decision("dale", estricta: true))
+        XCTAssertEqual(EscuchaSiNo.decision("Confirmo", estricta: true), true)
+        XCTAssertEqual(EscuchaSiNo.decision("sí, confirmo", estricta: true), true)
+        XCTAssertEqual(EscuchaSiNo.decision("no confirmo", estricta: true), false)
+        XCTAssertNil(EscuchaSiNo.decision("confirmo que mañana lo veo", estricta: true))
     }
 
     func testTocaResumenUnaVezYAntesDeMediodia() {
