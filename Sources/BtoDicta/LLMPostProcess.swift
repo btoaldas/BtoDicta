@@ -33,6 +33,8 @@ struct ChatIA {
     var keyDirecta: String? = nil                 // personalizadas guardan su key aparte
     var paraPulido: Bool = true
     var formato: FormatoIA = .openai
+    /// Modelo fijado a propósito por un Modo o el Asistente (conModelo): gana al de pulido.
+    var modeloFijo = false
 
     var esCuentaCodex: Bool { id == "codex_account" }
 
@@ -80,7 +82,7 @@ struct ChatIA {
             let detectado = Self.modeloSeguroParaPulido(Self.modelosLocales[id], respaldo: modelo)
             return Self.modeloSeguroParaPulido(Config.pulidoModelo(id), respaldo: detectado)
         }
-        if id.hasPrefix("custom:") { return modelo }
+        if id.hasPrefix("custom:") || modeloFijo { return modelo }
         return Self.modeloSeguroParaPulido(Config.pulidoModelo(id), respaldo: modelo)
     }
     /// Copia de esta IA con OTRO modelo (para los modos, que fijan su modelo).
@@ -88,6 +90,7 @@ struct ChatIA {
         var c = ChatIA(id: id, nombre: nombre, base: base, modelo: m.isEmpty ? modelo : m, keyEnv: keyEnv, local: local)
         c.authHeader = authHeader; c.authPrefix = authPrefix; c.headersExtra = headersExtra
         c.keyDirecta = keyDirecta; c.paraPulido = paraPulido; c.formato = formato
+        c.modeloFijo = !m.trimmingCharacters(in: .whitespaces).isEmpty || modeloFijo
         return c
     }
     /// Nombre corto del proveedor (sin el " · modelo" que traen algunos).

@@ -124,6 +124,7 @@ enum RouterGlobalIA {
             return
         }
         guard var req = ia.requestChat(prompt: prompt, temperatura: 0, textLen: textLen) else {
+            Log.write("IA \(ia.etiqueta): sin petición posible (falta clave o la dirección no es segura)")
             completion(nil); return
         }
         // (sin `Connection: close`: ver nota abajo)
@@ -132,12 +133,16 @@ enum RouterGlobalIA {
         // se cortaba y el pedido caía al cerebro sin ejecutar (ej. "hazme una tarea").
         req.timeoutInterval = 15
         URLSession.shared.dataTask(with: req) { data, resp, error in
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             let out: String? = {
-                guard error == nil, let data,
-                      let code = (resp as? HTTPURLResponse)?.statusCode,
-                      (200..<300).contains(code) else { return nil }
+                guard error == nil, let data, (200..<300).contains(code) else { return nil }
                 return ia.extraerContenido(data)
             }()
+            if out == nil {
+                // Sin esto el fallo era mudo («no obtuve respuesta») y no había por dónde empezar.
+                let cuerpo = data.map { String(decoding: $0.prefix(200), as: UTF8.self) } ?? ""
+                Log.write("IA \(ia.etiqueta): sin respuesta — HTTP \(code) \(error?.localizedDescription ?? "") \(cuerpo)")
+            }
             completion(out)
         }.resume()
     }

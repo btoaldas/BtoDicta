@@ -71,6 +71,15 @@ final class ModoIATests: XCTestCase {
         XCTAssertEqual(d?.clave, "buscar")
     }
 
+    func testModeloFijadoGanaAlDePulido() throws {
+        let zai = try XCTUnwrap(ChatIA.catalogo.first { $0.id == "zai" })
+        Config.set("pulido_modelos", to: ["zai": "glm-4.5-flash"])
+        defer { Config.set("pulido_modelos", to: [String: String]()) }
+        XCTAssertEqual(zai.modeloEfectivo, "glm-4.5-flash")
+        XCTAssertEqual(zai.conModelo("glm-4.7").modeloEfectivo, "glm-4.7")
+        XCTAssertEqual(zai.conModelo("").modeloEfectivo, zai.modeloEfectivo)
+    }
+
     func testInterpretarPlanTerminal() {
         let r = """
         Claro: {"respuesta":"Reviso el disco","comandos":[{"cmd":"df -h","sudo":false,"proposito":"espacio"},{"cmd":"sudo purge","proposito":"memoria"}]}
@@ -214,8 +223,12 @@ final class ModoIAAPIRealTests: XCTestCase {
         let ia = modelo.isEmpty ? base : base.conModelo(modelo)
         try XCTSkipIf(ia.key == nil, "sin clave para \(id)")
         let caps = CatalogoCapacidades.todas()
-        for pedido in ["Haz un borrador de correo para persona@ejemplo.com con asunto Prueba y texto: esto es una prueba.",
-                       "Abre el navegador y busca información sobre seguridad de los autos BMW."] {
+        let propio = ProcessInfo.processInfo.environment["BTODICTA_IA_PEDIDO"] ?? ""
+        let pedidos = propio.isEmpty
+            ? ["Haz un borrador de correo para persona@ejemplo.com con asunto Prueba y texto: esto es una prueba.",
+               "Abre el navegador y busca información sobre seguridad de los autos BMW."]
+            : [propio]
+        for pedido in pedidos {
             let e = expectation(description: pedido)
             let inicio = Date()
             let p = AgenteTerminal.promptMixto(pedido: pedido, contexto: "", catalogo: CatalogoCapacidades.paraIA(caps))
