@@ -58,10 +58,10 @@ Contacts.ReadWrite queda autorizado para una fase siguiente (no se usa aún).
 - [x] T01 Cliente Graph ampliado y pruebas puras.
 - [x] T02 Herramientas en el modo «Todo».
 - [x] T03 Enviar con confirmación obligatoria.
-- [ ] T04 Build local, reconexión y prueba real.
+- [x] T04 Build local, reconexión y prueba real.
 
 ## 5. Evidencia
 
 - `MicrosoftGraphAccionesTests` 5/5 y `MicrosoftGraphTests` 6/6; suite completa sin fallos.
 - Prueba real de decisión con glm-5.3: borrador para «Ana Pérez» → `borrador_correo` con asunto y cuerpo; «¿qué tengo mañana?» → `ver_agenda`; «busca los correos de la directora…» → `buscar_correo`; «dentista el martes a las cuatro» → `crear_evento` 16:00–17:00. 2–3 s cada una.
-- Falta la prueba contra la cuenta real (requiere reconectar para aceptar los permisos nuevos).
+- Prueba real con la cuenta de Alberto (2026-11-21, 02:07–02:11): agenda de hoy (sin eventos), lectura de 30 correos de 2 días con resumen, búsqueda en el buzón, borrador real, modificación del mismo borrador y envío tras la confirmación en pantalla. Corregido después: el asunto dictado se copia literal (commit `4440482`).
