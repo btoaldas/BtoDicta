@@ -125,15 +125,75 @@ enum OficinaAgente {
         var t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         if !t.contains("://") { t = "https://" + t }
         guard let u = URL(string: t), let esquema = u.scheme?.lowercased(), ["http", "https"].contains(esquema),
-              let host = u.host?.lowercased(), host.contains(".") else { return nil }
+              var host = u.host?.lowercased() else { return nil }
+        if host.hasSuffix(".") { host.removeLast() }
+        guard host.contains(".") else { return nil }
+        // Hosts numéricos solo en forma canónica de 4 octetos decimales («127.1» o «0x7f.0.0.1» no).
+        let etiquetas = host.split(separator: ".", omittingEmptySubsequences: false)
+        if etiquetas.allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isHexDigit || $0 == "x" } }),
+           etiquetas.contains(where: { $0.first?.isNumber == true }) {
+            guard etiquetas.count == 4, etiquetas.allSatisfy({ e in e.allSatisfy(\.isNumber) && (Int(e) ?? 999) <= 255
+                && !(e.count > 1 && e.hasPrefix("0")) }) else { return nil }
+        }
         if host == "localhost" || host.hasSuffix(".local") || host.hasSuffix(".localhost") || host.hasSuffix(".internal") { return nil }
         let o = host.split(separator: ".").compactMap { Int($0) }
-        if o.count == 4 {
-            if o[0] == 10 || o[0] == 127 || o[0] == 0 || (o[0] == 169 && o[1] == 254) || (o[0] == 192 && o[1] == 168)
-                || (o[0] == 172 && (16...31).contains(o[1])) || (o[0] == 100 && (64...127).contains(o[1])) { return nil }
-        }
+        if o.count == 4, ipPrivada(o) { return nil }
         if host.contains(":") { return nil }   // IPv6 literal
         return u
+    }
+
+    /// IPv4 de uso no público: propia, privada, enlace local, CGNAT, multidifusión o reservada. Puro.
+    static func ipPrivada(_ o: [Int]) -> Bool {
+        guard o.count == 4 else { return true }
+        return o[0] == 0 || o[0] == 10 || o[0] == 127 || (o[0] == 169 && o[1] == 254) || (o[0] == 192 && o[1] == 168)
+            || (o[0] == 172 && (16...31).contains(o[1])) || (o[0] == 100 && (64...127).contains(o[1])) || o[0] >= 224
+    }
+
+    /// IPv6 de uso no público (propia, enlace local, única local, multidifusión, IPv4 incrustada). Puro.
+    static func ipv6Privada(_ b: [UInt8]) -> Bool {
+        guard b.count == 16 else { return true }
+        if b.allSatisfy({ $0 == 0 }) || (b[0..<15].allSatisfy { $0 == 0 } && b[15] == 1) { return true }
+        if b[0] == 0xfe && (b[1] & 0xc0) == 0x80 { return true }
+        if (b[0] & 0xfe) == 0xfc || b[0] == 0xff { return true }
+        if b[0..<10].allSatisfy({ $0 == 0 }) && ((b[10] == 0xff && b[11] == 0xff) || (b[10] == 0 && b[11] == 0)) {
+            return ipPrivada(b[12..<16].map(Int.init))
+        }
+        return false
+    }
+
+    /// Resuelve el nombre y exige que TODAS sus direcciones sean públicas (evita nombres que apuntan a la red local).
+    static func hostResuelvePublico(_ host: String) -> Bool {
+        var pistas = addrinfo(ai_flags: 0, ai_family: AF_UNSPEC, ai_socktype: SOCK_STREAM, ai_protocol: 0,
+                              ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
+        var res: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &pistas, &res) == 0, let primero = res else { return false }
+        defer { freeaddrinfo(primero) }
+        var p: UnsafeMutablePointer<addrinfo>? = primero, alguna = false
+        while let a = p {
+            if a.pointee.ai_family == AF_INET, let sa = a.pointee.ai_addr {
+                let v = sa.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { UInt32(bigEndian: $0.pointee.sin_addr.s_addr) }
+                if ipPrivada([Int(v >> 24), Int((v >> 16) & 255), Int((v >> 8) & 255), Int(v & 255)]) { return false }
+                alguna = true
+            } else if a.pointee.ai_family == AF_INET6, let sa = a.pointee.ai_addr {
+                let b = sa.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { s -> [UInt8] in
+                    withUnsafeBytes(of: s.pointee.sin6_addr) { Array($0) }
+                }
+                if ipv6Privada(b) { return false }
+                alguna = true
+            }
+            p = a.pointee.ai_next
+        }
+        return alguna
+    }
+
+    /// Revisa cada redirección con las mismas reglas.
+    private final class Redirecciones: NSObject, URLSessionTaskDelegate {
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+            guard let u = request.url, let v = OficinaAgente.urlPublica(u.absoluteString), let h = v.host,
+                  OficinaAgente.hostResuelvePublico(h) else { completionHandler(nil); return }
+            completionHandler(request)
+        }
     }
 
     /// Texto visible de una página HTML (puro y sencillo).
@@ -157,11 +217,16 @@ enum OficinaAgente {
     static func leerPagina(_ u: URL, fin: @escaping (String?) -> Void) {
         var req = URLRequest(url: u); req.timeoutInterval = 15
         req.setValue("Mozilla/5.0 (Macintosh) BtoDicta", forHTTPHeaderField: "User-Agent")
-        URLSession.shared.dataTask(with: req) { data, resp, _ in
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let h = u.host, hostResuelvePublico(h) else { DispatchQueue.main.async { fin(nil) }; return }
+            let sesion = URLSession(configuration: .ephemeral, delegate: Redirecciones(), delegateQueue: nil)
+            sesion.dataTask(with: req) { data, resp, _ in
+                sesion.finishTasksAndInvalidate()
             let ok = ((resp as? HTTPURLResponse)?.statusCode ?? 0) == 200
             let t = ok ? data.flatMap { $0.count <= 3_000_000 ? String(data: $0, encoding: .utf8) ?? String(data: $0, encoding: .isoLatin1) : nil } : nil
             DispatchQueue.main.async { fin(t.map { textoDeHTML($0) }) }
-        }.resume()
+            }.resume()
+        }
     }
 
     // MARK: Sesiones de IA

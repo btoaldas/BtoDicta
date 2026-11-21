@@ -10,6 +10,25 @@ final class OficinaAgenteTests: XCTestCase {
                      "http://169.254.169.254/latest", "file:///etc/passwd", "http://impresora.local", "ftp://example.com"] {
             XCTAssertNil(OficinaAgente.urlPublica(mala), mala)
         }
+        for mala in ["http://127.1", "http://0x7f.0.0.1", "http://017.0.0.1", "http://localhost.", "http://224.0.0.1", "http://[::1]"] {
+            XCTAssertNil(OficinaAgente.urlPublica(mala), mala)
+        }
+        XCTAssertNotNil(OficinaAgente.urlPublica("http://8.8.8.8"))
+        XCTAssertNotNil(OficinaAgente.urlPublica("https://cafe.example.com"))   // letras hex en el nombre: no es IP
+    }
+
+    func testIPv6Privadas() {
+        func b(_ s: String) -> [UInt8] { var a = in6_addr(); inet_pton(AF_INET6, s, &a); return withUnsafeBytes(of: a) { Array($0) } }
+        XCTAssertTrue(OficinaAgente.ipv6Privada(b("::1")))
+        XCTAssertTrue(OficinaAgente.ipv6Privada(b("fe80::1")))
+        XCTAssertTrue(OficinaAgente.ipv6Privada(b("fd00::1")))
+        XCTAssertTrue(OficinaAgente.ipv6Privada(b("::ffff:192.168.1.1")))
+        XCTAssertFalse(OficinaAgente.ipv6Privada(b("2606:4700::1111")))
+    }
+
+    func testNombreQueResuelveALocalSeRechaza() {
+        XCTAssertFalse(OficinaAgente.hostResuelvePublico("localhost"))
+        XCTAssertFalse(OficinaAgente.hostResuelvePublico("127.0.0.1"))
     }
 
     func testTextoDeHTML() {
