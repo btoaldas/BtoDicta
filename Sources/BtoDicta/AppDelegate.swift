@@ -9507,8 +9507,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 case .failure(let e): fallo(e)
                 case .success(let p) where p.isEmpty: decir("No encontré a nadie con ese nombre. ¿Me lo dices de otra forma?", nil)
                 case .success(let p):
-                    let t = "Encontré: " + MicrosoftGraph.personasHabladas(p) + ". ¿Qué hago con ese contacto?"
-                    decir(t, String(t.prefix(400)))
+                    // Datos del directorio: se dicen, pero no van a la memoria ni al registro.
+                    decir("Encontré: " + MicrosoftGraph.personasHabladas(p) + ". ¿Qué hago con ese contacto?",
+                          "Busqué personas por nombre: \(p.count) resultado(s).")
                 }
             }
         case "borrador_correo":
@@ -9558,20 +9559,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         case "enviar_borrador":
             guard let b = graphUltimoBorrador else { decir("No tengo un borrador listo para enviar.", nil); return }
-            // Enviar SIEMPRE se confirma, con cualquier modo de confirmación.
-            guard autorizarDecisionIA("¿Enviar este correo?",
-                                      detalle: "Para: \(b.para.joined(separator: ", "))\nAsunto: \(b.asunto)\n\n\(b.inicio)") else {
-                decir("No lo envié. Sigue en Borradores.", nil); return
-            }
-            MicrosoftGraph.enviarBorrador(b.id) { [weak self] r in
+            // Enviar SIEMPRE se confirma, con cualquier modo de confirmación, y con
+            // lo que hay de verdad en el buzón: se relee el borrador justo antes.
+            MicrosoftGraph.detalleParaEnviar(b.id) { [weak self] detalle in
                 guard let self, self.agenteVigente(token) else { return }
-                switch r {
-                case .failure(let e): fallo(e)
-                case .success:
-                    self.graphUltimoBorrador = nil
-                    AgenteLog.registrar("graph_enviado", ["para": b.para.count])
-                    decir("Enviado a \(b.para.joined(separator: ", ")). ¿Algo más?", "Envié el borrador «\(b.asunto)».")
+                guard let detalle else { decir("No pude leer el borrador antes de enviarlo. No envié nada.", nil); return }
+                guard self.autorizarDecisionIA("¿Enviar este correo?", detalle: detalle) else {
+                    decir("No lo envié. Sigue en Borradores.", nil); return
                 }
+                self.enviarConfirmado(b, token: token, decir: decir, fallo: fallo)
             }
         case "ver_agenda":
             let d = AgenteTerminal.dias(plan.contenido, porDefecto: 1)
@@ -9615,6 +9611,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    private func enviarConfirmado(_ b: BorradorGraph, token: Int,
+                                  decir: @escaping (String, String?) -> Void,
+                                  fallo: @escaping (MicrosoftGraph.ErrorGraph) -> Void) {
+        MicrosoftGraph.enviarBorrador(b.id) { [weak self] r in
+            guard let self, self.agenteVigente(token) else { return }
+            switch r {
+            case .failure(let e): fallo(e)
+            case .success:
+                self.graphUltimoBorrador = nil
+                AgenteLog.registrar("graph_enviado", ["para": b.para.count])
+                decir("Enviado a \(b.para.joined(separator: ", ")). ¿Algo más?", "Envié el borrador «\(b.asunto)».")
+            }
+        }
+    }
+
     /// Correo directo, o el de la única persona que coincide con el nombre.
     private func resolverDestinatario(_ d: String?, token: Int, decir: @escaping (String, String?) -> Void,
                                       listo: @escaping (String) -> Void) {
@@ -9628,8 +9639,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case .success(let p) where p.count == 1: listo(p[0].correo)
             case .success(let p) where p.isEmpty: decir("No encontré el correo de \(t). ¿Me lo dictas?", nil)
             case .success(let p):
-                let opciones = "Hay varias personas: " + MicrosoftGraph.personasHabladas(p) + ". ¿A cuál le escribo?"
-                decir(opciones, String(opciones.prefix(400)))
+                decir("Hay varias personas: " + MicrosoftGraph.personasHabladas(p) + ". ¿A cuál le escribo? Dime su nombre completo.",
+                      "Busqué destinatario: \(p.count) coincidencias; pedí el nombre completo.")
             }
         }
     }

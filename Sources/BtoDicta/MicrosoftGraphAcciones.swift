@@ -112,6 +112,37 @@ extension MicrosoftGraph {
         }
     }
 
+    /// Lo que se va a enviar de verdad, leído del buzón justo antes: todos los
+    /// destinatarios y el texto completo (acotado). nil si no se pudo leer.
+    static func detalleParaEnviar(_ id: String, fin: @escaping (String?) -> Void) {
+        llamar("GET", "/me/messages/\(id)", query: [
+            URLQueryItem(name: "$select", value: "subject,toRecipients,ccRecipients,bccRecipients,body"),
+        ], cabeceras: ["Prefer": "outlook.body-content-type=\"text\""]) { codigo, json in
+            fin(codigo == 200 ? detalleEnvio(json) : nil)
+        }
+    }
+
+    static func detalleEnvio(_ json: Any?) -> String? {
+        guard let j = json as? [String: Any] else { return nil }
+        func lista(_ k: String) -> String {
+            ((j[k] as? [[String: Any]]) ?? []).compactMap {
+                ($0["emailAddress"] as? [String: Any])?["address"] as? String
+            }.joined(separator: ", ")
+        }
+        let para = lista("toRecipients")
+        guard !para.isEmpty else { return nil }
+        var t = "Para: \(para)"
+        let cc = lista("ccRecipients"), cco = lista("bccRecipients")
+        if !cc.isEmpty { t += "\nCC: \(cc)" }
+        if !cco.isEmpty { t += "\nCCO: \(cco)" }
+        t += "\nAsunto: \((j["subject"] as? String) ?? "")"
+        let cuerpo = ((j["body"] as? [String: Any])?["content"] as? String ?? "")
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        t += "\n\n" + (cuerpo.count > 1500 ? String(cuerpo.prefix(1500)) + "…" : cuerpo)
+        return t
+    }
+
     /// Envía un borrador. Quien llama YA pidió la confirmación del usuario.
     static func enviarBorrador(_ id: String, fin: @escaping Fin<Void>) {
         llamar("POST", "/me/messages/\(id)/send") { codigo, _ in

@@ -26,7 +26,7 @@ struct CodigoDispositivo: Equatable {
 }
 
 enum MicrosoftGraph {
-    static let alcances = "offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite Contacts.ReadWrite People.Read User.ReadBasic.All"
+    static let alcances = "offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite People.Read User.ReadBasic.All"
     private static let cuentaLlavero = "microsoft-graph-refresh"
     private static let lock = NSLock()
     private static var acceso: (token: String, vence: Date)?

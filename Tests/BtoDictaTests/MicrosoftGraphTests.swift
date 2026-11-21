@@ -114,6 +114,17 @@ final class MicrosoftGraphAccionesTests: XCTestCase {
         XCTAssertTrue(MicrosoftGraph.agendaParaIA(ev).contains("Consejo · Sala 1"))
     }
 
+    func testDetalleEnvioMuestraTodo() throws {
+        let d = try XCTUnwrap(MicrosoftGraph.detalleEnvio([
+            "subject": "Hola", "toRecipients": [["emailAddress": ["address": "a@x.edu"]]],
+            "ccRecipients": [["emailAddress": ["address": "c@x.edu"]]],
+            "bccRecipients": [["emailAddress": ["address": "oculto@x.edu"]]],
+            "body": ["content": "<p>Texto completo</p>"]]))
+        XCTAssertTrue(d.contains("CC: c@x.edu")); XCTAssertTrue(d.contains("CCO: oculto@x.edu"))
+        XCTAssertTrue(d.hasSuffix("Texto completo"))
+        XCTAssertNil(MicrosoftGraph.detalleEnvio(["subject": "sin destinatario"]))
+    }
+
     func testCatalogoGraphEnPrompt() {
         let p = AgenteTerminal.promptMixto(pedido: "x", contexto: "", catalogo: "", correo: true)
         for h in ["borrador_correo", "enviar_borrador", "ver_agenda", "buscar_persona"] { XCTAssertTrue(p.contains(h)) }
