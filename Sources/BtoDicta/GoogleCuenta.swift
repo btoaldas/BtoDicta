@@ -13,6 +13,7 @@ enum GoogleCuenta {
     static let alcances = ["openid", "email",
                            "https://www.googleapis.com/auth/gmail.readonly",
                            "https://www.googleapis.com/auth/gmail.compose",
+                           "https://www.googleapis.com/auth/gmail.modify",
                            "https://www.googleapis.com/auth/calendar.events",
                            "https://www.googleapis.com/auth/contacts.readonly"]
     typealias ErrorG = MicrosoftGraph.ErrorGraph
@@ -293,6 +294,18 @@ enum GoogleCuenta {
             if !t.isEmpty { return t }
         }
         return ""
+    }
+
+    /// Archivar en Gmail = quitar la etiqueta de la bandeja de entrada (se deshace con «Mover a Recibidos»).
+    /// Una cuenta conectada antes de este permiso responde 403: hay que reconectarla.
+    static func archivar(_ cuenta: CuentaNube, _ id: String, fin: @escaping Fin<Void>) {
+        llamar(cuenta, "POST", gmail + "/messages/\(id)/modify", cuerpo: ["removeLabelIds": ["INBOX"]]) { c, _ in
+            switch c {
+            case 200: fin(.success(()))
+            case 403: fin(.failure(.respuesta("falta el permiso para archivar; vuelve a conectar la cuenta en Ajustes")))
+            default: fin(.failure(MicrosoftGraph.error(c)))
+            }
+        }
     }
 
     static func enviarBorrador(_ cuenta: CuentaNube, _ id: String, fin: @escaping Fin<Void>) {

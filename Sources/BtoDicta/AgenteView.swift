@@ -788,7 +788,7 @@ struct AgenteView: View {
 
             card("Cuentas de correo, agenda y contactos", "envelope.open") {
                 Toggle("Permitir que el asistente use mis cuentas", isOn: $m.graphActivo)
-                Text("Microsoft 365, Outlook.com y Google (Gmail, Calendar, Contactos); puedes conectar varias de cada una. Lee y busca correo, prepara borradores y eventos. Enviar SIEMPRE te pide confirmación; nunca borra ni mueve correos. Lo leído viaja a la IA del asistente para resumirlo. Di el nombre corto («revisa mi correo Personal») o usa la predeterminada.")
+                Text("Microsoft 365, Outlook.com y Google (Gmail, Calendar, Contactos); puedes conectar varias de cada una. Lee y busca correo, prepara borradores y eventos. Enviar y archivar SIEMPRE te piden confirmación; nunca borra correos. Lo leído viaja a la IA del asistente para resumirlo. Di el nombre corto («revisa mi correo Personal») o usa la predeterminada.")
                     .font(.caption).foregroundStyle(.orange)
                 if m.graphActivo {
                     ForEach(m.cuentas) { c in

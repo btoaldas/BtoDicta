@@ -114,6 +114,13 @@ extension MicrosoftGraph {
         }
     }
 
+    /// Mueve el correo a la carpeta Archivo (se deshace moviéndolo de vuelta).
+    static func archivar(_ idMensaje: String, fin: @escaping Fin<Void>) {
+        llamar("POST", "/me/messages/\(idMensaje)/move", cuerpo: ["destinationId": "archive"]) { codigo, _ in
+            codigo == 201 ? fin(.success(())) : fin(.failure(error(codigo)))
+        }
+    }
+
     static func crearReenvio(_ idMensaje: String, para: String, comentario: String, fin: @escaping Fin<BorradorGraph>) {
         llamar("POST", "/me/messages/\(idMensaje)/createForward", cuerpo: [
             "comment": comentario,

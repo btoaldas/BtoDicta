@@ -9875,6 +9875,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     }
                 }
             }
+        case "archivar_correo":
+            let idx = AgenteTerminal.indicesArchivar(plan.contenido, numero: plan.numero, total: graphUltimosCorreos.count)
+                .filter { !graphUltimosCorreos[$0].id.isEmpty }
+            guard !idx.isEmpty else {
+                decir(graphUltimosCorreos.isEmpty
+                      ? "Primero pídeme que revise o busque tus correos; luego dime cuáles archivo."
+                      : "¿Cuáles archivo? Dime sus números o «todos».", nil)
+                return
+            }
+            let elegidos = idx.map { graphUltimosCorreos[$0] }
+            let lista = zip(idx, elegidos).map { "\($0 + 1). \($1.de) — \($1.asunto)" }.joined(separator: "\n")
+            // Mover correos cambia el buzón: se confirma SIEMPRE, con cualquier modo.
+            guard autorizarDecisionIA("¿Archivar \(elegidos.count == 1 ? "este correo" : "estos \(elegidos.count) correos")?",
+                                      detalle: lista + "\n\nSalen de la bandeja de entrada; no se borran.") else {
+                decir("Vale, no archivo nada.", nil); return
+            }
+            archivarEnOrden(elegidos, hechos: 0, token: token, decir: decir, fallo: fallo)
         case "enviar_borrador":
             guard let b = graphUltimoBorrador else { decir("No tengo un borrador listo para enviar.", nil); return }
             // Enviar SIEMPRE se confirma, con cualquier modo de confirmación, y con
@@ -9965,6 +9982,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Lee la bandeja (Graph), la IA resume según el pedido y Beto lo dice.
     /// La memoria guarda solo cuántos correos se revisaron, no su texto.
+    /// Archiva uno tras otro; si uno falla, se detiene y dice cuántos quedaron archivados.
+    private func archivarEnOrden(_ correos: [CorreoLeido], hechos: Int, token: Int,
+                                 decir: @escaping (String, String?) -> Void,
+                                 fallo: @escaping (MicrosoftGraph.ErrorGraph) -> Void) {
+        guard let primero = correos.first else {
+            AgenteLog.registrar("correo_archivar", ["cantidad": hechos])
+            decir(hechos == 1 ? "Listo, archivé el correo. ¿Algo más?" : "Listo, archivé los \(hechos) correos. ¿Algo más?",
+                  "Archivé \(hechos) correo(s) de la última lista.")
+            return
+        }
+        opsCorreo.archivar(primero.id) { [weak self] r in
+            guard let self, self.agenteVigente(token) else { return }
+            switch r {
+            case .success:
+                self.archivarEnOrden(Array(correos.dropFirst()), hechos: hechos + 1, token: token, decir: decir, fallo: fallo)
+            case .failure(let e) where hechos > 0:
+                decir("Archivé \(hechos) y luego falló: \(e.mensaje)", "Archivé \(hechos) correo(s); el resto falló.")
+            case .failure(let e):
+                fallo(e)
+            }
+        }
+    }
+
     private func leerCorreoYResumir(_ texto: String, dias: Int, cantidad: Int? = nil, ia: ChatIA?, token: Int) {
         if !recorder.isRecording { panel.update("📬 Leyendo tu correo…") }
         AgenteLog.registrar("correo_leer", ["dias": dias, "cantidad": cantidad ?? 0])

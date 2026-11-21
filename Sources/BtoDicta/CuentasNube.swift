@@ -149,6 +149,9 @@ struct OperacionesCorreo {
     func crearReenvio(_ id: String, para: String, comentario: String, fin: @escaping Fin<BorradorGraph>) {
         if google != nil { noGmail(fin) } else { usarMicrosoft(); MicrosoftGraph.crearReenvio(id, para: para, comentario: comentario, fin: fin) }
     }
+    func archivar(_ id: String, fin: @escaping Fin<Void>) {
+        if let g = google { GoogleCuenta.archivar(g, id, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.archivar(id, fin: fin) }
+    }
     func detalleParaEnviar(_ id: String, fin: @escaping (String?) -> Void) {
         if let g = google { GoogleCuenta.detalleParaEnviar(g, id, fin: fin) } else { usarMicrosoft(); MicrosoftGraph.detalleParaEnviar(id, fin: fin) }
     }

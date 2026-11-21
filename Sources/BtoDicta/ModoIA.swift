@@ -207,6 +207,7 @@ enum AgenteTerminal {
         - [herramienta:modificar_borrador] Cambiar el último borrador creado. "asunto" y/o "contenido" con la versión completa nueva.
         - [herramienta:responder_correo] Preparar como borrador la respuesta a un correo de la última lista leída. "numero" = su número en la lista; "contenido" = texto de la respuesta.
         - [herramienta:reenviar_correo] Preparar como borrador el reenvío de un correo de la última lista. "numero"; "destinatario" = correo o nombre; "contenido" = comentario opcional.
+        - [herramienta:archivar_correo] Archivar correos de la última lista leída (salen de la bandeja de entrada; no se borran). "contenido" = sus números separados por comas, o «todos». BtoDicta pide confirmación.
         - [herramienta:enviar_borrador] Enviar el último borrador. BtoDicta pedirá confirmación al usuario.
         - [herramienta:ver_agenda] Ver eventos del calendario. "contenido" = días desde hoy (1–7).
         - [herramienta:crear_evento] Crear un evento propio, sin invitados. "contenido" = título; "inicio" y "fin" = "AAAA-MM-DDTHH:MM" en hora local; "lugar" opcional.
@@ -232,7 +233,7 @@ enum AgenteTerminal {
     }
 
     static let herramientasGraph: Set<String> = ["leer_correo", "buscar_correo", "buscar_persona", "borrador_correo",
-                                                 "modificar_borrador", "responder_correo", "reenviar_correo", "enviar_borrador",
+                                                 "modificar_borrador", "responder_correo", "reenviar_correo", "enviar_borrador", "archivar_correo",
                                                  "ver_agenda", "crear_evento", "tareas_resumen", "recordar",
                                                  "crear_documento", "crear_hoja", "buscar_historial",
                                                  "resumen_bitacora", "transcribir_archivo",
@@ -317,6 +318,16 @@ enum AgenteTerminal {
         // «el último correo», «el último mensaje»: uno.
         for i in t.indices.dropLast() where ["el", "mi"].contains(t[i]) && t[i + 1] == "ultimo" { return 1 }
         return nil
+    }
+
+    /// Qué correos de la última lista archivar (índices desde 0). «todos», «los tres», «1, 3», o `numero`.
+    static func indicesArchivar(_ contenido: String, numero: Int?, total: Int) -> [Int] {
+        guard total > 0 else { return [] }
+        let n = PerfilAgente.normalizar(contenido)
+        if n.contains("todo") { return Array(0..<total) }
+        let cifras = n.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+        let elegidos = cifras.isEmpty ? (numero.map { [$0] } ?? []) : cifras
+        return Array(Set(elegidos.filter { (1...total).contains($0) }.map { $0 - 1 })).sorted()
     }
 
     static func dias(_ contenido: String, porDefecto: Int = 2) -> Int {

@@ -10,6 +10,7 @@ final class EvaluacionAsistenteTests: XCTestCase {
         ("¿Qué tengo en mi agenda esta semana?", "graph:ver_agenda"),
         ("Revisa mis correos de hoy, los más importantes", "graph:leer_correo"),
         ("Revisa mi correo personal de hoy, por favor.", "graph:leer_correo"),
+        ("Archiva esos tres correos que me leíste", "graph:archivar_correo"),
         ("Busca los correos de persona@ejemplo.com", "graph:buscar_correo"),
         ("Hazme un borrador para persona@ejemplo.com con asunto Prueba diciendo hola", "graph:borrador_correo"),
         ("Agéndame una reunión con el equipo mañana a las diez por una hora", "graph:crear_evento"),

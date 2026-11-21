@@ -163,6 +163,7 @@ enum Arnes {
         - Borradores reales: borrador_correo; cambiar el mismo: modificar_borrador; responder / reenviar
           un correo de la última lista: responder_correo / reenviar_correo (por su número).
         - Enviar: enviar_borrador (BtoDicta siempre pide confirmación en pantalla).
+        - Archivar correos de la última lista: archivar_correo con sus números o «todos» (siempre con confirmación; no borra).
         - Agenda: ver_agenda; crear: crear_evento (sin invitados).
         - Responder y reenviar solo en cuentas Microsoft; en Gmail, un borrador nuevo.
         - Si no hay ninguna cuenta conectada, abrir el correo web es lo único posible.

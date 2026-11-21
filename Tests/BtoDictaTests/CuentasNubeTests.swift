@@ -162,3 +162,24 @@ final class CantidadCorreosTests: XCTestCase {
         XCTAssertNil(AgenteTerminal.cantidadPedida("x", numero: 900))
     }
 }
+
+/// Qué correos de la última lista se archivan.
+final class ArchivarCorreosTests: XCTestCase {
+    func testIndicesArchivar() {
+        XCTAssertEqual(AgenteTerminal.indicesArchivar("todos", numero: nil, total: 3), [0, 1, 2])
+        XCTAssertEqual(AgenteTerminal.indicesArchivar("1, 3", numero: nil, total: 3), [0, 2])
+        XCTAssertEqual(AgenteTerminal.indicesArchivar("", numero: 2, total: 3), [1])
+        XCTAssertEqual(AgenteTerminal.indicesArchivar("2, 9, 2", numero: nil, total: 3), [1])   // fuera de rango y repetidos fuera
+        XCTAssertEqual(AgenteTerminal.indicesArchivar("", numero: nil, total: 3), [])          // sin decir cuáles: no archiva
+        XCTAssertEqual(AgenteTerminal.indicesArchivar("todos", numero: nil, total: 0), [])
+    }
+
+    func testPlanArchivar() {
+        let p = AgenteTerminal.planGraph(#"{"capacidad":{"tipo":"herramienta","clave":"archivar_correo","contenido":"todos"}}"#)
+        XCTAssertEqual(p?.herramienta, "archivar_correo")
+    }
+
+    func testGooglePideElPermisoDeModificar() {
+        XCTAssertTrue(GoogleCuenta.alcances.contains("https://www.googleapis.com/auth/gmail.modify"))
+    }
+}
