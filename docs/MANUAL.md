@@ -507,6 +507,12 @@ con Beto sin decir su nombre. Viene **apagado**.
     conversa pero no ejecuta nada elegido por una IA.
   - *Elegir del catálogo de acciones* (por defecto): la IA elige una capacidad
     existente; nunca inventa otra.
+  - *Todo: acción, terminal o respuesta* (desde 0.87.0): una sola consulta a la
+    IA decide entre una capacidad del catálogo, comandos (por ejemplo
+    `open "mailto:…"` para un borrador de correo, que no se envía) o solo
+    responder. La capacidad pasa por la misma confirmación que el catálogo y
+    los comandos por la de la terminal. Es el modo recomendado para «que haga
+    cosas».
   - *Terminal*: la IA propone hasta cinco comandos y BtoDicta los ejecuta uno a
     uno, se detiene ante el primer fallo y resume el resultado en voz alta. Con
     sudo usa `sudo -n` si ya lo dejaste sin clave; si no, macOS pide tu clave en su
@@ -528,7 +534,13 @@ con Beto sin decir su nombre. Viene **apagado**.
   «tacha la tarea X» o «marca como hecha X» la completa. **Un clic en el icono de
   la barra** calla a Beto mientras habla (se puede apagar).
 - **Cerebro**: además de la IA de BtoDicta, Hermes y Codex, puedes elegir
-  **ZCode (GLM)**. Corre sin herramientas: solo razona y responde.
+  **ZCode (GLM)**. Corre sin herramientas: solo razona y responde. Si no está
+  instalado, se usa la IA configurada en BtoDicta.
+- **IA del asistente y su modelo** (Cerebro y memoria): elige un proveedor
+  conectado (su clave se pone en Ajustes) y un modelo. **Descubrir** consulta
+  los modelos que ofrece ese proveedor y **Elegir** los muestra en un menú. El
+  modelo elegido aquí manda sobre el del pulido; el router del catálogo también
+  usa esta IA.
 
 Claves en `config.json`: `agente_gesto_activo`, `agente_gesto_tecla`,
 `agente_gesto_ventana`, `agente_gesto_conversacion`, `agente_ia_decision`,

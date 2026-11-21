@@ -8,11 +8,18 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.86.1"
+    static let numero = "0.87.0"
     static let fecha = "2026-11-20"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.87.0", "2026-11-21", [
+            "NUEVO modo de decisión «Todo: acción, terminal o respuesta» para el asistente. Una sola consulta a la IA decide si usar una acción de BtoDicta (búsqueda web, tarea, música…), proponer comandos (por ejemplo abrir un borrador de correo con mailto, sin enviarlo) o solo responder. Funciona con la IA que elijas: cualquier proveedor por API, Codex, Hermes o ZCode",
+            "NUEVO en Asistente, junto al modelo de la IA del asistente: «Descubrir» consulta los modelos del proveedor y «Elegir» los ofrece en un menú, sin escribirlos a mano",
+            "ARREGLADO que el asistente solo conversara: el router descartaba todas sus decisiones porque el modelo copiaba la confianza 0 del ejemplo. Ahora usa la IA elegida para el asistente y no la del pulido",
+            "ARREGLADO que el modelo elegido para el asistente o para un modo se ignorara y se usara el de pulido del proveedor",
+            "ARREGLADO que un fallo de la IA dijera solo «no obtuve respuesta»: el registro anota el código y el mensaje del servidor",
+        ]),
         ("0.86.1", "2026-11-20", [
             "ARREGLADO que, en el modo IA con terminal y confirmación Auto, dos formas de escribir un comando de lectura pudieran leer un archivo sin preguntar. Ahora un número solo cuenta como valor de head -n o tail -n; en cualquier otro caso se trata como archivo y BtoDicta pide tu autorización",
         ]),

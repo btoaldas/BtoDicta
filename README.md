@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.87.0
+
+- **Un asistente que hace, no solo conversa.** El modo «Todo» decide en una sola
+  consulta si usar una acción de BtoDicta, abrir algo en la Mac (un borrador de
+  correo, una página) o responder. Funciona con la IA que elijas.
+- **Elige el modelo sin escribirlo.** «Descubrir» lista los modelos de tu
+  proveedor y «Elegir» los ofrece en un menú.
+
 ### Novedades 0.86.1
 
 - **Modo IA más prudente.** Con terminal y confirmación Auto, ningún comando puede
