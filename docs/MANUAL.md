@@ -517,7 +517,9 @@ con Beto sin decir su nombre. Viene **apagado**.
     equipo sin abrir archivos (`df`, `ls`, `ps aux`, `pmset -g`…), sin comillas,
     comodines, rutas ocultas ni palabras de secretos. Leer el contenido de un
     archivo (`cat`, `grep`, `defaults read`…), escribir y todo sudo pregunta: lo
-    que se lee viaja a la IA en el resumen.
+    que se lee viaja a la IA en el resumen. Desde 0.86.1, `grep`, `head`,
+    `tail` y `wc` solo pasan sin preguntar como filtros tras una tubería, y un
+    número solo cuenta como valor de `head -n` o `tail -n`.
   - *Omitir permisos*: ejecuta sin preguntar. Lo que diga una nota, un correo o
     una página puede influir en la IA: úsalo sabiendo eso.
 - **Tiempo máximo por comando** (terminal): 5–600 s. Esc o «calla» detienen el

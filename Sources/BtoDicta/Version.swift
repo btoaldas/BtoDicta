@@ -8,11 +8,14 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.86.0"
+    static let numero = "0.86.1"
     static let fecha = "2026-11-20"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.86.1", "2026-11-20", [
+            "ARREGLADO que, en el modo IA con terminal y confirmación Auto, dos formas de escribir un comando de lectura pudieran leer un archivo sin preguntar. Ahora un número solo cuenta como valor de head -n o tail -n; en cualquier otro caso se trata como archivo y BtoDicta pide tu autorización",
+        ]),
         ("0.86.0", "2026-11-20", [
             "NUEVO modo IA con tecla propia. Con dos toques rápidos de Control (o la tecla que elijas en Asistente) Beto escucha; un toque de la misma tecla envía. Responde con su voz y, si quieres, vuelve a escuchar para seguir la conversación; un turno en silencio, Esc o «calla» la terminan. Viene apagado: se enciende en Asistente → Modo IA con tecla propia",
             "NUEVO qué puede decidir la IA y cómo se confirma, todo configurable. Decisión: solo reglas fijas, elegir del catálogo de acciones, o terminal (la IA propone comandos y BtoDicta los ejecuta; con sudo, macOS pide tu clave en su propio diálogo). Confirmación: Aprobación (pregunta siempre), Auto (solo lo que únicamente lee pasa sin preguntar) u Omitir permisos (no pregunta)",

@@ -34,6 +34,11 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.86.1
+
+- **Modo IA más prudente.** Con terminal y confirmación Auto, ningún comando puede
+  leer un archivo sin preguntarte.
+
 ### Novedades 0.86.0
 
 - **Modo IA con tecla propia.** Dos toques de Control y Beto escucha; un toque
