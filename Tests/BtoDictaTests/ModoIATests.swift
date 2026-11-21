@@ -76,7 +76,7 @@ final class ModoIATests: XCTestCase {
 
     func testSoloLectura() {
         XCTAssertTrue(AgenteTerminal.esSoloLectura("df -h"))
-        XCTAssertTrue(AgenteTerminal.esSoloLectura("ps aux | grep Safari | head -5"))
+        XCTAssertTrue(AgenteTerminal.esSoloLectura("ps aux | grep -i Safari | head -n 5"))
         XCTAssertTrue(AgenteTerminal.esSoloLectura("pmset -g batt"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("rm -rf ~/x"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("ls; rm x"))
@@ -112,7 +112,14 @@ final class ModoIATests: XCTestCase {
         XCTAssertFalse(AgenteTerminal.esSoloLectura("ps -AE"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("grep -ri clave ."))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("grep --recursive x Documents"))
-        XCTAssertTrue(AgenteTerminal.esSoloLectura("grep -i error log.txt"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("grep -i error log.txt"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("cat notas.txt"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("ls | grep -d recurse x ."))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("ls | grep --rec x"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("ls | grep x archivo"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("defaults read com.app"))
+        XCTAssertFalse(AgenteTerminal.esSoloLectura("launchctl print system"))
+        XCTAssertTrue(AgenteTerminal.esSoloLectura("ls -la Downloads | wc -l"))
         XCTAssertFalse(AgenteTerminal.esSoloLectura("sysctl -f archivo"))
         XCTAssertTrue(AgenteTerminal.esSoloLectura("sysctl -n hw.ncpu"))
     }

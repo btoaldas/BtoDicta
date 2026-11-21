@@ -175,10 +175,18 @@ enum AgenteTerminal {
         // Sin argumentos que escriban. Fuera a propósito: open (lanza .command),
         // sort/uniq (-o y archivo de salida), sed/awk (escriben o ejecutan),
         // less, printenv/env (exponen secretos a la IA), file (-C escribe).
-        "ls", "cat", "head", "tail", "wc", "df", "du", "uptime", "whoami",
-        "sw_vers", "uname", "pwd", "echo", "which", "grep", "egrep", "stat",
-        "mdfind", "system_profiler", "vm_stat", "cal", "cut", "tr", "id",
+        // Nada que lea el CONTENIDO de un archivo: su salida va a la IA.
+        "ls", "df", "du", "uptime", "whoami", "sw_vers", "uname", "pwd", "echo",
+        "which", "stat", "mdfind", "system_profiler", "vm_stat", "cal", "id",
         "groups", "lsof",
+    ]
+
+    /// Filtros que solo leen lo que les llega por la tubería: opciones permitidas
+    /// y cuántos argumentos sueltos admiten (el patrón de grep; ninguno los demás).
+    private static let filtros: [String: (opciones: Set<String>, sueltos: Int)] = [
+        "grep": (["-i", "-v", "-c", "-n", "-w", "-x", "-E", "-F", "-o"], 1),
+        "egrep": (["-i", "-v", "-c", "-n", "-w", "-x", "-o"], 1),
+        "head": (["-n"], 0), "tail": (["-n"], 0), "wc": (["-l", "-w", "-c"], 0),
     ]
 
     /// ¿Solo lee? Cualquier duda = no (y entonces se pregunta).
@@ -202,10 +210,21 @@ enum AgenteTerminal {
             || cmd.contains("/.") { return false }
         let tramos = cmd.split(separator: "|", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: .whitespaces) }
-        for tramo in tramos {
+        for (i, tramo) in tramos.enumerated() {
             let partes = tramo.split(separator: " ").map(String.init)
             guard let cabeza = partes.first else { return false }
             let resto = Set(partes.dropFirst())
+            if let f = filtros[cabeza] {
+                // Solo tras una tubería: leyendo un archivo sacaría su contenido.
+                guard i > 0 else { return false }
+                var sueltos = 0
+                for a in partes.dropFirst() {
+                    if a.hasPrefix("-") { if !f.opciones.contains(a) { return false } }
+                    else if Int(a) == nil { sueltos += 1 }
+                }
+                if sueltos > f.sueltos { return false }
+                continue
+            }
             switch cabeza {
             case "find":
                 // Lista positiva: cualquier otra opción (-delete, -exec, -fprint…) pregunta.
@@ -216,21 +235,16 @@ enum AgenteTerminal {
             case "hostname": if partes.count > 1 { return false }
             case "ifconfig": if partes.count > 2 || !["-a", "-l"].contains(partes.dropFirst().first ?? "-a") { return false }
             case "pmset": if !resto.contains("-g") { return false }
-            case "defaults": if partes.dropFirst().first != "read" { return false }
             case "networksetup":
                 if !(partes.dropFirst().first.map { $0.hasPrefix("-get") || $0.hasPrefix("-list") } ?? false) { return false }
             case "diskutil": if !["list", "info"].contains(partes.dropFirst().first ?? "") { return false }
-            case "launchctl": if !["list", "print"].contains(partes.dropFirst().first ?? "") { return false }
+            case "launchctl": if partes.dropFirst().first != "list" || partes.count > 2 { return false }
             case "sysctl":
                 // -f carga asignaciones desde un archivo: solo lectura con -n/-a/-h.
                 if partes.dropFirst().contains(where: { $0.hasPrefix("-") && !["-n", "-a", "-h"].contains($0) }) { return false }
             case "ps":
                 // Lista cerrada: otras formas (ps e, -E, -eE…) muestran el entorno, con claves.
                 if !["ps", "ps aux", "ps -A", "ps -ax", "ps -ef"].contains(partes.joined(separator: " ")) { return false }
-            case "grep", "egrep":
-                // Recursivo vuelca carpetas enteras (secretos incluidos) hacia la IA.
-                if partes.dropFirst().contains(where: { $0 == "--recursive" || $0.hasPrefix("--dereference-recursive")
-                    || ($0.hasPrefix("-") && !$0.hasPrefix("--") && ($0.contains("r") || $0.contains("R"))) }) { return false }
             case "top": if !resto.contains("-l") { return false }
             default:
                 if !lectura.contains(cabeza) { return false }
