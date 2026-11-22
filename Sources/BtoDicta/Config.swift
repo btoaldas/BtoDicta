@@ -1686,6 +1686,9 @@ struct Config {
     static func whatsappCodigoPais() -> String { (json()["whatsapp_codigo_pais"] as? String) ?? "" }
     /// Bóveda de Obsidian (spec 021); vacío = la que Obsidian tiene abierta.
     static func obsidianBoveda() -> String { (json()["obsidian_boveda"] as? String) ?? "" }
+    /// Avisar a los 6 días que hay que reconectar Gmail (apps de Google en modo prueba).
+    static func avisoReconectarGoogle() -> Bool { (json()["google_aviso_reconectar"] as? Bool) ?? true }
+    static func avisoReconectarGoogleUltimo() -> String { (json()["google_aviso_reconectar_ultimo"] as? String) ?? "" }
     /// Resumen de la mañana a una hora fija (spec 020): apagado de fábrica.
     static func resumenMananaActivo() -> Bool { (json()["agente_resumen_manana_activo"] as? Bool) ?? false }
     static func resumenMananaHora() -> String { (json()["agente_resumen_manana_hora"] as? String) ?? "08:00" }

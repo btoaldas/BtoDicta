@@ -210,3 +210,17 @@ final class BuzonDelegadoTests: XCTestCase {
         XCTAssertNil(l[0].buzon); XCTAssertFalse(l[0].esBuzonDelegado)
     }
 }
+
+extension CuentasNubeTests {
+    func testPorReconectarGoogleALos6Dias() {
+        let ahora = Date()
+        var g = CuentaNube(id: "g", proveedor: .google, alias: "Personal", correo: "", clientID: "x", tenant: "",
+                           llavero: "l", predeterminada: false)
+        var m = g; m.id = "m"; m.proveedor = .microsoft
+        g.conectadaEn = ahora.addingTimeInterval(-6 * 86400 - 60)
+        m.conectadaEn = ahora.addingTimeInterval(-30 * 86400)
+        var nueva = g; nueva.id = "n"; nueva.conectadaEn = ahora.addingTimeInterval(-86400)
+        var sinFecha = g; sinFecha.id = "s"; sinFecha.conectadaEn = nil
+        XCTAssertEqual(CuentasNube.porReconectar([g, m, nueva, sinFecha], ahora: ahora).map(\.id), ["g"])
+    }
+}

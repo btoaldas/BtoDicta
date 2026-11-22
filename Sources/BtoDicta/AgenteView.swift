@@ -229,6 +229,9 @@ final class AgenteSettingsModel: ObservableObject {
     @Published var nuevaTenant = "common"
     @Published var nuevaSecreto = ""
     @Published var nuevaBuzon = ""
+    @Published var avisoGoogle = Config.avisoReconectarGoogle() {
+        didSet { Config.set("google_aviso_reconectar", to: avisoGoogle) }
+    }
 
     func refrescarCuentas() { cuentas = CuentasNube.todas(); graphConectado = !CuentasNube.conectadas.isEmpty }
 
@@ -919,6 +922,7 @@ struct AgenteView: View {
                         SecureField("Secreto del cliente", text: $m.nuevaSecreto).textFieldStyle(.roundedBorder)
                         Text("Google Cloud → APIs: Gmail, Calendar y People activadas; pantalla de consentimiento en modo prueba con tu correo como usuario de prueba; credencial «App de escritorio». El secreto se guarda en el Llavero.")
                             .font(.caption).foregroundStyle(.secondary)
+                        Toggle("Avisarme a los 6 días para reconectar Google (app en modo prueba)", isOn: $m.avisoGoogle)
                     }
                     HStack {
                         Spacer()

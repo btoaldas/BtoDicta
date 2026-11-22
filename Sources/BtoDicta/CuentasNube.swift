@@ -22,6 +22,8 @@ struct CuentaNube: Codable, Equatable, Identifiable {
     var predeterminada: Bool
     /// Buzón compartido o delegado de Microsoft (su correo); nil = el propio (spec 019).
     var buzon: String?
+    /// Cuándo se conectó (Google en modo prueba corta la sesión a los 7 días).
+    var conectadaEn: Date?
 
     var esBuzonDelegado: Bool { !(buzon ?? "").isEmpty }
     var etiqueta: String { correo.isEmpty ? alias : "\(alias) (\(correo))" }
@@ -114,6 +116,11 @@ enum CuentasNube {
     }
 
     /// Línea para el prompt: qué cuentas hay y cuál es la predeterminada.
+    /// Cuentas de Google con 6 días o más desde que se conectaron (puro).
+    static func porReconectar(_ lista: [CuentaNube], ahora: Date = Date()) -> [CuentaNube] {
+        lista.filter { $0.proveedor == .google && ($0.conectadaEn.map { ahora.timeIntervalSince($0) >= 6 * 86400 } ?? false) }
+    }
+
     static func paraIA(_ lista: [CuentaNube] = conectadas) -> String {
         lista.map { "\($0.alias) — \($0.proveedor.nombre)\($0.correo.isEmpty ? "" : ", \($0.correo)")\($0.predeterminada ? " (predeterminada)" : "")" }
             .joined(separator: "; ")

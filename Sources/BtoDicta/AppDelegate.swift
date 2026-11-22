@@ -5121,6 +5121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         vigilarResumenManana()
         vigilarDelegados()
         vigilarSeguimientos()
+        vigilarReconexionGoogle()
         inicioCompleto = true
         let urlsAlArrancar = urlsPendientes
         urlsPendientes.removeAll()
@@ -9872,6 +9873,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                       "Di el resumen de la mañana (\(d.cuentas.count) cuenta(s), \(n) correos).")
             }
         }
+    }
+
+    /// Una vez al día, avisa si una cuenta de Google lleva 6 días conectada (en modo prueba
+    /// Google corta la sesión a los 7). Las cuentas sin fecha toman la de hoy.
+    private func vigilarReconexionGoogle() {
+        let revisar: () -> Void = { [weak self] in
+            guard let self, Config.avisoReconectarGoogle() else { return }
+            for var c in CuentasNube.todas() where c.proveedor == .google && c.conectadaEn == nil && CuentasNube.conectada(c) {
+                c.conectadaEn = Date(); CuentasNube.actualizar(c)
+            }
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+            let hoy = f.string(from: Date())
+            let viejas = CuentasNube.porReconectar(CuentasNube.conectadas)
+            guard !viejas.isEmpty, Config.avisoReconectarGoogleUltimo() != hoy, !self.recorder.isRecording, !self.agenteActivo else { return }
+            Config.set("google_aviso_reconectar_ultimo", to: hoy)
+            let nombres = viejas.map(\.alias).joined(separator: ", ")
+            let aviso = "Tu cuenta de Google «\(nombres)» cumple una semana: reconéctala en Ajustes, Asistente, para que no se corte."
+            Log.write("cuentas: aviso de reconexión de Google")
+            self.panel.flash("🔑 " + aviso, segundos: 10)
+            Voz.decir(aviso)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { revisar() }
+        let t = Timer(timeInterval: 3600, repeats: true) { _ in revisar() }
+        RunLoop.main.add(t, forMode: .common)
     }
 
     /// Revisa los seguimientos de correo cada 15 minutos, uno tras otro.

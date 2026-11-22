@@ -123,7 +123,7 @@ enum GoogleCuenta {
     private static func anotarCorreo(_ cuenta: CuentaNube) {
         llamar(cuenta, "GET", "https://openidconnect.googleapis.com/v1/userinfo") { c, json in
             guard c == 200, let correo = (json as? [String: Any])?["email"] as? String else { return }
-            var cu = cuenta; cu.correo = correo; CuentasNube.actualizar(cu)
+            var cu = cuenta; cu.correo = correo; cu.conectadaEn = Date(); CuentasNube.actualizar(cu)
         }
     }
 
