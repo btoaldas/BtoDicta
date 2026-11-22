@@ -34,6 +34,14 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.90.0
+
+- **Actas de reunión de verdad.** Graba tu voz y la de la videollamada, separa quién
+  habla, toma título e invitados de tu agenda y deja el correo de seguimiento como
+  borrador. También lo pasa a tu gestor documental como memorando borrador.
+- **Beto mira tu pantalla.** Con un modelo con visión entiende tablas, gráficos y
+  errores; si no, lee el texto.
+
 ### Novedades 0.89.0
 
 - **Habla con Beto sin tocar nada.** Confirma de viva voz («sí»; «confirmo» para lo

@@ -631,6 +631,26 @@ no saltan ninguna confirmación. El registro anota cuál se usó en cada pedido.
   números guardados sin código de país toman el de tu región.
 - **Encargos a Claude Code o Codex**: Beto avisa cuando terminan un turno.
 
+### Acta de reunión completa (desde 0.90.0)
+
+- Graba **dos pistas**: tu micrófono y el sonido del equipo (la otra parte de una
+  videollamada, aunque uses audífonos; sin la voz de Beto). Usa el permiso de
+  Grabación de pantalla; sin él, solo el micrófono. Avisa a los participantes.
+- Separa **quién habla** («Persona 1, Persona 2…», o su nombre si se presenta) con
+  ElevenLabs Scribe; sin su clave, transcribe como siempre.
+- Si la reunión estaba en tu **agenda**, toma de ahí el título y los invitados y deja
+  el **correo de seguimiento como borrador** (resumen, acuerdos y tareas). Para
+  enviarlo, «confirmo».
+- «**Pasa el acta a Quipux**» encarga a Claude Code un memorando **borrador** con tu
+  habilidad; nunca lo envía ni lo firma.
+- **Mirar la pantalla**: con un proveedor que tiene modelo con visión (Z.ai
+  `glm-4.6v`, OpenAI), Beto mira la imagen; si no, lee el texto (OCR).
+- **Gmail en modo prueba**: Beto avisa a los 6 días que lo reconectes (se apaga en
+  Ajustes).
+
+Claves nuevas: `agente_acta_sonido_equipo`, `agente_vision_modelo` («-» = solo OCR),
+`google_aviso_reconectar`.
+
 Claves en `config.json`: `agente_graph_activo`, `agente_persona_voz`,
 `arnes_externo_activo`, `arnes_externo_carpetas`, `agente_confirmar_voz`,
 `agente_resumen_manana_activo`, `agente_resumen_manana_hora`, `obsidian_boveda`,

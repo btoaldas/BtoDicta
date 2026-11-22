@@ -8,11 +8,19 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.89.0"
-    static let fecha = "2026-11-21"
+    static let numero = "0.90.0"
+    static let fecha = "2026-11-22"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.90.0", "2026-11-22", [
+            "NUEVO el acta graba también el sonido del equipo (la otra parte de una videollamada) y separa quién habla",
+            "NUEVO el acta toma título e invitados de tu agenda y deja el correo de seguimiento como borrador",
+            "NUEVO «pasa el acta a Quipux»: Claude Code prepara el memorando como borrador con tu habilidad",
+            "NUEVO mirar la pantalla con un modelo que ve (Z.ai glm-4.6v, OpenAI); si no hay, lee el texto",
+            "NUEVO aviso a los 6 días para reconectar Gmail cuando la app de Google está en modo prueba",
+            "MEJORADO el asistente sigue mejor las conversaciones encadenadas («archívalos», «hazlo más formal»)",
+        ]),
         ("0.89.0", "2026-11-21", [
             "NUEVO confirmar de viva voz además del cuadro: «sí» para lo leve y «confirmo» para enviar, papelera, adjuntar, delegar, firmar o comandos; cualquier «no» cancela",
             "NUEVO resumen de la mañana (agenda, correo de todas las cuentas y recordatorios), por voz o a una hora fija",
