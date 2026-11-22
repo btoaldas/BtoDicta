@@ -170,6 +170,9 @@ final class GrabadorSistemaReunion: NSObject, SCStreamOutput, SCStreamDelegate {
     private var ruta: URL?
     private var bytes = 0
     private var conversor: AVAudioConverter?
+    /// Sesión vigente: una captura que termina de arrancar después de «terminó la reunión»
+    /// (o que es de una reunión anterior) se detiene y sus muestras se descartan.
+    private var sesion = UUID()
     private let salida = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true)!
 
     /// Cabecera WAV PCM16 mono 16 kHz para `datos` bytes (pura).
@@ -203,9 +206,19 @@ final class GrabadorSistemaReunion: NSObject, SCStreamOutput, SCStreamDelegate {
                 FileManager.default.createFile(atPath: u.path, contents: Self.cabeceraWAV(datos: 0))
                 let h = try FileHandle(forWritingTo: u)
                 h.seekToEndOfFile()
-                cola.sync { self.archivo = h; self.ruta = u; self.bytes = 0; self.conversor = nil }
+                let mia = UUID()
+                cola.sync { self.archivo = h; self.ruta = u; self.bytes = 0; self.conversor = nil; self.sesion = mia }
                 try await s.startCapture()
-                cola.sync { self.flujo = s }
+                let vigente = cola.sync { () -> Bool in
+                    guard self.sesion == mia else { return false }
+                    self.flujo = s; return true
+                }
+                guard vigente else {
+                    try? await s.stopCapture()
+                    Log.write("reunión: captura del equipo detenida (la reunión terminó mientras arrancaba)")
+                    DispatchQueue.main.async { fin(false) }
+                    return
+                }
                 Log.write("reunión: sonido del equipo en marcha")
                 DispatchQueue.main.async { fin(true) }
             } catch {
@@ -219,7 +232,7 @@ final class GrabadorSistemaReunion: NSObject, SCStreamOutput, SCStreamDelegate {
 
     /// Detiene, cierra el WAV con su tamaño real y devuelve el archivo (nil si quedó vacío).
     func terminar() -> URL? {
-        let s: SCStream? = cola.sync { let f = flujo; flujo = nil; return f }
+        let s: SCStream? = cola.sync { let f = flujo; flujo = nil; sesion = UUID(); return f }
         if let s { Task { try? await s.stopCapture() } }
         return cola.sync {
             defer { archivo = nil; ruta = nil }
@@ -231,7 +244,7 @@ final class GrabadorSistemaReunion: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer muestra: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard type == .audio, let h = archivo, let pcm = convertir(muestra) else { return }
+        guard type == .audio, stream === flujo, let h = archivo, let pcm = convertir(muestra) else { return }
         h.write(pcm); bytes += pcm.count
     }
 
