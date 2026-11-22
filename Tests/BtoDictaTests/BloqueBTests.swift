@@ -95,3 +95,26 @@ final class ActaRealTests: XCTestCase {
         wait(for: [e], timeout: 60)
     }
 }
+
+/// Acta con sonido del equipo (spec 024).
+final class ActaSonidoEquipoTests: XCTestCase {
+    func testCabeceraWAV() {
+        let c = GrabadorSistemaReunion.cabeceraWAV(datos: 32_000)
+        XCTAssertEqual(c.count, 44)
+        XCTAssertEqual(String(decoding: c[0..<4], as: UTF8.self), "RIFF")
+        XCTAssertEqual(String(decoding: c[8..<12], as: UTF8.self), "WAVE")
+        let tam = c[40..<44].withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+        XCTAssertEqual(UInt32(littleEndian: tam), 32_000)
+        let frecuencia = c[24..<28].withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+        XCTAssertEqual(UInt32(littleEndian: frecuencia), 16_000)
+    }
+
+    func testPromptConDosPistas() {
+        let p = ActaReunion.prompt(transcripcion: "yo me encargo del informe", demas: "nosotros vemos el presupuesto")
+        XCTAssertTrue(p.contains("«YO» es el micrófono"))
+        XCTAssertTrue(p.contains("YO:\nyo me encargo del informe"))
+        XCTAssertTrue(p.contains("LOS DEMÁS:\nnosotros vemos el presupuesto"))
+        let solo = ActaReunion.prompt(transcripcion: "hola")
+        XCTAssertFalse(solo.contains("LOS DEMÁS"))
+    }
+}

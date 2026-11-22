@@ -1684,6 +1684,8 @@ struct Config {
     /// Leer correo con Microsoft Graph. Apagado de fábrica: el texto va a la IA.
     /// Código de país para los números de WhatsApp guardados sin él (vacío = el de la región del Mac).
     static func whatsappCodigoPais() -> String { (json()["whatsapp_codigo_pais"] as? String) ?? "" }
+    /// El acta graba también el sonido del equipo (videollamadas). Encendido por defecto.
+    static func actaSonidoEquipo() -> Bool { (json()["agente_acta_sonido_equipo"] as? Bool) ?? true }
     /// Modelo con visión para mirar la pantalla (spec 023); vacío = el del proveedor, «-» = solo OCR.
     static func agenteVisionModelo() -> String { (json()["agente_vision_modelo"] as? String) ?? "" }
     /// Bóveda de Obsidian (spec 021); vacío = la que Obsidian tiene abierta.

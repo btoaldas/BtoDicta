@@ -9726,11 +9726,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 decir("Ya estoy grabando la reunión. Cuando termine, dime «terminó la reunión».", nil); break
             }
             do {
-                _ = try GrabadorReunion.shared.empezar(alTope: { [weak self] in
+                let audio = try GrabadorReunion.shared.empezar(alTope: { [weak self] in
                     self?.terminarReunion(ia: ia, decir: { t, _ in self?.panel.flash(t, segundos: 6) })
                 })
-                decir("Listo, estoy grabando la reunión. Avisa a los participantes que se graba. Cuando termine, dime «terminó la reunión».",
-                      "Empecé a grabar una reunión.")
+                guard Config.actaSonidoEquipo(), #available(macOS 13.0, *) else {
+                    decir("Listo, estoy grabando la reunión con el micrófono. Avisa a los participantes que se graba. Cuando termine, dime «terminó la reunión».",
+                          "Empecé a grabar una reunión.")
+                    break
+                }
+                GrabadorSistemaReunion.shared.empezar(junto: audio) { ok in
+                    decir(ok ? "Listo, estoy grabando la reunión: tu micrófono y el sonido del equipo, para la videollamada. Avisa a los participantes que se graba. Cuando termine, dime «terminó la reunión»."
+                             : "Listo, estoy grabando la reunión con el micrófono; el sonido del equipo no pude, revisa el permiso de Grabación de pantalla. Avisa a los participantes que se graba.",
+                          "Empecé a grabar una reunión\(ok ? " (micrófono y equipo)" : "").")
+                }
             } catch {
                 decir("No pude empezar a grabar. Revisa el permiso del micrófono.", nil)
             }
@@ -9836,16 +9844,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let (audio, minutos) = GrabadorReunion.shared.terminar() else {
             decir("No hay ninguna reunión grabándose. Para empezar, di «graba esta reunión».", nil); return
         }
+        var equipo: URL?
+        if #available(macOS 13.0, *) { equipo = GrabadorSistemaReunion.shared.terminar() }
         if !recorder.isRecording { panel.update("📝 Transcribiendo la reunión (\(minutos) min)…") }
+        // Las dos pistas por separado, una tras otra: «yo» (micrófono) y «los demás» (equipo).
+        let transcribirEquipo: (@escaping (String?) -> Void) -> Void = { listo in
+            guard let equipo else { listo(nil); return }
+            AudioArchivo.transcribir(equipo) { r in
+                if case .success(let (t, _, _)) = r, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { listo(t) } else { listo(nil) }
+            }
+        }
         AudioArchivo.transcribir(audio) { [weak self] r in
             guard let self else { return }
-            guard case .success(let (texto, _, _)) = r, !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            let texto: String = { if case .success(let (t, _, _)) = r { return t }; return "" }()
+            transcribirEquipo { demas in
+            guard !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || demas != nil else {
                 decir("Grabé la reunión, pero no pude transcribirla. El audio quedó en Documentos, BtoDicta, Reuniones.", nil); return
             }
             let txt = audio.deletingPathExtension().appendingPathExtension("txt")
-            try? texto.write(to: txt, atomically: true, encoding: .utf8)
+            let completo = demas.map { "YO (micrófono):\n\(texto)\n\nLOS DEMÁS (sonido del equipo):\n\($0)" } ?? texto
+            try? completo.write(to: txt, atomically: true, encoding: .utf8)
             if !self.recorder.isRecording { self.panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
-            CerebroTexto.pedir(ActaReunion.prompt(transcripcion: texto), ia: ia) { bruto in
+            CerebroTexto.pedir(ActaReunion.prompt(transcripcion: texto, demas: demas), ia: ia) { bruto in
                 guard let acta = bruto.flatMap(ActaReunion.leer) else {
                     decir("Transcribí la reunión, pero no pude armar el acta. La transcripción quedó en Documentos, BtoDicta, Reuniones.", nil)
                     return
@@ -9858,6 +9878,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     decir("Listo, el acta de «\(acta.titulo)»: \(acta.acuerdos.count) acuerdos y \(acta.tareas.count) tareas; anoté las \(mias.count) tuyas.\(donde) ¿Preparo el correo de seguimiento?",
                           "Acta de «\(acta.titulo)» (\(minutos) min). Resumen: \(acta.resumen.prefix(400)) Acuerdos: \(acta.acuerdos.prefix(6).joined(separator: "; ").prefix(500))")
                 }
+            }
             }
         }
     }
