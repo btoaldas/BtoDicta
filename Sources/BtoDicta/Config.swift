@@ -1684,6 +1684,8 @@ struct Config {
     /// Leer correo con Microsoft Graph. Apagado de fábrica: el texto va a la IA.
     /// Código de país para los números de WhatsApp guardados sin él (vacío = el de la región del Mac).
     static func whatsappCodigoPais() -> String { (json()["whatsapp_codigo_pais"] as? String) ?? "" }
+    /// Modelo con visión para mirar la pantalla (spec 023); vacío = el del proveedor, «-» = solo OCR.
+    static func agenteVisionModelo() -> String { (json()["agente_vision_modelo"] as? String) ?? "" }
     /// Bóveda de Obsidian (spec 021); vacío = la que Obsidian tiene abierta.
     static func obsidianBoveda() -> String { (json()["obsidian_boveda"] as? String) ?? "" }
     /// Avisar a los 6 días que hay que reconectar Gmail (apps de Google en modo prueba).

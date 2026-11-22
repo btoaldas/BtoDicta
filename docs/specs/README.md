@@ -35,5 +35,6 @@ otra spec con `Modifica: NNN`.
 | 020 | Pulido del asistente de oficina | Hecha | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 017, 019 | Implementación |
 | 021 | Oficina: Obsidian, WhatsApp, Quipux y actividades | Hecha | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 019, 020 | Implementación |
 | 022 | Acta de reunión, aviso de encargos y seguimiento de correos | Hecha | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 019, 020 | Implementación |
+| 023 | Entender mejor y no fallar (bloque C) | Hecha | P | mejora | 2026-11-21 | Alberto 2026-11-21 | 017, 019, 020 | Implementación |
 
 <!-- sdd:indice:fin -->
