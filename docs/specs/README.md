@@ -37,5 +37,6 @@ otra spec con `Modifica: NNN`.
 | 022 | Acta de reunión, aviso de encargos y seguimiento de correos | Hecha | P | funcionalidad | 2026-11-21 | Alberto 2026-11-21 | 019, 020 | Implementación |
 | 023 | Entender mejor y no fallar (bloque C) | Hecha | P | mejora | 2026-11-21 | Alberto 2026-11-21 | 017, 019, 020 | Implementación |
 | 024 | Acta con el sonido del equipo | Hecha | P | funcionalidad | 2026-11-22 | Alberto 2026-11-22 | 022 | Implementación |
+| 025 | Acta completa: personas, agenda, seguimiento y gestión documental | Hecha | P | funcionalidad | 2026-11-22 | Alberto 2026-11-22 | 022, 024 | Implementación |
 
 <!-- sdd:indice:fin -->

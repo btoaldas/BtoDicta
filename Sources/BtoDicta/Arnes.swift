@@ -165,7 +165,7 @@ enum Arnes {
         - Enviar: enviar_borrador (BtoDicta siempre pide confirmación en pantalla).
         - Archivar correos de la última lista: archivar_correo con sus números o «todos» (siempre con confirmación; no borra).
         - Marcar (leído, no leído, destacado): marcar_correo · mover a una carpeta: mover_correo · papelera: papelera_correo.
-        - Reunión: «graba esta reunión» [herramienta:grabar_reunion]; «terminó la reunión» [herramienta:terminar_reunion] (acta en Word, acuerdos y tareas). Después, el correo de seguimiento con borrador_correo usando el acta de la memoria.
+        - Reunión: «graba esta reunión» [herramienta:grabar_reunion]; «terminó la reunión» [herramienta:terminar_reunion] (acta en Word, acuerdos y tareas; si la reunión estaba en la agenda, deja el correo de seguimiento como borrador). Si no hubo invitados, el correo con borrador_correo usando el acta de la memoria. «Pasa el acta a Quipux»: [herramienta:acta_a_documental].
         - Obsidian: anotar [herramienta:obsidian_anotar]; buscar en las notas [herramienta:obsidian_buscar].
         - WhatsApp: el modo WhatsApp deja el mensaje escrito en la app; lo envía el usuario.
         - Sistemas internos (Quipux, registro de actividades, servidores): [herramienta:delegar_agente] con el encargo completo.

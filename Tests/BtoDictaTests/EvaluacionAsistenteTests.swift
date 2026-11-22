@@ -74,6 +74,7 @@ final class EvaluacionAsistenteTests: XCTestCase {
             (borrador, "Adjúntale el último PDF que bajé", "graph:adjuntar_archivo"),
             (borrador, "Mejor hazlo más formal", "graph:modificar_borrador"),
             (acta, "Sí, prepáralo para ana@ejemplo.org", "graph:borrador_correo"),
+            (acta, "Pásalo a Quipux como memorando", "graph:acta_a_documental"),
         ]
     }()
 

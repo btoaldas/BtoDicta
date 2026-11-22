@@ -9597,7 +9597,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                     "editar_seleccion", "crear_habilidad", "leer_documento", "resumir_pagina",
                                     "abrir_sesion_ia", "firmar_documento", "reproducir_youtube", "delegar_agente",
                                     "resumen_manana", "obsidian_anotar", "obsidian_buscar",
-                                    "grabar_reunion", "terminar_reunion"]
+                                    "grabar_reunion", "terminar_reunion", "acta_a_documental"]
         guard locales.contains(plan.herramienta) else { return false }
         let decir: (String, String?) -> Void = { [weak self] t, memoria in
             guard let self else { return }
@@ -9744,6 +9744,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         case "terminar_reunion":
             terminarReunion(ia: ia, decir: decir)
+        case "acta_a_documental":
+            guard let a = ultimaActa else { decir("No tengo un acta reciente. Primero «graba esta reunión» y luego «terminó la reunión».", nil); break }
+            let sistema = plan.contenido.isEmpty ? "Quipux" : plan.contenido
+            var encargo = "Crea en \(sistema) un memorando como BORRADOR (nunca lo envíes ni lo firmes) con el acta de la reunión «\(a.titulo)». "
+                + "La transcripción está en \(a.txt.path)" + (a.word.map { " y el acta en Word en \($0.path)" } ?? "") + ". "
+                + "Asunto: Acta — \(a.titulo). Si faltan destinatarios, pregúntamelos antes de crearlo."
+            encargo += HabilidadesExternas.sugerencia(para: "\(sistema) memorando borrador")
+            guard autorizarDecisionIA("¿Encargar a Claude Code el memorando en \(sistema)?",
+                                      detalle: encargo + "\n\nQueda como borrador; se abre la Terminal y ahí apruebas cada paso.") else {
+                decir("Vale, no lo encargo.", nil); break
+            }
+            OficinaAgente.abrirSesion(.claudeCode, en: nil, encargo: encargo)
+            decir("Listo, se lo pasé a Claude Code para que haga el memorando borrador en \(sistema). Te aviso cuando termine.",
+                  "Encargué el acta «\(a.titulo)» a \(sistema) como borrador.")
         case "obsidian_anotar":
             guard let b = ObsidianAgente.boveda() else { decir("No encontré tu bóveda de Obsidian. Indícala en Ajustes, Asistente.", nil); break }
             do {
@@ -9839,49 +9853,79 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return true
     }
 
-    /// Detiene la grabación, transcribe, saca el acta con la IA, crea el Word y anota las tareas del usuario.
+    /// Detiene la grabación, transcribe (separando personas), toma título e invitados de la agenda,
+    /// saca el acta con la IA, crea el Word, anota las tareas del usuario y deja el correo de
+    /// seguimiento como BORRADOR para los invitados (nunca lo envía solo).
     private func terminarReunion(ia: ChatIA?, decir: @escaping (String, String?) -> Void) {
+        let inicio = GrabadorReunion.shared.inicio ?? Date()
         guard let (audio, minutos) = GrabadorReunion.shared.terminar() else {
             decir("No hay ninguna reunión grabándose. Para empezar, di «graba esta reunión».", nil); return
         }
+        let finReunion = Date()
         var equipo: URL?
         if #available(macOS 13.0, *) { equipo = GrabadorSistemaReunion.shared.terminar() }
         if !recorder.isRecording { panel.update("📝 Transcribiendo la reunión (\(minutos) min)…") }
-        // Las dos pistas por separado, una tras otra: «yo» (micrófono) y «los demás» (equipo).
-        let transcribirEquipo: (@escaping (String?) -> Void) -> Void = { listo in
-            guard let equipo else { listo(nil); return }
-            AudioArchivo.transcribir(equipo) { r in
-                if case .success(let (t, _, _)) = r, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { listo(t) } else { listo(nil) }
+        let cuenta = CuentasNube.hayDisponible ? CuentasNube.elegir(nil) : nil
+        ActaReunion.transcribir(audio) { [weak self] texto in
+            let siguienteEquipo: (@escaping (String?) -> Void) -> Void = { listo in
+                if let equipo { ActaReunion.transcribir(equipo, fin: listo) } else { listo(nil) }
             }
-        }
-        AudioArchivo.transcribir(audio) { [weak self] r in
-            guard let self else { return }
-            let texto: String = { if case .success(let (t, _, _)) = r { return t }; return "" }()
-            transcribirEquipo { demas in
-            guard !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || demas != nil else {
-                decir("Grabé la reunión, pero no pude transcribirla. El audio quedó en Documentos, BtoDicta, Reuniones.", nil); return
-            }
-            let txt = audio.deletingPathExtension().appendingPathExtension("txt")
-            let completo = demas.map { "YO (micrófono):\n\(texto)\n\nLOS DEMÁS (sonido del equipo):\n\($0)" } ?? texto
-            try? completo.write(to: txt, atomically: true, encoding: .utf8)
-            if !self.recorder.isRecording { self.panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
-            CerebroTexto.pedir(ActaReunion.prompt(transcripcion: texto, demas: demas), ia: ia) { bruto in
-                guard let acta = bruto.flatMap(ActaReunion.leer) else {
-                    decir("Transcribí la reunión, pero no pude armar el acta. La transcripción quedó en Documentos, BtoDicta, Reuniones.", nil)
-                    return
+            siguienteEquipo { demas in
+                guard let self else { return }
+                let yo = texto ?? ""
+                guard !yo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || demas != nil else {
+                    decir("Grabé la reunión, pero no pude transcribirla. El audio quedó en Documentos, BtoDicta, Reuniones.", nil); return
                 }
-                let mias = acta.tareas.filter(\.mia)
-                for t in mias { NotasStore.agregar(tipo: "tarea", texto: t.tarea, fechaObjetivo: t.fecha) }
-                DocumentosAgente.crearDocumento(tipo: "informe", asunto: "Acta — \(acta.titulo)", para: nil, de: nil,
-                                                cuerpo: ActaReunion.cuerpo(acta, minutos: minutos)) { r in
-                    let donde = (try? r.get()).map { " Quedó en Word: \($0.lastPathComponent)." } ?? ""
-                    decir("Listo, el acta de «\(acta.titulo)»: \(acta.acuerdos.count) acuerdos y \(acta.tareas.count) tareas; anoté las \(mias.count) tuyas.\(donde) ¿Preparo el correo de seguimiento?",
-                          "Acta de «\(acta.titulo)» (\(minutos) min). Resumen: \(acta.resumen.prefix(400)) Acuerdos: \(acta.acuerdos.prefix(6).joined(separator: "; ").prefix(500))")
+                let txt = audio.deletingPathExtension().appendingPathExtension("txt")
+                let completo = demas.map { "YO (micrófono):\n\(yo)\n\nLOS DEMÁS (sonido del equipo):\n\($0)" } ?? yo
+                try? completo.write(to: txt, atomically: true, encoding: .utf8)
+                // La agenda da el título y los invitados, si la reunión estaba en el calendario.
+                let conAgenda: (@escaping (EventoGraph?) -> Void) -> Void = { listo in
+                    guard let cuenta else { listo(nil); return }
+                    OperacionesCorreo(cuenta: cuenta).agenda(dias: 1) { r in
+                        listo((try? r.get()).flatMap { ActaReunion.eventoDeLaReunion($0, inicio: inicio, fin: finReunion) })
+                    }
                 }
-            }
+                conAgenda { evento in
+                    if !self.recorder.isRecording { self.panel.pensando(ia: CerebroTexto.etiqueta(ia: ia)) }
+                    CerebroTexto.pedir(ActaReunion.prompt(transcripcion: yo, demas: demas, evento: evento), ia: ia) { bruto in
+                        guard let acta = bruto.flatMap(ActaReunion.leer) else {
+                            decir("Transcribí la reunión, pero no pude armar el acta. La transcripción quedó en Documentos, BtoDicta, Reuniones.", nil)
+                            return
+                        }
+                        let mias = acta.tareas.filter(\.mia)
+                        for t in mias { NotasStore.agregar(tipo: "tarea", texto: t.tarea, fechaObjetivo: t.fecha) }
+                        DocumentosAgente.crearDocumento(tipo: "informe", asunto: "Acta — \(acta.titulo)", para: nil, de: nil,
+                                                        cuerpo: ActaReunion.cuerpo(acta, minutos: minutos)) { r in
+                            let word = try? r.get()
+                            self.ultimaActa = (txt, word, acta.titulo)
+                            let donde = word.map { " Quedó en Word: \($0.lastPathComponent)." } ?? ""
+                            let base = "Listo, el acta de «\(acta.titulo)»: \(acta.acuerdos.count) acuerdos y \(acta.tareas.count) tareas; anoté las \(mias.count) tuyas.\(donde)"
+                            let memoria = "Acta de «\(acta.titulo)» (\(minutos) min). Resumen: \(acta.resumen.prefix(400)) Acuerdos: \(acta.acuerdos.prefix(6).joined(separator: "; ").prefix(500))"
+                            let invitados = (evento?.asistentes ?? []).filter { $0.lowercased() != cuenta?.correo.lowercased() }
+                            guard let cuenta, !invitados.isEmpty else {
+                                decir(base + " ¿Preparo el correo de seguimiento o lo paso a Quipux?", memoria); return
+                            }
+                            self.cuentaCorreo = cuenta
+                            self.opsCorreo.crearBorrador(para: invitados, asunto: "Acta — \(acta.titulo)",
+                                                         cuerpo: ActaReunion.correoSeguimiento(acta)) { rb in
+                                if case .success(let b) = rb {
+                                    self.graphUltimoBorrador = b
+                                    decir(base + " Dejé el correo de seguimiento como borrador para \(invitados.count) invitado(s). ¿Lo envío?",
+                                          memoria + " Borrador de seguimiento para: \(invitados.joined(separator: ", ")).")
+                                } else {
+                                    decir(base + " ¿Preparo el correo de seguimiento?", memoria)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
+
+    /// Acta más reciente (transcripción, Word y título), para pasarla a Quipux.
+    private var ultimaActa: (txt: URL, word: URL?, titulo: String)?
 
     /// Resumen de la mañana: Mac + correo y agenda de todas las cuentas, contado por la IA.
     private func contarResumenManana(ia: ChatIA?, decir: @escaping (String, String?) -> Void) {

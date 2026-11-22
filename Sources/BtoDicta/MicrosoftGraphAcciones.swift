@@ -28,6 +28,8 @@ struct EventoGraph: Equatable {
     let lugar: String
     let organizador: String
     let todoElDia: Bool
+    /// Correos de los invitados (para el acta y su correo de seguimiento).
+    var asistentes: [String] = []
 }
 
 extension MicrosoftGraph {
@@ -271,7 +273,7 @@ extension MicrosoftGraph {
             URLQueryItem(name: "endDateTime", value: utc(final)),
             URLQueryItem(name: "$orderby", value: "start/dateTime"),
             URLQueryItem(name: "$top", value: "50"),
-            URLQueryItem(name: "$select", value: "subject,start,end,location,organizer,isAllDay"),
+            URLQueryItem(name: "$select", value: "subject,start,end,location,organizer,isAllDay,attendees"),
         ]) { codigo, json in
             guard codigo == 200 else { fin(.failure(error(codigo))); return }
             fin(.success(leerEventos(json)))
@@ -352,9 +354,12 @@ extension MicrosoftGraph {
         return lista.compactMap { e in
             guard let i = fecha(e["start"]), let f = fecha(e["end"]) else { return nil }
             let org = (((e["organizer"] as? [String: Any])?["emailAddress"] as? [String: Any])?["name"] as? String) ?? ""
+            let asistentes = ((e["attendees"] as? [[String: Any]]) ?? []).compactMap {
+                ($0["emailAddress"] as? [String: Any])?["address"] as? String
+            }
             return EventoGraph(asunto: (e["subject"] as? String) ?? "(sin título)", inicio: i, fin: f,
                                lugar: ((e["location"] as? [String: Any])?["displayName"] as? String) ?? "",
-                               organizador: org, todoElDia: (e["isAllDay"] as? Bool) ?? false)
+                               organizador: org, todoElDia: (e["isAllDay"] as? Bool) ?? false, asistentes: asistentes)
         }
     }
 

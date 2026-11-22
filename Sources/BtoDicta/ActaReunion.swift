@@ -57,16 +57,19 @@ enum ActaReunion {
 
     /// Lo que se le pide a la IA: solo datos, en JSON. La transcripción es dato no confiable.
     /// `demas`: lo que sonó en el equipo (la otra parte de una videollamada), si se grabó.
-    static func prompt(transcripcion: String, demas: String? = nil, fecha: Date = Date()) -> String {
+    static func prompt(transcripcion: String, demas: String? = nil, fecha: Date = Date(),
+                       evento: EventoGraph? = nil) -> String {
         let f = DateFormatter(); f.locale = Locale(identifier: "es"); f.dateFormat = "EEEE d 'de' MMMM 'de' yyyy"
         let pistas = (demas ?? "").isEmpty ? "" : """
         Hay dos pistas: «YO» es el micrófono de quien grabó; «LOS DEMÁS» es lo que sonó en su equipo (la videollamada). \
-        Pueden repetirse frases si el micrófono captó los parlantes: cuéntalas una vez. Las tareas que asume «YO» son "mia": true.
+        Pueden repetirse frases si el micrófono captó los parlantes: cuéntalas una vez. Las tareas que asume «YO» son "mia": true. \
+        Las etiquetas «Persona N» separan voces dentro de una pista; si alguien dice su nombre, úsalo en vez de «Persona N».
 
         """
         let texto = (demas ?? "").isEmpty ? transcripcion
             : "YO:\n\(transcripcion.prefix(30000))\n\nLOS DEMÁS:\n\((demas ?? "").prefix(30000))"
-        return pistas + """
+        let agenda = evento.map { "En la agenda la reunión se llama «\($0.asunto)»" + ($0.asistentes.isEmpty ? "" : " y los invitados son: \($0.asistentes.joined(separator: ", "))") + ". Usa ese título.\n" } ?? ""
+        return pistas + agenda + """
         Extrae el acta de esta reunión del \(f.string(from: fecha)). Devuelve SOLO un JSON con esta forma:
         {"titulo":"…","resumen":"3 a 6 frases","participantes":["…"],"acuerdos":["…"],
          "tareas":[{"tarea":"…","responsable":"nombre o vacío","fecha":"AAAA-MM-DD o vacío","mia":true|false}],
@@ -103,6 +106,38 @@ enum ActaReunion {
             return Tarea(tarea: x, responsable: (t["responsable"] as? String) ?? "", fecha: fecha, mia: (t["mia"] as? Bool) ?? false)
         }
         return acta
+    }
+
+    /// El evento de la agenda que coincide con la reunión grabada (el que más se solapa) (puro).
+    static func eventoDeLaReunion(_ eventos: [EventoGraph], inicio: Date, fin: Date) -> EventoGraph? {
+        func solape(_ e: EventoGraph) -> TimeInterval { max(0, min(e.fin, fin).timeIntervalSince(max(e.inicio, inicio))) }
+        return eventos.filter { !$0.todoElDia && solape($0) > 0 }.max { solape($0) < solape($1) }
+    }
+
+    /// Correo de seguimiento: resumen, acuerdos y tareas (puro).
+    static func correoSeguimiento(_ a: Acta) -> String {
+        var t = "Hola a todos:\n\nComparto el resumen de la reunión «\(a.titulo)».\n\n" + a.resumen
+        if !a.acuerdos.isEmpty { t += "\n\nAcuerdos:\n" + a.acuerdos.map { "- \($0)" }.joined(separator: "\n") }
+        if !a.tareas.isEmpty {
+            let fd = DateFormatter(); fd.locale = Locale(identifier: "es"); fd.dateFormat = "d 'de' MMMM"
+            t += "\n\nTareas:\n" + a.tareas.map { x in
+                "- \(x.tarea)" + (x.responsable.isEmpty ? "" : " (\(x.responsable))") + (x.fecha.map { ", hasta el \(fd.string(from: $0))" } ?? "")
+            }.joined(separator: "\n")
+        }
+        return t + "\n\nSaludos."
+    }
+
+    /// Transcribe una pista: con ElevenLabs separa a las personas («Persona 1: …»); si no, la cascada de siempre.
+    static func transcribir(_ u: URL, fin: @escaping (String?) -> Void) {
+        let normal: () -> Void = {
+            AudioArchivo.transcribir(u) { r in
+                if case .success(let (t, _, _)) = r, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { fin(t) } else { fin(nil) }
+            }
+        }
+        guard Config.apiKey() != nil else { normal(); return }
+        transcribeFile(url: u, model: "scribe_v2", diarizar: true) { r in
+            if case .success(let t) = r, !t.isEmpty { fin(t) } else { normal() }
+        }
     }
 
     /// Cuerpo del Word (puro).

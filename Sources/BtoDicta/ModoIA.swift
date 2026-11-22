@@ -161,6 +161,7 @@ enum AgenteTerminal {
             + "\n- [herramienta:reproducir_youtube] Poner algo en YouTube y que empiece a sonar (abre el primer video). Úsala SIEMPRE que el usuario nombre YouTube, en vez del modo música. \"contenido\" = qué buscar; \"lugar\" = navegador si lo nombra (Edge, Chrome…)."
             + "\n- [herramienta:grabar_reunion] Empezar a grabar una reunión para sacar el acta («graba esta reunión», «empieza el acta»)."
             + "\n- [herramienta:terminar_reunion] Terminar la reunión que se está grabando y sacar el acta: Word, acuerdos y tareas («terminó la reunión», «haz el acta»)."
+            + "\n- [herramienta:acta_a_documental] Pasar la última acta a un sistema de gestión documental como memorando BORRADOR («pasa el acta a Quipux»). \"contenido\" = el sistema (por defecto Quipux)."
             + "\n- [herramienta:obsidian_anotar] Anotar algo en Obsidian («anota en Obsidian que…»). \"contenido\" = el texto a anotar."
             + "\n- [herramienta:obsidian_buscar] Buscar en las notas de Obsidian del usuario y responder («¿qué decidimos sobre X?», «busca en Obsidian…»). \"contenido\" = palabras clave."
             + "\n- [herramienta:resumen_manana] Resumen del día completo: agenda, correos de todas las cuentas y recordatorios («dame el resumen de la mañana», «¿qué tengo hoy?», «ponme al día»)."
@@ -261,7 +262,7 @@ enum AgenteTerminal {
                                                  "ver_pantalla", "editar_seleccion", "crear_habilidad",
                                                  "leer_documento", "resumir_pagina", "abrir_sesion_ia", "firmar_documento",
                                                  "reproducir_youtube", "delegar_agente", "resumen_manana",
-                                                 "obsidian_anotar", "obsidian_buscar", "grabar_reunion", "terminar_reunion"]
+                                                 "obsidian_anotar", "obsidian_buscar", "grabar_reunion", "terminar_reunion", "acta_a_documental"]
 
     static func planGraph(_ texto: String) -> PlanGraph? {
         guard let a = texto.firstIndex(of: "{"), let b = texto.lastIndex(of: "}"), a < b,

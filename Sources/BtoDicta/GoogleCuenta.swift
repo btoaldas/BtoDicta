@@ -523,8 +523,10 @@ enum GoogleCuenta {
         return items.compactMap { e in
             guard let (i, todo) = f(e["start"]), let (fi, _) = f(e["end"]) else { return nil }
             let org = (e["organizer"] as? [String: Any]).flatMap { ($0["displayName"] as? String) ?? ($0["email"] as? String) } ?? ""
+            let asistentes = ((e["attendees"] as? [[String: Any]]) ?? []).filter { ($0["self"] as? Bool) != true }
+                .compactMap { $0["email"] as? String }
             return EventoGraph(asunto: (e["summary"] as? String) ?? "(sin título)", inicio: i, fin: fi,
-                               lugar: (e["location"] as? String) ?? "", organizador: org, todoElDia: todo)
+                               lugar: (e["location"] as? String) ?? "", organizador: org, todoElDia: todo, asistentes: asistentes)
         }
     }
 

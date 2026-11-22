@@ -53,7 +53,9 @@ func transcribeBatch(wav: CuerpoMultipart.Origen, model: String, completion: @es
 
 /// Transcribe un archivo de disco (audio o video). ElevenLabs acepta muchos
 /// formatos (wav, mp3, m4a, ogg, mp4, mov…) y extrae el audio del video.
-func transcribeFile(url: URL, model: String, completion: @escaping (Result<String, Error>) -> Void) {
+/// `diarizar`: separa a las personas que hablan y devuelve «Persona 1: …» por turnos.
+func transcribeFile(url: URL, model: String, diarizar: Bool = false,
+                    completion: @escaping (Result<String, Error>) -> Void) {
     guard let key = Config.apiKey() else { completion(.failure(ScribeError.sinApiKey)); return }
     guard FileManager.default.fileExists(atPath: url.path) else {
         completion(.failure(ScribeError.http(0, "No se pudo leer el archivo")))
@@ -74,6 +76,7 @@ func transcribeFile(url: URL, model: String, completion: @escaping (Result<Strin
     let boundary = "BtoDicta-\(UUID().uuidString)"
     var campos: [(String, String)] = [("model_id", model), ("language_code", "es"),
                                       ("tag_audio_events", "false")]
+    if diarizar { campos.append(("diarize", "true")) }
     for term in Config.keyterms().prefix(1000) { campos.append(("keyterms", term)) }
     // Desde archivo: transcribir una grabación de horas del historial no tiene
     // por qué cargarla entera en memoria.
@@ -105,8 +108,28 @@ func transcribeFile(url: URL, model: String, completion: @escaping (Result<Strin
                   let text = json["text"] as? String else {
                 completion(.failure(ScribeError.sinTexto)); return
             }
+            if diarizar, let porTurnos = transcripcionPorHablante(json), !porTurnos.isEmpty {
+                completion(.success(porTurnos)); return
+            }
             completion(.success(text.trimmingCharacters(in: .whitespacesAndNewlines)))
         }
     }
 }
 
+
+
+/// Respuesta de Scribe con `diarize` → «Persona 1: …» por turnos (pura). nil si no trae hablantes.
+func transcripcionPorHablante(_ json: [String: Any]) -> String? {
+    guard let palabras = json["words"] as? [[String: Any]] else { return nil }
+    var numeros: [String: Int] = [:]
+    var turnos: [(Int, String)] = []
+    for p in palabras {
+        guard let t = p["text"] as? String, (p["type"] as? String) != "audio_event",
+              let id = p["speaker_id"] as? String else { continue }
+        let n: Int
+        if let ya = numeros[id] { n = ya } else { n = numeros.count + 1; numeros[id] = n }
+        if let u = turnos.last, u.0 == n { turnos[turnos.count - 1].1 += t } else { turnos.append((n, t)) }
+    }
+    guard !numeros.isEmpty else { return nil }
+    return turnos.map { "Persona \($0.0): \($0.1.trimmingCharacters(in: .whitespaces))" }.joined(separator: "\n")
+}
