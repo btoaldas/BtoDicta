@@ -34,6 +34,16 @@ Hecho en Ecuador 🇪🇨 para el español latino — nació porque los dictados
 
 ## Características
 
+### Novedades 0.89.0
+
+- **Habla con Beto sin tocar nada.** Confirma de viva voz («sí»; «confirmo» para lo
+  importante) y la conversación ya no se come tus primeras palabras.
+- **Tu día, resumido.** Agenda, correo de todas tus cuentas y recordatorios cada
+  mañana; tareas desde un correo y avisos si alguien no te responde.
+- **Actas de reunión.** Graba, transcribe y entrega el Word con acuerdos y tareas.
+- **Obsidian y WhatsApp.** Anota y busca en tu bóveda; deja el WhatsApp listo para
+  enviar.
+
 ### Novedades 0.88.0
 
 - **Tu correo, agenda y contactos, de varias cuentas.** Microsoft 365, Outlook.com

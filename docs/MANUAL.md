@@ -610,8 +610,31 @@ que se haga, **se lo encarga a Claude Code** (o a Codex si lo nombras): confirma
 el encargo y la Terminal lo abre, y ahí apruebas cada paso. Son guía, no autoridad:
 no saltan ninguna confirmación. El registro anota cuál se usó en cada pedido.
 
+### Oficina por voz (desde 0.89.0)
+
+- **Confirmar de viva voz**: además del cuadro, Beto pregunta y escucha (reconocimiento
+  local de Apple). Lo leve (archivar, mover, leer una página) acepta «sí»; lo de
+  riesgo (enviar, papelera, adjuntar, delegar, firmar, comandos, mirar la pantalla)
+  solo «confirmo». Cualquier «no» cancela. La primera vez macOS pide el permiso de
+  Reconocimiento de voz.
+- **Resumen de la mañana**: «dame el resumen de la mañana» o a una hora fija
+  (Asistente; apagado de fábrica): agenda, correo de todas las cuentas y recordatorios.
+- **Del correo a la tarea**: «recuérdame responder el último correo el viernes a las 9».
+- **Seguimiento**: «avísame si Paul no me responde hasta el viernes» o «avísame cuando
+  me escriba Ana» (revisa cada 15 min; solo cuenta el remitente exacto).
+- **Acta de reunión**: «graba esta reunión» y «terminó la reunión»: Word con resumen,
+  acuerdos y tareas (las tuyas se anotan solas). Graba el micrófono, hasta 3 horas.
+- **Obsidian**: «anota en Obsidian que…» (solo en `BtoDicta/Notas de voz/`) y «¿qué
+  decidimos sobre…?» (busca con Spotlight; nunca manda a la IA notas de credenciales
+  ni líneas con claves). La bóveda se elige en Asistente o se toma la abierta.
+- **WhatsApp**: deja el mensaje escrito en el chat del contacto; lo envías tú. Los
+  números guardados sin código de país toman el de tu región.
+- **Encargos a Claude Code o Codex**: Beto avisa cuando terminan un turno.
+
 Claves en `config.json`: `agente_graph_activo`, `agente_persona_voz`,
-`arnes_externo_activo`, `arnes_externo_carpetas`. Cuentas en
+`arnes_externo_activo`, `arnes_externo_carpetas`, `agente_confirmar_voz`,
+`agente_resumen_manana_activo`, `agente_resumen_manana_hora`, `obsidian_boveda`,
+`whatsapp_codigo_pais`. Cuentas en
 `~/.btodicta/cuentas.json`; sus sesiones, en el Llavero.
 
 ## 12. Pestaña Acciones

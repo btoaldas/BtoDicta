@@ -8,11 +8,21 @@ import Foundation
 // compara ambas y no publica si difieren.
 
 enum Version {
-    static let numero = "0.88.0"
+    static let numero = "0.89.0"
     static let fecha = "2026-11-21"
 
     /// Historial literal, la más nueva primero. Se muestra en Créditos.
     static let historial: [(version: String, fecha: String, cambios: [String])] = [
+        ("0.89.0", "2026-11-21", [
+            "NUEVO confirmar de viva voz además del cuadro: «sí» para lo leve y «confirmo» para enviar, papelera, adjuntar, delegar, firmar o comandos; cualquier «no» cancela",
+            "NUEVO resumen de la mañana (agenda, correo de todas las cuentas y recordatorios), por voz o a una hora fija",
+            "NUEVO tareas desde un correo y seguimiento: «avísame si X no me responde hasta el viernes»",
+            "NUEVO acta de reunión: graba, transcribe y entrega el Word con resumen, acuerdos y tareas",
+            "NUEVO Obsidian: anotar y buscar en tu bóveda sin mandar a la IA notas de credenciales",
+            "NUEVO aviso cuando Claude Code o Codex terminan un encargo",
+            "ARREGLADO que la conversación perdiera las primeras palabras: el aviso de «te escucho» suena cuando el micrófono ya graba",
+            "ARREGLADO WhatsApp: el chat se abre con el contacto y los números sin código de país funcionan",
+        ]),
         ("0.88.0", "2026-11-21", [
             "NUEVO varias cuentas de correo, agenda y contactos: Microsoft 365, Outlook.com y Gmail (con OAuth oficial), incluido el buzón compartido o delegado de Microsoft. Se eligen por su nombre corto («revisa mi correo Personal»)",
             "NUEVO el asistente lee, busca, redacta, responde y reenvía correos; archiva, marca, mueve, manda a la papelera (nunca borra definitivamente), baja adjuntos a Descargas/BtoDicta y adjunta archivos. Enviar, mover, archivar, papelera y adjuntar se confirman siempre",
