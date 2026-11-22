@@ -58,6 +58,59 @@ final class EvaluacionAsistenteTests: XCTestCase {
         ("Recuerda que mi jefe directo se llama Pedro Gómez", "graph:recordar"),
     ]
 
+    /// Conversaciones encadenadas: lo que el usuario dice DESPUÉS de una acción.
+    static let cadenas: [(contexto: String, pedido: String, esperado: String)] = {
+        let lista = "MEMORIA CORTA DE ESTA CONVERSACIÓN:\nUsuario: léeme los tres últimos de mi correo personal\nBeto: Revisé los 3 correos más recientes. 1) Ana Pérez — Informe trimestral (trae un PDF); 2) Paul — Reunión del lunes; 3) Banco — Estado de cuenta."
+        let borrador = "MEMORIA CORTA DE ESTA CONVERSACIÓN:\nUsuario: escríbele a paul@ejemplo.org que confirmo la reunión del lunes\nBeto: Preparé un borrador para paul@ejemplo.org, asunto «Reunión del lunes». ¿Lo envío o lo cambio?"
+        let acta = "MEMORIA CORTA DE ESTA CONVERSACIÓN:\nUsuario: terminó la reunión\nBeto: Listo, el acta de «Plan de red»: 2 acuerdos y 3 tareas. Acuerdos: cambiar el switch; abrir la VLAN 30. ¿Preparo el correo de seguimiento?"
+        return [
+            (lista, "Archívalos", "graph:archivar_correo"),
+            (lista, "Responde al 2 que mañana lo reviso", "graph:responder_correo"),
+            (lista, "Baja los adjuntos del primero", "graph:adjuntos_correo"),
+            (lista, "Márcalos como leídos", "graph:marcar_correo"),
+            (lista, "Recuérdame contestarle a Ana el lunes a las 9", "graph:correo_a_tarea"),
+            (lista, "Manda el del banco a la papelera", "graph:papelera_correo"),
+            (borrador, "Sí, envíalo", "graph:enviar_borrador"),
+            (borrador, "Adjúntale el último PDF que bajé", "graph:adjuntar_archivo"),
+            (borrador, "Mejor hazlo más formal", "graph:modificar_borrador"),
+            (acta, "Sí, prepáralo para ana@ejemplo.org", "graph:borrador_correo"),
+        ]
+    }()
+
+    func testCadenasConIA() throws {
+        let id = ProcessInfo.processInfo.environment["BTODICTA_IA_REAL"] ?? ""
+        try XCTSkipIf(id.isEmpty)
+        let base = try XCTUnwrap(ChatIA.catalogo.first { $0.id == id })
+        let modelo = ProcessInfo.processInfo.environment["BTODICTA_IA_MODELO"] ?? ""
+        let ia = modelo.isEmpty ? base : base.conModelo(modelo)
+        let caps = CatalogoCapacidades.todas().filter { ["modo", "conexion", "rutina"].contains($0.tipo) && $0.clave != "agente" }
+        Arnes.preparar(catalogo: CatalogoCapacidades.todas())
+        var aciertos = 0
+        for c in Self.cadenas {
+            var obtenido = AgenteEvaluacion.porReglas(c.pedido, graph: true)
+            if obtenido == nil {
+                let e = expectation(description: c.pedido)
+                let p = AgenteTerminal.promptMixto(pedido: c.pedido, contexto: c.contexto,
+                                                   catalogo: CatalogoCapacidades.paraIA(caps), correo: true,
+                                                   arnes: Arnes.contexto(para: c.pedido), memoria: Arnes.memoria())
+                let t0 = Date()
+                RouterGlobalIA.llamarIA(ia, prompt: p, textLen: p.count, plazo: 40) { r in
+                    obtenido = AgenteEvaluacion.porIA(r ?? "", catalogo: caps, texto: c.pedido)
+                    if !AgenteEvaluacion.acierta(obtenido ?? "", esperado: c.esperado) {
+                        print("CADENA CRUDO \(c.pedido): \((r ?? "nil").prefix(300))")
+                    }
+                    print(String(format: "CADENA tiempo %.1f s", Date().timeIntervalSince(t0)))
+                    e.fulfill()
+                }
+                wait(for: [e], timeout: 60)
+            }
+            let ok = AgenteEvaluacion.acierta(obtenido ?? "", esperado: c.esperado)
+            if ok { aciertos += 1 }
+            print("CADENA \(ok ? "✓" : "✗") \(c.pedido) → \(obtenido ?? "-") (esperado \(c.esperado))")
+        }
+        print("CADENA TOTAL \(aciertos)/\(Self.cadenas.count)")
+    }
+
     func testCasosValidos() {
         XCTAssertTrue(AgenteEvaluacion.acierta("regla:volumen", esperado: "regla:volumen"))
         XCTAssertTrue(AgenteEvaluacion.acierta("comando", esperado: "graph:x|comando"))

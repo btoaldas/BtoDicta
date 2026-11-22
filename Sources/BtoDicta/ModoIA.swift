@@ -216,7 +216,7 @@ enum AgenteTerminal {
         - [herramienta:buscar_correo] Buscar en todo el buzón. "contenido" = palabras clave; para un remitente usa from:correo o from:nombre. No pongas palabras de tiempo ("hoy", "esta semana"): para correos recientes usa leer_correo.
         - [herramienta:buscar_persona] Buscar a una persona (contactos frecuentes y directorio). "contenido" = nombre.
         - [herramienta:borrador_correo] Crear un borrador real en la cuenta (carpeta Borradores). "destinatario" = correo o nombre; "asunto"; "contenido" = cuerpo redactado. Para correo de una cuenta conectada usa ESTA herramienta y no la app de correo.
-        - [herramienta:modificar_borrador] Cambiar el último borrador creado. "asunto" y/o "contenido" con la versión completa nueva.
+        - [herramienta:modificar_borrador] Cambiar el último borrador creado. "asunto" y/o "contenido" con la versión completa nueva. Si acabas de preparar un borrador y el usuario pide cambiarlo («hazlo más formal», «cámbiale el asunto», «agrega que…»), usa SIEMPRE esta herramienta, nunca un borrador nuevo.
         - [herramienta:responder_correo] Preparar como borrador la respuesta a un correo de la última lista leída. "numero" = su número en la lista; "contenido" = texto de la respuesta.
         - [herramienta:reenviar_correo] Preparar como borrador el reenvío de un correo de la última lista. "numero"; "destinatario" = correo o nombre; "contenido" = comentario opcional.
         - [herramienta:archivar_correo] Archivar correos de la última lista leída (salen de la bandeja de entrada; no se borran). "contenido" = sus números separados por comas, o «todos». Si no se leyó nada antes, BtoDicta lee la bandeja y el 1 es el más reciente («el último que llegó» = 1). BtoDicta pide confirmación.
@@ -804,7 +804,7 @@ enum ReglasModoTodo {
         // «Recuérdame responder ese correo»: lo decide la IA con el correo (correo_a_tarea).
         let n = PerfilAgente.normalizar(texto)
         if graph, acciones.contains("recordatorios"),
-           ["correo", "mail", "responderle", "me responde", "me escriba", "me conteste", "reunion", "acta"].contains(where: { n.contains($0) }) {
+           ["correo", "mail", "responderle", "contestarle", "me responde", "me escriba", "me conteste", "reunion", "acta"].contains(where: { n.contains($0) }) {
             return false
         }
         return acciones.allSatisfy { precisas.contains($0) }
