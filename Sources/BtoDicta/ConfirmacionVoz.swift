@@ -109,6 +109,11 @@ enum ConfirmacionVoz {
         escucha.alDecidir = { si in
             guard abierto else { return }
             NSApp.stopModal(withCode: si ? .alertFirstButtonReturn : .alertSecondButtonReturn)
+            // stopModal fuera de un evento no cierra hasta el próximo evento: se envía uno vacío.
+            if let e = NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0,
+                                          windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0) {
+                NSApp.postEvent(e, atStart: true)
+            }
         }
         // Escucha solo cuando Beto terminó de preguntar: así no se oye a sí mismo.
         Voz.decir(pregunta + (estricta ? " Di «confirmo» o «no»." : ""), completion: {

@@ -39,9 +39,10 @@ extension MicrosoftGraph {
                        cuerpo: [String: Any]? = nil, cabeceras: [String: String] = [:],
                        fin: @escaping (Int, Any?) -> Void) {
         guard disponible else { DispatchQueue.main.async { fin(-1, nil) }; return }
+        let buzon = cuenta?.buzon   // la de ESTA llamada, aunque otra cambie la cuenta mientras espera
         conToken { token in
             guard let token else { DispatchQueue.main.async { fin(401, nil) }; return }
-            var c = URLComponents(string: "https://graph.microsoft.com/v1.0" + Self.ruta(ruta, buzon: cuenta?.buzon))
+            var c = URLComponents(string: "https://graph.microsoft.com/v1.0" + Self.ruta(ruta, buzon: buzon))
             if !query.isEmpty { c?.queryItems = query }
             guard let url = c?.url else { DispatchQueue.main.async { fin(0, nil) }; return }
             var req = URLRequest(url: url)

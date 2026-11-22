@@ -9876,7 +9876,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Revisa los seguimientos de correo cada 15 minutos, uno tras otro.
     private func vigilarSeguimientos() {
-        let t = Timer(timeInterval: 900, repeats: true) { [weak self] _ in self?.revisarSeguimientos(SeguimientoCorreo.todos()[...]) }
+        let t = Timer(timeInterval: 900, repeats: true) { [weak self] _ in
+            // No se cruza con una operación de correo del usuario en curso.
+            guard let self, !self.agenteActivo, !self.recorder.isRecording else { return }
+            self.revisarSeguimientos(SeguimientoCorreo.todos()[...])
+        }
         RunLoop.main.add(t, forMode: .common)
     }
 
@@ -10018,11 +10022,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             CerebroTexto.pedir(prompt, ia: ia) { [weak self] resultado in
                 guard let self else { return }
                 // Sin caracteres de control ni salto final: en una terminal, un salto ejecutaría.
-                let nuevo = AgenteTerminal.textoSeguroParaPegar(resultado ?? "")
-                guard !nuevo.isEmpty else { decir("No pude editar el texto.", nil); return }
                 let esTerminal = AgenteTerminal.esTerminal(appActiva?.bundleIdentifier)
+                var nuevo = AgenteTerminal.textoSeguroParaPegar(resultado ?? "")
+                // En una terminal cada salto de línea ejecutaría una orden: va en una sola línea.
+                if esTerminal { nuevo = nuevo.components(separatedBy: .newlines).joined(separator: " ") }
+                guard !nuevo.isEmpty else { decir("No pude editar el texto.", nil); return }
                 if esTerminal || Config.agenteIAConfirmacion() == "aprobacion",
-                   !self.autorizarDecisionIA("¿Reemplazar el texto seleccionado?", detalle: String(nuevo.prefix(1200)), leve: true) {
+                   !self.autorizarDecisionIA("¿Reemplazar el texto seleccionado?", detalle: String(nuevo.prefix(1200)), leve: !esTerminal) {
                     decir("Vale, no lo cambio.", nil); return
                 }
                 // La confirmación pudo traer BtoDicta al frente: se devuelve el foco antes de pegar.
@@ -10194,7 +10200,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard let self else { return }
                 // Mover o mandar a la papelera cambia el buzón: se confirma SIEMPRE.
                 let titulo = aPapelera ? "¿Mandar a la papelera \(elegidos.count) correo(s)?" : "¿Mover \(elegidos.count) correo(s) a «\(nombre)»?"
-                guard self.autorizarDecisionIA(titulo, detalle: lista + (aPapelera ? "\n\nSe pueden recuperar desde la papelera; no se borran definitivamente." : ""), leve: !aPapelera) else {
+                // Mover a eliminados, papelera o spam es lo mismo que la papelera: exige «confirmo».
+                let nc = PerfilAgente.normalizar(nombre)
+                let comoPapelera = aPapelera || ["elimin", "deleted", "papelera", "trash", "spam", "junk", "no deseado"].contains { nc.contains($0) }
+                guard self.autorizarDecisionIA(titulo, detalle: lista + (aPapelera ? "\n\nSe pueden recuperar desde la papelera; no se borran definitivamente." : ""), leve: !comoPapelera) else {
                     decir("Vale, no los muevo.", nil); return
                 }
                 self.aplicarEnOrden(elegidos, hechos: 0, token: token,

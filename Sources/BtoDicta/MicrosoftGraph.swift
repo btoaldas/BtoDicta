@@ -104,26 +104,28 @@ enum MicrosoftGraph {
 
     private static func esperarAutorizacion(_ c: CodigoDispositivo, limite: Date,
                                             intervalo: Double? = nil,
+                                            destino: (llavero: String, cliente: String, url: URL?)? = nil,
                                             fin: @escaping (String?) -> Void) {
         let espera = max(2, intervalo ?? c.intervalo)
+        let d = destino ?? (cuentaLlavero, clientID, urlToken)
         DispatchQueue.global().asyncAfter(deadline: .now() + espera) {
             lock.lock(); let sigue = esperandoCodigo; lock.unlock()
             guard sigue else { DispatchQueue.main.async { fin("Conexión cancelada.") }; return }
-            guard Date() < limite, let url = urlToken else {
+            guard Date() < limite, let url = d.url else {
                 DispatchQueue.main.async { fin("El código venció. Vuelve a pulsar Conectar.") }; return
             }
             post(url, ["grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-                       "client_id": clientID, "device_code": c.codigoDispositivo]) { codigo, json in
+                       "client_id": d.cliente, "device_code": c.codigoDispositivo]) { codigo, json in
                 let error = json?["error"] as? String
-                if codigo == 200, let json, guardarTokens(json) {
+                if codigo == 200, let json, guardarTokens(json, llavero: d.llavero) {
                     lock.lock(); esperandoCodigo = false; lock.unlock()
                     Log.write("correo Microsoft: cuenta conectada")
                     anotarCorreoDeLaCuenta()
                     DispatchQueue.main.async { fin(nil) }
                 } else if error == "authorization_pending" {
-                    esperarAutorizacion(c, limite: limite, intervalo: espera, fin: fin)
+                    esperarAutorizacion(c, limite: limite, intervalo: espera, destino: d, fin: fin)
                 } else if error == "slow_down" {
-                    esperarAutorizacion(c, limite: limite, intervalo: espera + 5, fin: fin)
+                    esperarAutorizacion(c, limite: limite, intervalo: espera + 5, destino: d, fin: fin)
                 } else {
                     lock.lock(); esperandoCodigo = false; lock.unlock()
                     DispatchQueue.main.async { fin(mensajeError(json, codigo: codigo)) }
@@ -138,9 +140,10 @@ enum MicrosoftGraph {
     static func leerBandeja(dias: Int, ahora: Date = Date(),
                             fin: @escaping (Result<[CorreoLeido], ErrorGraph>) -> Void) {
         guard disponible else { DispatchQueue.main.async { fin(.failure(.sinCuenta)) }; return }
+        let buzon = cuenta?.buzon
         conToken { token in
             guard let token else { DispatchQueue.main.async { fin(.failure(.sesionVencida)) }; return }
-            guard let url = urlBandeja(dias: dias, ahora: ahora) else {
+            guard let url = urlBandeja(dias: dias, ahora: ahora, buzon: buzon) else {
                 DispatchQueue.main.async { fin(.failure(.respuesta("dirección inválida"))) }; return
             }
             var req = URLRequest(url: url)
@@ -185,25 +188,28 @@ enum MicrosoftGraph {
         }
     }
 
+    /// La cuenta se toma AL EMPEZAR y se usa hasta el final: otra operación (un aviso
+    /// programado) puede cambiar la cuenta elegida mientras esta espera la red.
     static func conToken(_ listo: @escaping (String?) -> Void) {
-        lock.lock(); let a = acceso; lock.unlock()
+        let c = cuenta, llavero = cuentaLlavero, cliente = clientID, scope = alcances(de: c)
+        lock.lock(); let a = accesos[llavero]; lock.unlock()
         if let a, a.vence > Date().addingTimeInterval(60) { listo(a.token); return }
-        guard let refresco = SecretosKeychain.leer(cuenta: cuentaLlavero), let url = urlToken else { listo(nil); return }
-        post(url, ["grant_type": "refresh_token", "client_id": clientID,
-                   "refresh_token": refresco, "scope": alcances(de: cuenta)]) { codigo, json in
-            guard codigo == 200, let json, guardarTokens(json) else { listo(nil); return }
-            lock.lock(); let t = acceso?.token; lock.unlock()
+        guard let refresco = SecretosKeychain.leer(cuenta: llavero), let url = urlToken else { listo(nil); return }
+        post(url, ["grant_type": "refresh_token", "client_id": cliente,
+                   "refresh_token": refresco, "scope": scope]) { codigo, json in
+            guard codigo == 200, let json, guardarTokens(json, llavero: llavero) else { listo(nil); return }
+            lock.lock(); let t = accesos[llavero]?.token; lock.unlock()
             listo(t)
         }
     }
 
     @discardableResult
-    private static func guardarTokens(_ json: [String: Any]) -> Bool {
+    private static func guardarTokens(_ json: [String: Any], llavero: String) -> Bool {
         guard let token = json["access_token"] as? String, !token.isEmpty else { return false }
         let vence = Date().addingTimeInterval((json["expires_in"] as? Double) ?? Double((json["expires_in"] as? Int) ?? 3600))
-        lock.lock(); acceso = (token, vence); lock.unlock()
+        lock.lock(); accesos[llavero] = (token, vence); lock.unlock()
         if let r = json["refresh_token"] as? String, !r.isEmpty {
-            SecretosKeychain.guardar(r, cuenta: cuentaLlavero)
+            SecretosKeychain.guardar(r, cuenta: llavero)
         }
         return true
     }
@@ -232,13 +238,13 @@ enum MicrosoftGraph {
         }.joined(separator: "&")
     }
 
-    static func urlBandeja(dias: Int, ahora: Date) -> URL? {
+    static func urlBandeja(dias: Int, ahora: Date, buzon: String? = nil) -> URL? {
         let d = min(7, max(1, dias))
         // Desde el inicio del día (d-1) días atrás: «ayer y hoy» = 2.
         let inicio = Calendar.current.startOfDay(for: ahora.addingTimeInterval(-Double(d - 1) * 86_400))
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
-        var c = URLComponents(string: "https://graph.microsoft.com/v1.0" + ruta("/me/mailFolders/inbox/messages", buzon: cuenta?.buzon))
+        var c = URLComponents(string: "https://graph.microsoft.com/v1.0" + ruta("/me/mailFolders/inbox/messages", buzon: buzon))
         c?.queryItems = [
             URLQueryItem(name: "$filter", value: "receivedDateTime ge \(f.string(from: inicio))"),
             URLQueryItem(name: "$orderby", value: "receivedDateTime desc"),
